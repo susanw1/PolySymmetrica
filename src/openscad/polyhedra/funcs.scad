@@ -1,3 +1,5 @@
+// Handy functions (and aliases)
+
 function v_add(a, b)   = a + b;
 function v_sub(a, b)   = a - b;
 function v_scale(a, k) = a * k;             // scalar multiplication
