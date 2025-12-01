@@ -46,13 +46,22 @@ module octa_vertices_sym_ir(inter_radius) {
     place_on_vertices_ir(octahedron, inter_radius) children();
 }
 
+// Octahedral edges (edge-based)
+module octa_edges_sym(edge_len) {
+    place_on_edges(octahedron, edge_len) children();
+}
+// Octahedral edges (inter-radius-based)
+module octa_edges_sym_ir(inter_radius) {
+    place_on_edges_ir(octahedron, inter_radius) children();
+}
+
 
 //////
 // TEST DEMOS
 //////
 
 octa_faces_sym_ir(40) {
-    color("yellow") cylinder($fn = 3, r = $ph_facet_radius / 5);
+    color("yellow") cylinder($fn = 3, r = $ph_facet_radius / 2);
     color("green")
         translate([0,0,2-norm($ph_poly_center_local)])
         cylinder(h = norm($ph_poly_center_local), r = 0.5, center = false);
@@ -72,4 +81,8 @@ octa_vertices_sym(40) {
 
 octa_faces_sym(40) {
     face_debug();
+}
+
+octa_edges_sym_ir(40) {
+    color("black") cube([$ph_edge_len/2,1,1], center=true);
 }

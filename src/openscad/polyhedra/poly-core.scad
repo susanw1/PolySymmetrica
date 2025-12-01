@@ -7,7 +7,7 @@ use <edge-mount.scad>
 function poly_verts(poly)      = poly[0];
 function poly_faces(poly)      = poly[1];
 function poly_unit_edge(poly)  = poly[2];
-function poly_e_over_ir(poly) = poly[3];
+function poly_e_over_ir(poly)  = poly[3];
 
 // ---- Generic face-frame helpers ----
 function poly_face_center(poly, fi, scale) =
@@ -63,7 +63,7 @@ module place_on_faces(poly, edge_len) {
 
         face_midradius = norm(center);  // distance from origin to face centre
         rad_vec = [ for (vid = f) norm(verts[vid] * scale - center) ];
-        facet_radius = (rad_vec * [ for (i = [1: len(rad_vec)]) 1 ]) / len(f);
+        facet_radius = sum(rad_vec) / len(rad_vec);
         
         // Vector from face centre to poly centre (which is at world [0,0,0]), expressed in LOCAL coords.
         // World-space vector is -center.
@@ -160,4 +160,75 @@ module place_on_vertices(poly, edge_len) {
 module place_on_vertices_ir(poly, inter_radius) {
     edge_len = inter_radius * poly_e_over_ir(poly);
     place_on_vertices(poly, edge_len) children();
+}
+
+
+
+// Build unique undirected edge list from faces
+function poly_edges(poly) =
+    let(
+        faces = poly_faces(poly),
+        raw_edges = [
+            for (fi = [0 : len(faces)-1]) 
+                let(f = faces[fi])
+                    for (k = [0 : len(f)-1]) 
+                        let(
+                            a = f[k],
+                            b = f[(k+1) % len(f)],
+                            e = (a < b) ? [a, b] : [b, a]
+                        ) e
+        ],
+        uniq_edges = [
+            for (i = [0 : len(raw_edges)-1])
+                let(ei = raw_edges[i])
+                    // include if this is the first occurrence
+                    if (sum([
+                            for (j = [0 : i-1])
+                                edge_equal(raw_edges[j], ei) ? 1 : 0
+                        ]) == 0) ei
+        ]
+    )
+    uniq_edges;
+
+// ---- Place children on all edges of a polyhedron ----
+module place_on_edges(poly, edge_len) {
+
+    scale = edge_len / poly_unit_edge(poly);
+    verts = poly_verts(poly);
+    edges = poly_edges(poly);
+
+    for (ei = [0 : len(edges)-1]) {
+
+        e  = edges[ei];
+        v0 = verts[e[0]] * scale;
+        v1 = verts[e[1]] * scale;
+
+        center = (v0 + v1) / 2;          // edge midpoint (world)
+        ex     = v_norm(v1 - v0);        // along edge
+        ez     = v_norm(center);         // radial, outward from origin
+        ey     = v_cross(ez, ex);        // completes basis
+
+        edge_midradius    = norm(center);
+
+        // vector from edge centre to poly centre in local coords
+        poly_center_local = [
+            v_dot(-center, ex),
+            v_dot(-center, ey),
+            v_dot(-center, ez)
+        ];
+
+        // Metadata for children (edge-local)
+        $ph_edge_idx          = ei;
+        $ph_edge_len          = edge_len;
+        $ph_edge_midradius    = edge_midradius;
+        $ph_poly_center_local = poly_center_local;
+
+        multmatrix(frame_matrix(center, ex, ey, ez))
+            children();
+    }
+}
+
+module place_on_edges_ir(poly, inter_radius) {
+    edge_len = inter_radius * poly_e_over_ir(poly);
+    place_on_edges(poly, edge_len) children();
 }

@@ -45,6 +45,15 @@ module tetra_vertices_sym_ir(inter_radius) {
     place_on_vertices_ir(tetrahedron, inter_radius) children();
 }
 
+// Tetrahedral edges (edge-based)
+module tetra_edges_sym(edge_len) {
+    place_on_edges(tetrahedron, edge_len) children();
+}
+// Tetrahedral edges (inter-radius-based)
+module tetra_edges_sym_ir(inter_radius) {
+    place_on_edges_ir(tetrahedron, inter_radius) children();
+}
+
 //////
 // TEST DEMOS
 //////
