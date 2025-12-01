@@ -65,6 +65,7 @@ function edge_faces_table(faces, edges) =
             ]
     ];  
 
+
 function poly_face_centers_unscaled(poly) =
     let(
         faces = poly_faces(poly),
@@ -90,22 +91,30 @@ function vertex_incident_faces(poly, vi) =
 
 function edges_incident_to_vertex(edges, v) =
     [
-        for (ei = [0 : len(edges)-1])
+        for (ei = [0 : 1 : len(edges)-1])
             let(e = edges[ei])
             if (e[0] == v || e[1] == v) ei
     ];
 
+function find_edge_index(edges, a, b) =
+    let(
+        e = (a < b) ? [a,b] : [b,a],
+        idxs = [for (i = [0 : len(edges)-1]) if (edge_equal(edges[i], e)) i]
+    )
+    idxs[0];   // assume the edge exists
 
-function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
+function next_face_around_vertex1(v, f_cur, f_prev, faces, edges, edge_faces) =
     let(
         incEdges = edges_incident_to_vertex(edges, v),
+
         candidates = [
             for (ei = incEdges)
                 let(ef = edge_faces[ei])
-                // if this edge is between f_cur and some other face:
+                // edge has exactly 2 faces and one is f_cur
                 if (len(ef) == 2 && (ef[0] == f_cur || ef[1] == f_cur))
                     (ef[0] == f_cur ? ef[1] : ef[0])
         ],
+
         filtered = [
             for (cf = candidates)
                 if (cf != f_prev) cf
@@ -113,6 +122,35 @@ function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
     )
     filtered[0];  // there should always be exactly 1 in a convex poly
 
+function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
+    let(
+        f = faces[f_cur],
+        n = len(f),
+
+        // position of v in this face
+        pos = [for (k = [0 : n-1]) if (f[k] == v) k],
+        k0  = pos[0],                 // there should be exactly one
+
+        // the two neighbours of v in this face
+        k_prev = (k0 - 1 + n) % n,
+        k_next = (k0 + 1) % n,
+        v_prev = f[k_prev],
+        v_next = f[k_next],
+
+        // edges (v -> v_next) and (v_prev -> v)
+        ei1 = find_edge_index(edges, v,      v_next),
+        ei2 = find_edge_index(edges, v_prev, v     ),
+
+        ef1 = edge_faces[ei1],
+        ef2 = edge_faces[ei2],
+
+        cand1 = (ef1[0] == f_cur ? ef1[1] : ef1[0]),
+        cand2 = (ef2[0] == f_cur ? ef2[1] : ef2[0]),
+
+        candidates = [cand1, cand2],
+        filtered   = [for (cf = candidates) if (cf != f_prev) cf]
+    )
+    filtered[0];   // in a convex poly this is unique
 
 function faces_around_vertex_rec(v, f_cur, f_prev, f_start,
                                  faces, edges, edge_faces, acc = []) =
@@ -136,7 +174,7 @@ function faces_around_vertex(poly, v, edges, edge_faces) =
         start = inc[0]
     )
     faces_around_vertex_rec(v, start, -1, start, faces, edges, edge_faces);
-    
+
                
 function dual_faces(poly, centers) =
     let(
@@ -186,20 +224,17 @@ function poly_dual(poly) =
     [ centers, faces_orient, unit_e_dual, e_over_ir_dual ];
 
 
-//function dodecahedron() = poly_dual(icosahedron());
+function dodecahedron() = poly_dual(icosahedron());
 function tetrahedron_dual() = poly_dual(tetrahedron());
 function hexahedron() = poly_dual(octahedron());
 
-//// Place something on dodeca faces
-//module dodeca_faces_sym(edge_len) {
-//    place_on_faces(tetrahedron(), edge_len) children();
-//}
 
-color("green") place_on_faces_ir(octahedron(), 30) 
-    circle(r = $ph_facet_radius, $fn = 3);
+translate([100, 0, 0]) place_on_faces_ir(hexahedron(), 30) 
+    circle(r = $ph_facet_radius, $fn = 4);
 
-place_on_faces_ir(hexahedron(), 30) 
-    square( [ $ph_edge_len, $ph_edge_len ], center = true );
+place_on_faces_ir(dodecahedron(), 30) 
+    face_debug();
+//    circle(r = $ph_facet_radius, $fn = 5);
 
 //dodeca_faces_sym(40) {
 //    circle(r = $ph_facet_radius, $fn = 5);

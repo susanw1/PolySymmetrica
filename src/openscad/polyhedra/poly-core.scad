@@ -10,13 +10,28 @@ function poly_unit_edge(poly)  = poly[2];
 function poly_e_over_ir(poly)  = poly[3];
 
 // ---- Generic face-frame helpers ----
+//function poly_face_center(poly, fi, scale) =
+//    let(f  = poly_faces(poly)[fi],
+//        vs = poly_verts(poly),
+//        v0 = vs[f[0]] * scale,
+//        v1 = vs[f[1]] * scale,
+//        v2 = vs[f[2]] * scale)
+//    (v0 + v1 + v2) / 3;
+
 function poly_face_center(poly, fi, scale) =
-    let(f  = poly_faces(poly)[fi],
-        vs = poly_verts(poly),
-        v0 = vs[f[0]] * scale,
-        v1 = vs[f[1]] * scale,
-        v2 = vs[f[2]] * scale)
-    (v0 + v1 + v2) / 3;
+    let(
+        f   = poly_faces(poly)[fi],
+        vs  = poly_verts(poly),
+        xs  = [ for (vid = f) vs[vid][0] * scale ],
+        ys  = [ for (vid = f) vs[vid][1] * scale ],
+        zs  = [ for (vid = f) vs[vid][2] * scale ]
+    )
+    [
+        sum(xs) / len(f),
+        sum(ys) / len(f),
+        sum(zs) / len(f)
+    ];
+
 
 function poly_face_ez(poly, fi, scale) =
     let(f  = poly_faces(poly)[fi],
