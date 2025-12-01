@@ -1,7 +1,7 @@
 use <poly-core.scad>
 
 // ---- Canonical Octahedron (edge length = sqrt(2)) ----
-octahedron = [
+function octahedron() = [
     // verts (index 0)
     [
         [ 1, 0, 0],  // 0
@@ -28,31 +28,31 @@ octahedron = [
 
 // Octahedral faces (edge-based)
 module octa_faces_sym(edge_len) {
-    place_on_faces(octahedron, edge_len) children();
+    place_on_faces(octahedron(), edge_len) children();
 }
 
 // Octahedral faces (inter-radius-based)
 module octa_faces_sym_ir(inter_radius) {
-    place_on_faces_ir(octahedron, inter_radius) children();
+    place_on_faces_ir(octahedron(), inter_radius) children();
 }
 
 // Octahedral vertices (edge-based)
 module octa_vertices_sym(edge_len) {
-    place_on_vertices(octahedron, edge_len) children();
+    place_on_vertices(octahedron(), edge_len) children();
 }
 
 // Octahedral vertices (inter-radius-based)
 module octa_vertices_sym_ir(inter_radius) {
-    place_on_vertices_ir(octahedron, inter_radius) children();
+    place_on_vertices_ir(octahedron(), inter_radius) children();
 }
 
 // Octahedral edges (edge-based)
 module octa_edges_sym(edge_len) {
-    place_on_edges(octahedron, edge_len) children();
+    place_on_edges(octahedron(), edge_len) children();
 }
 // Octahedral edges (inter-radius-based)
 module octa_edges_sym_ir(inter_radius) {
-    place_on_edges_ir(octahedron, inter_radius) children();
+    place_on_edges_ir(octahedron(), inter_radius) children();
 }
 
 

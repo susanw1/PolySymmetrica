@@ -3,7 +3,7 @@ use <poly-core.scad>
 phi = (1 + sqrt(5)) / 2;
 
 // ---- Canonical Icosahedron: edge length = 2 ----
-icosahedron = [
+function icosahedron() = [
 
     // verts (index 0)
     [
@@ -61,36 +61,35 @@ icosahedron = [
     2 / phi
 ];
 
-
 // Icosahedral faces (edge-based)
 module icosa_faces_sym(edge_len) {
-    place_on_faces(icosahedron, edge_len) children();
+    place_on_faces(icosahedron(), edge_len) children();
 }
 
 
 // Icosahedral faces (inter-radius-based)
 module icosa_faces_sym_ir(inter_radius) {
-    place_on_faces_ir(icosahedron, inter_radius) children();
+    place_on_faces_ir(icosahedron(), inter_radius) children();
 }
 
 
 // Icosahedral vertices (edge-based)
 module icosa_vertices_sym(edge_len) {
-    place_on_vertices(icosahedron, edge_len) children();
+    place_on_vertices(icosahedron(), edge_len) children();
 }
 
 // Icosahedral vertices (inter-radius-based)
 module icosa_vertices_sym_ir(inter_radius) {
-    place_on_vertices_ir(icosahedron, inter_radius) children();
+    place_on_vertices_ir(icosahedron(), inter_radius) children();
 }
 
 // Icosahedral edges (edge-based)
 module icosa_edges_sym(edge_len) {
-    place_on_edges(icosahedron, edge_len) children();
+    place_on_edges(icosahedron(), edge_len) children();
 }
 // Icosahedral edges (inter-radius-based)
 module icosa_edges_sym_ir(inter_radius) {
-    place_on_edges_ir(icosahedron, inter_radius) children();
+    place_on_edges_ir(icosahedron(), inter_radius) children();
 }
 
 //////

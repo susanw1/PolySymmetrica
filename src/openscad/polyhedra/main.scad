@@ -22,10 +22,10 @@ use <icosahedron.scad>
 
 difference() {
     N = 3;
-    icosa_faces_sym_ir(30) {
+    tetra_faces_sym_ir(30) {
         regular_polygon_frame(N, $ph_edge_len);
     }
-    icosa_faces_sym_ir(30) {
+    tetra_faces_sym_ir(30) {
         // main facet base
         translate([0, 0, 1]) linear_extrude(height = 5) {
             regular_polygon_2d(N, $ph_edge_len);

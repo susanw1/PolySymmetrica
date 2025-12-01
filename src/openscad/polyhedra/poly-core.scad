@@ -183,7 +183,7 @@ function poly_edges(poly) =
                 let(ei = raw_edges[i])
                     // include if this is the first occurrence
                     if (sum([
-                            for (j = [0 : i-1])
+                            for (j = [0 : 1 : i-1])
                                 edge_equal(raw_edges[j], ei) ? 1 : 0
                         ]) == 0) ei
         ]
