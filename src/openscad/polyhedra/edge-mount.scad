@@ -24,5 +24,11 @@ module regular_polygon_frame(n_vertex, edge_len) {
     } 
 }
 
+module regular_polygon_2d(n_vertex, edge_len) {
+    polygon_rad = calc_radius(n_vertex, edge_len);
+    circle(r = polygon_rad, $fn = n_vertex);
+}
 
 regular_polygon_frame(5, 40);
+
+translate([0,0,0]) regular_polygon_2d(5, 40);

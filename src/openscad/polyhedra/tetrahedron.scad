@@ -25,15 +25,36 @@ tetrahedron = [
     2 * sqrt(2)
 ];
 
+// Tetrahedral faces (edge-based)
 module tetra_faces_sym(edge_len) {
     place_on_faces(tetrahedron, edge_len) children();
 }
 
+// Tetrahedral faces (inter-radius-based)
 module tetra_faces_sym_ir(inter_radius) {
     place_on_faces_ir(tetrahedron, inter_radius) children();
 }
 
-// test demo
-tetra_faces_sym_ir(40) {
-    cylinder($fn = 3, r = $ph_edge_len / 2);
+// Tetrahedral vertices (edge-based)
+module tetra_vertices_sym(edge_len) {
+    place_on_vertices(tetrahedron, edge_len) children();
 }
+
+// Tetrahedral vertices (inter-radius-based)
+module tetra_vertices_sym_ir(inter_radius) {
+    place_on_vertices_ir(tetrahedron, inter_radius) children();
+}
+
+//////
+// TEST DEMOS
+//////
+
+tetra_faces_sym(40) {
+    cylinder($fn = 3, r = $ph_facet_radius);
+}
+
+tetra_vertices_sym(40) {
+    color("red") sphere(5);
+    color("blue") cylinder(h = 10, r = 1, center = false);  // along local +Z
+}
+

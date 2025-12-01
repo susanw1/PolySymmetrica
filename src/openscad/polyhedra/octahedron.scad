@@ -26,16 +26,50 @@ octahedron = [
 ];
 
 
+// Octahedral faces (edge-based)
 module octa_faces_sym(edge_len) {
     place_on_faces(octahedron, edge_len) children();
 }
 
+// Octahedral faces (inter-radius-based)
 module octa_faces_sym_ir(inter_radius) {
     place_on_faces_ir(octahedron, inter_radius) children();
 }
 
+// Octahedral vertices (edge-based)
+module octa_vertices_sym(edge_len) {
+    place_on_vertices(octahedron, edge_len) children();
+}
 
-// test demo
+// Octahedral vertices (inter-radius-based)
+module octa_vertices_sym_ir(inter_radius) {
+    place_on_vertices_ir(octahedron, inter_radius) children();
+}
+
+
+//////
+// TEST DEMOS
+//////
+
 octa_faces_sym_ir(40) {
-    cylinder($fn = 3, r = $ph_edge_len / 2);
+    color("yellow") cylinder($fn = 3, r = $ph_facet_radius / 5);
+    color("green")
+        translate([0,0,2-norm($ph_poly_center_local)])
+        cylinder(h = norm($ph_poly_center_local), r = 0.5, center = false);
+}
+
+octa_vertices_sym(40) {
+    color("red") sphere(5);
+    cylinder(h = 20, r = 2, center = false);  // along local +Z
+}
+
+octa_vertices_sym(40) {
+    // Draw an arrow along +X to show incident-edge direction
+    color("cyan")
+    cube([8,1,1], center=false);
+}
+
+
+octa_faces_sym(40) {
+    face_debug();
 }

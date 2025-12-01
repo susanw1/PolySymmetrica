@@ -62,16 +62,46 @@ icosahedron = [
 ];
 
 
+// Icosahedral faces (edge-based)
 module icosa_faces_sym(edge_len) {
     place_on_faces(icosahedron, edge_len) children();
 }
 
+
+// Icosahedral faces (inter-radius-based)
 module icosa_faces_sym_ir(inter_radius) {
     place_on_faces_ir(icosahedron, inter_radius) children();
 }
 
 
-// test demo
+// Icosahedral vertices (edge-based)
+module icosa_vertices_sym(edge_len) {
+    place_on_vertices(icosahedron, edge_len) children();
+}
+
+// Icosahedral vertices (inter-radius-based)
+module icosa_vertices_sym_ir(inter_radius) {
+    place_on_vertices_ir(icosahedron, inter_radius) children();
+}
+
+//////
+// TEST DEMOS
+//////
+
 icosa_faces_sym_ir(40) {
-    cylinder($fn = 3, r = $ph_edge_len / 2);
+    cylinder($fn = 3, r = $ph_facet_radius );
+
+    color("white") translate([0,0,1])
+        text(str($ph_facet_idx), size = 5, halign="center", valign="center");
+
+    // starts at face centre, points to poly centre
+    color("green")
+        translate([0,0,2-norm($ph_poly_center_local)])
+        cylinder(h = norm($ph_poly_center_local), r = 0.5, center = false);
+}
+
+icosa_vertices_sym_ir(40) {
+    color("blue") cylinder($fn = 5, r = $ph_vert_radius/2);
+    color("red") sphere(5);
+    cylinder(h = 20, r = 2, center = false);  // along local +Z
 }
