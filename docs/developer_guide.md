@@ -1,6 +1,3 @@
-Absolutely — here is the **updated, polished, fully renamed Developer Guide** for **PolySymmetrica**.
----
-
 # **PolySymmetrica – Developer Guide**
 
 *A parametric geometry & symmetry engine for OpenSCAD*
@@ -43,37 +40,41 @@ This enables a wide range of applications:
 * Custom geometric elements attached to any symmetry site
 * Explorations of symmetry, stellation, and polyhedral combinatorics
 
-PolySymmetrica is as much a *research tool* as a *maker tool*.
 
 ---
 
 ## **2. Repository Structure**
 
-A suggested layout for clarity:
-
 ```
 PolySymmetrica/
 │
+├─ README.md
 ├─ src/
-│   ├─ core/
-│   │   ├─ funcs.scad           # vector ops, dot, cross, sum, etc.
-│   │   ├─ placement.scad       # face/edge/vertex placement operators
-│   │   ├─ dual.scad            # poly_dual implementation
-│   │   ├─ descriptors.scad     # tetrahedron(), octahedron(), icosahedron(), etc.
-│   │   └─ util.scad            # centroids, normals, edges, orientation helpers
-│   │
-│   ├─ printers/
-│   │   └─ frame_mounts.scad    # physical connection parts
-│   │
-│   └─ examples/
-│       ├─ show_octahedron.scad
-│       ├─ show_dual_cube.scad
-│       ├─ show_dodecahedron.scad
-│       └─ …
+│   ├─ polysymmetrica/
+│   │   ├─ polysymmetrica.scad      # umbrella include
+│   │   │
+│   │   ├─ core/
+│   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
+│   │   │   ├─ placement.scad       # face/edge/vertex placement
+│   │   │   ├─ duals.scad           # poly_dual and helpers
+│   │   │   └─ util.scad            # (optional future)
+│   │   │
+│   │   ├─ models/
+│   │   │   ├─ tetrahedron.scad
+│   │   │   ├─ octahedron.scad
+│   │   │   ├─ icosahedron.scad
+│   │   │   └─ (future) cube.scad, dodeca.scad, truncations…
+│   │   │
+│   │   └─ examples/
+│   │       ├─ poly-frame/
+│   │       │   ├─ main.scad
+│   │       │   ├─ polygon-sym.scad
+│   │       │   └─ edge-mount.scad
+│   │       └─ (future) demos for duals, placements, truncations
 │
 └─ docs/
-    ├─ developer_guide.md       # **THIS FILE**
-    └─ diagrams/                # optional figures and debug images
+    ├─ developer_guide.md
+    └─ diagrams/
 ```
 
 Each module is deliberately small so that users can take only what they need.
@@ -355,14 +356,3 @@ It is ideal for:
 PolySymmetrica turns the beautiful world of polyhedral geometry into a programmable, extensible toolkit.
 
 ---
-
-If you want next steps:
-
-* polish the README,
-* generate a logo,
-* create example diagrams,
-* implement the truncation operator,
-* or add Archimedean family support,
-
-just let me know!
-
