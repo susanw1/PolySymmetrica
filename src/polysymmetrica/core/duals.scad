@@ -226,12 +226,12 @@ function poly_dual(poly) =
 //
 //
 //translate([100, 0, 0]) place_on_faces_ir(hexahedron(), 30) 
-//    circle(r = $ph_facet_radius, $fn = 4);
+//    circle(r = $ps_facet_radius, $fn = 4);
 //
 //place_on_faces_ir(dodecahedron(), 30) 
 ////    face_debug();
-//    circle(r = $ph_facet_radius, $fn = 5);
+//    circle(r = $ps_facet_radius, $fn = 5);
 //
 ////dodeca_faces_sym(40) {
-////    circle(r = $ph_facet_radius, $fn = 5);
+////    circle(r = $ps_facet_radius, $fn = 5);
 ////}

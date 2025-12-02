@@ -34,7 +34,7 @@ PolySymmetrica is a geometry engine that generates and manipulates polyhedra usi
 * **Fully combinatorial dual operator**
   Works for any convex polyhedron defined in the system.
 
-* **Contextual `$ph_*` variables**
+* **Contextual `$ps_*` variables**
   Child modules automatically receive local coordinate frames and geometry metadata.
 
 ---
@@ -45,14 +45,14 @@ PolySymmetrica is a geometry engine that generates and manipulates polyhedra usi
 use <src/polysymmetrica/polysymmetrica.scad>;
 
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ph_face_poly_radius, $fn = 3);
+    circle(r = $ps_face_poly_radius, $fn = 3);
 ```
 
 Attach geometry to edges:
 
 ```scad
 place_on_edges_ir(icosahedron(), 40)
-    edge_mount($ph_edge_len);
+    edge_mount($ps_edge_len);
 ```
 
 Create dual polyhedra:

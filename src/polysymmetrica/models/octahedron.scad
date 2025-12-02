@@ -61,10 +61,10 @@ module octa_edges_sym_ir(inter_radius) {
 //////
 
 octa_faces_sym_ir(40) {
-    color("yellow") cylinder($fn = 3, r = $ph_facet_radius / 2);
+    color("yellow") cylinder($fn = 3, r = $ps_facet_radius / 2);
     color("green")
-        translate([0,0,2-norm($ph_poly_center_local)])
-        cylinder(h = norm($ph_poly_center_local), r = 0.5, center = false);
+        translate([0,0,2-norm($ps_poly_center_local)])
+        cylinder(h = norm($ps_poly_center_local), r = 0.5, center = false);
 }
 
 octa_vertices_sym(40) {
@@ -84,5 +84,5 @@ octa_faces_sym(40) {
 }
 
 octa_edges_sym_ir(40) {
-    color("black") cube([$ph_edge_len/2,1,1], center=true);
+    color("black") cube([$ps_edge_len/2,1,1], center=true);
 }

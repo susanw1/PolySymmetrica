@@ -78,11 +78,11 @@ module place_on_faces(poly, edge_len) {
         ];
 
         // Per-facet metadata (local-space friendly)
-        $ph_facet_idx        = fi;
-        $ph_edge_len         = edge_len;
-        $ph_face_midradius    = face_midradius;
-        $ph_facet_radius      = facet_radius;
-        $ph_poly_center_local = poly_center_local;
+        $ps_facet_idx        = fi;
+        $ps_edge_len         = edge_len;
+        $ps_face_midradius    = face_midradius;
+        $ps_facet_radius      = facet_radius;
+        $ps_poly_center_local = poly_center_local;
         
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();
@@ -99,7 +99,7 @@ module place_on_faces_ir(poly, inter_radius) {
 module face_debug() {
     // Face index
     color("white") translate([0,0,2])
-        text(str($ph_facet_idx), size=5, halign="center", valign="center");
+        text(str($ps_facet_idx), size=5, halign="center", valign="center");
 
     // Local axes
     color("red")   cube([8,1,1], center=false);
@@ -107,7 +107,7 @@ module face_debug() {
     color("blue")  rotate([0,-90,0]) cube([8,1,1], center=false);
 
     // Radial line to centre
-    color("yellow") cylinder(h = -$ph_poly_center_local[2], r = 0.5, center=false);
+    color("yellow") cylinder(h = -$ps_poly_center_local[2], r = 0.5, center=false);
 }
 
 
@@ -150,10 +150,10 @@ module place_on_vertices(poly, edge_len) {
         vert_radius = norm(center);   // distance from poly centre
 
         // Metadata for children (local-space friendly)
-        $ph_vertex_idx        = vi;
-        $ph_edge_len          = edge_len;
-        $ph_vert_radius       = vert_radius;
-        $ph_poly_center_local = [0, 0, -vert_radius];  // by construction
+        $ps_vertex_idx        = vi;
+        $ps_edge_len          = edge_len;
+        $ps_vert_radius       = vert_radius;
+        $ps_poly_center_local = [0, 0, -vert_radius];  // by construction
 
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();
@@ -222,10 +222,10 @@ module place_on_edges(poly, edge_len) {
         ];
 
         // Metadata for children (edge-local)
-        $ph_edge_idx          = ei;
-        $ph_edge_len          = edge_len;
-        $ph_edge_midradius    = edge_midradius;
-        $ph_poly_center_local = poly_center_local;
+        $ps_edge_idx          = ei;
+        $ps_edge_len          = edge_len;
+        $ps_edge_midradius    = edge_midradius;
+        $ps_poly_center_local = poly_center_local;
 
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();

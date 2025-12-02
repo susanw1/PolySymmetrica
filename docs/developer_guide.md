@@ -25,7 +25,7 @@ It provides:
 * A robust, fully combinatorial **dual operator**
   Which correctly generates convex duals of any polyhedron described in the system.
 
-* A clean mechanism for contextual special variables (`$ph_*`)
+* A clean mechanism for contextual special variables (`$ps_*`)
   allowing child modules to respond to their placement environment.
 
 PolySymmetrica’s design philosophy:
@@ -148,13 +148,13 @@ Each operator:
 
 | Variable               | Meaning                                               |
 | ---------------------- | ----------------------------------------------------- |
-| `$ph_facet_idx`        | Index of the face being placed                        |
-| `$ph_edge_idx`         | Index of the edge                                     |
-| `$ph_vertex_idx`       | Index of the vertex                                   |
-| `$ph_edge_len`         | Edge length after scaling                             |
-| `$ph_face_poly_radius` | Radius of the face polygon                            |
-| `$ph_face_midradius`   | Distance from center to face center                   |
-| `$ph_center_local`     | Vector from face center to poly center (local coords) |
+| `$ps_facet_idx`        | Index of the face being placed                        |
+| `$ps_edge_idx`         | Index of the edge                                     |
+| `$ps_vertex_idx`       | Index of the vertex                                   |
+| `$ps_edge_len`         | Edge length after scaling                             |
+| `$ps_face_poly_radius` | Radius of the face polygon                            |
+| `$ps_face_midradius`   | Distance from center to face center                   |
+| `$ps_center_local`     | Vector from face center to poly center (local coords) |
 
 These make the system extremely expressive.
 
@@ -215,14 +215,14 @@ Tetrahedron is self-dual.
 
 ```scad
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ph_face_poly_radius, $fn = 3);
+    circle(r = $ps_face_poly_radius, $fn = 3);
 ```
 
 ### **5.2 Edge frames on an icosahedron**
 
 ```scad
 place_on_edges_ir(icosahedron(), 40)
-    edge_mount($ph_edge_len);
+    edge_mount($ps_edge_len);
 ```
 
 ### **5.3 Dodecahedron from dual of icosa**
@@ -231,7 +231,7 @@ place_on_edges_ir(icosahedron(), 40)
 d = poly_dual(icosahedron());
 
 place_on_faces_ir(d, 40)
-    circle(r = $ph_face_poly_radius, $fn = 5);
+    circle(r = $ps_face_poly_radius, $fn = 5);
 ```
 
 ### **5.4 Visual debugging: original + dual overlay**
@@ -239,11 +239,11 @@ place_on_faces_ir(d, 40)
 ```scad
 color("green")
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ph_face_poly_radius, $fn = 3);
+    circle(r = $ps_face_poly_radius, $fn = 3);
 
 color("gold")
 place_on_faces_ir(hexahedron(), 60)    // note scaling for vertex/face alignment
-    square([$ph_edge_len, $ph_edge_len], center = true);
+    square([$ps_edge_len, $ps_edge_len], center = true);
 ```
 
 ---
@@ -278,7 +278,7 @@ Planned:
 Just follow the structure of `place_on_faces`:
 
 * compute a frame,
-* set `$ph_*` variables,
+* set `$ps_*` variables,
 * descend into `children()`.
 
 ---
@@ -313,7 +313,7 @@ Confirm:
 
 ### **Child geometry rotated oddly?**
 
-Use `$ph_*` variables (especially `$ph_center_local`) to confirm the local frame orientation.
+Use `$ps_*` variables (especially `$ps_center_local`) to confirm the local frame orientation.
 
 ---
 

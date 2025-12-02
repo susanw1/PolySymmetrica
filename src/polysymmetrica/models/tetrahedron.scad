@@ -57,7 +57,7 @@ module tetra_edges_sym_ir(inter_radius) {
 //////
 
 tetra_faces_sym(40) {
-    cylinder($fn = 3, r = $ph_facet_radius);
+    cylinder($fn = 3, r = $ps_facet_radius);
 }
 
 tetra_vertices_sym(40) {
