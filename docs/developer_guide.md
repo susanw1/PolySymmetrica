@@ -56,8 +56,7 @@ PolySymmetrica/
 │   │   ├─ core/
 │   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
 │   │   │   ├─ placement.scad       # face/edge/vertex placement
-│   │   │   ├─ duals.scad           # poly_dual and helpers
-│   │   │   └─ util.scad            # (optional future)
+│   │   │   └─ duals.scad           # poly_dual and helpers
 │   │   │
 │   │   ├─ models/
 │   │   │   ├─ tetrahedron.scad
@@ -71,6 +70,7 @@ PolySymmetrica/
 │   │       │   ├─ polygon-sym.scad
 │   │       │   └─ edge-mount.scad
 │   │       └─ (future) demos for duals, placements, truncations
+│   └─ tests/...
 │
 └─ docs/
     ├─ developer_guide.md
