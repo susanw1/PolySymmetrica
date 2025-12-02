@@ -1,3 +1,9 @@
+// ---------------------------------------------------------------------------
+// PolySymmetrica - Polyhedral Geometry Engine
+// Version: 0.1.0
+// Copyright 2025 Susan Witts
+// SPDX-License-Identifier: MIT
+
 use <../core/placement.scad>
 
 // ---- Canonical Octahedron (edge length = sqrt(2)) ----
@@ -26,63 +32,33 @@ function octahedron() = [
 ];
 
 
-// Octahedral faces (edge-based)
-module octa_faces_sym(edge_len) {
-    place_on_faces(octahedron(), edge_len) children();
-}
-
-// Octahedral faces (inter-radius-based)
-module octa_faces_sym_ir(inter_radius) {
-    place_on_faces_ir(octahedron(), inter_radius) children();
-}
-
-// Octahedral vertices (edge-based)
-module octa_vertices_sym(edge_len) {
-    place_on_vertices(octahedron(), edge_len) children();
-}
-
-// Octahedral vertices (inter-radius-based)
-module octa_vertices_sym_ir(inter_radius) {
-    place_on_vertices_ir(octahedron(), inter_radius) children();
-}
-
-// Octahedral edges (edge-based)
-module octa_edges_sym(edge_len) {
-    place_on_edges(octahedron(), edge_len) children();
-}
-// Octahedral edges (inter-radius-based)
-module octa_edges_sym_ir(inter_radius) {
-    place_on_edges_ir(octahedron(), inter_radius) children();
-}
-
-
 //////
 // TEST DEMOS
 //////
 
-octa_faces_sym_ir(40) {
+place_on_faces_ir(octahedron(), 40) {
     color("yellow") cylinder($fn = 3, r = $ps_facet_radius / 2);
     color("green")
         translate([0,0,2-norm($ps_poly_center_local)])
         cylinder(h = norm($ps_poly_center_local), r = 0.5, center = false);
 }
 
-octa_vertices_sym(40) {
+place_on_vertices(octahedron(), 40) {
     color("red") sphere(5);
     cylinder(h = 20, r = 2, center = false);  // along local +Z
 }
 
-octa_vertices_sym(40) {
+place_on_vertices(octahedron(), 40) {
     // Draw an arrow along +X to show incident-edge direction
     color("cyan")
     cube([8,1,1], center=false);
 }
 
 
-octa_faces_sym(40) {
+place_on_faces(octahedron(), 40) {
     face_debug();
 }
 
-octa_edges_sym_ir(40) {
+place_on_edges_ir(octahedron(), 40) {
     color("black") cube([$ps_edge_len/2,1,1], center=true);
 }

@@ -42,7 +42,8 @@ PolySymmetrica is a geometry engine that generates and manipulates polyhedra usi
 ## 🔶 Quick Start
 
 ```scad
-use <src/polysymmetrica/polysymmetrica.scad>;
+use <polysymmetrica/core/placement.scad>
+use <polysymmetrica/models/octahedron.scad>
 
 place_on_faces_ir(octahedron(), 30)
     circle(r = $ps_face_poly_radius, $fn = 3);
@@ -51,14 +52,19 @@ place_on_faces_ir(octahedron(), 30)
 Attach geometry to edges:
 
 ```scad
+use <polysymmetrica/core/placement.scad>
+use <polysymmetrica/models/icosahedron.scad>
+
 place_on_edges_ir(icosahedron(), 40)
-    edge_mount($ps_edge_len);
+    cube([$ps_edge_len, 1, 1], center = true);
 ```
 
 Create dual polyhedra:
 
 ```scad
 dual_dodeca = poly_dual(icosahedron());
+place_on_edges_ir(dual_dodeca, 40)
+    cube([$ps_edge_len, 1, 1], center = true);
 ```
 
 ---
@@ -70,7 +76,6 @@ src/polysymmetrica/
     core/        # math, placement, duals
     models/      # tetra, octa, icosa…
     examples/    # 3D printable frames
-    polysymmetrica.scad
 docs/
     developer_guide.md
 ```

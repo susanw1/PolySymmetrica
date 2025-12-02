@@ -1,58 +1,5 @@
 use <funcs.scad>
 
-// ---- Poly descriptor accessors ----
-function poly_verts(poly)      = poly[0];
-function poly_faces(poly)      = poly[1];
-function poly_unit_edge(poly)  = poly[2];
-function poly_e_over_ir(poly)  = poly[3];
-
-// ---- Generic face-frame helpers ----
-function poly_face_center(poly, fi, scale) =
-    let(
-        f   = poly_faces(poly)[fi],
-        vs  = poly_verts(poly),
-        xs  = [ for (vid = f) vs[vid][0] * scale ],
-        ys  = [ for (vid = f) vs[vid][1] * scale ],
-        zs  = [ for (vid = f) vs[vid][2] * scale ]
-    )
-    [
-        sum(xs) / len(f),
-        sum(ys) / len(f),
-        sum(zs) / len(f)
-    ];
-
-
-function poly_face_ez(poly, fi, scale) =
-    let(f  = poly_faces(poly)[fi],
-        vs = poly_verts(poly),
-        v0 = vs[f[0]] * scale,
-        v1 = vs[f[1]] * scale,
-        v2 = vs[f[2]] * scale)
-    v_norm(v_cross(v1 - v0, v2 - v0));   // outward normal
-
-
-function poly_face_ex(poly, fi, scale) =
-    let(f      = poly_faces(poly)[fi],
-        vs     = poly_verts(poly),
-        center = poly_face_center(poly, fi, scale),
-        v0     = vs[f[0]] * scale)
-    v_norm(v0 - center);   // local +X points to vertex 0
-
-function poly_face_ey(poly, fi, scale) =
-    v_cross(
-        poly_face_ez(poly, fi, scale),
-        poly_face_ex(poly, fi, scale)
-    );
-
-function frame_matrix(center, ex, ey, ez) = [
-    [ex[0], ey[0], ez[0], center[0]],
-    [ex[1], ey[1], ez[1], center[1]],
-    [ex[2], ey[2], ez[2], center[2]],
-    [0,      0,     0,     1]
-];
-
-
-
 // ---- Generic face-placement driver ----
 module place_on_faces(poly, edge_len) {
     scale = edge_len / poly_unit_edge(poly);
@@ -95,34 +42,6 @@ module place_on_faces_ir(poly, inter_radius) {
     place_on_faces(poly, edge_len) children();
 }
 
-
-module face_debug() {
-    // Face index
-    color("white") translate([0,0,2])
-        text(str($ps_facet_idx), size=5, halign="center", valign="center");
-
-    // Local axes
-    color("red")   cube([8,1,1], center=false);
-    color("green") rotate([0,0,90]) cube([8,1,1], center=false);
-    color("blue")  rotate([0,-90,0]) cube([8,1,1], center=false);
-
-    // Radial line to centre
-    color("yellow") cylinder(h = -$ps_poly_center_local[2], r = 0.5, center=false);
-}
-
-
-
-// Return index of some neighbour vertex of vi (from the face list)
-function poly_vertex_neighbor(poly, vi) =
-    let(
-        faces = poly_faces(poly),
-        // collect "next" vertex after vi in any face that contains it
-        candidates = [
-            for (f = faces)
-                for (k = [0 : len(f)-1])
-                    if (f[k] == vi) f[(k+1) % len(f)]
-        ]
-    ) candidates[0];  // first one is enough
 
 // ---- Place children on all vertices of a polyhedron ----
 module place_on_vertices(poly, edge_len) {
@@ -236,3 +155,21 @@ module place_on_edges_ir(poly, inter_radius) {
     edge_len = inter_radius * poly_e_over_ir(poly);
     place_on_edges(poly, edge_len) children();
 }
+
+
+module face_debug() {
+    // Face index
+    color("white") translate([0,0,2])
+        text(str($ps_facet_idx), size=5, halign="center", valign="center");
+
+    // Local axes
+    color("red")   cube([8,1,1], center=false);
+    color("green") rotate([0,0,90]) cube([8,1,1], center=false);
+    color("blue")  rotate([0,-90,0]) cube([8,1,1], center=false);
+
+    // Radial line to centre
+    color("yellow") cylinder(h = -$ps_poly_center_local[2], r = 0.5, center=false);
+}
+
+
+

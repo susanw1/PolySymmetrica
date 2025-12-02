@@ -1,3 +1,9 @@
+// ---------------------------------------------------------------------------
+// PolySymmetrica - Polyhedral Geometry Engine
+// Version: 0.1.0
+// Copyright 2025 Susan Witts
+// SPDX-License-Identifier: MIT
+
 use <../core/placement.scad>
 
 phi = (1 + sqrt(5)) / 2;
@@ -61,69 +67,41 @@ function icosahedron() = [
     2 / phi
 ];
 
-// Icosahedral faces (edge-based)
-module icosa_faces_sym(edge_len) {
-    place_on_faces(icosahedron(), edge_len) children();
-}
 
-
-// Icosahedral faces (inter-radius-based)
-module icosa_faces_sym_ir(inter_radius) {
-    place_on_faces_ir(icosahedron(), inter_radius) children();
-}
-
-
-// Icosahedral vertices (edge-based)
-module icosa_vertices_sym(edge_len) {
-    place_on_vertices(icosahedron(), edge_len) children();
-}
-
-// Icosahedral vertices (inter-radius-based)
-module icosa_vertices_sym_ir(inter_radius) {
-    place_on_vertices_ir(icosahedron(), inter_radius) children();
-}
-
-// Icosahedral edges (edge-based)
-module icosa_edges_sym(edge_len) {
-    place_on_edges(icosahedron(), edge_len) children();
-}
-// Icosahedral edges (inter-radius-based)
-module icosa_edges_sym_ir(inter_radius) {
-    place_on_edges_ir(icosahedron(), inter_radius) children();
-}
-
-//////
+////////////////////////////////////////////////////////////////////////
 // TEST DEMOS
 //////
 
-//icosa_faces_sym_ir(40) {
-//    cylinder($fn = 3, r = $ps_facet_radius );
-//
-//    color("white") translate([0,0,1])
-//        text(str($ps_facet_idx), size = 5, halign="center", valign="center");
-//
-//    // starts at face centre, points to poly centre
-//    color("green")
-//        translate([0,0,2-norm($ps_poly_center_local)])
-//        cylinder(h = norm($ps_poly_center_local), r = 0.5, center = false);
-//}
-//
-//icosa_vertices_sym_ir(40) {
-//    color("blue") cylinder($fn = 5, r = $ps_vert_radius/2);
-//    color("red") sphere(5);
-//    cylinder(h = 20, r = 2, center = false);  // along local +Z
-//}
+place_on_faces_ir(icosahedron(), 40) {
+    cylinder($fn = 3, r = $ps_facet_radius );
 
-icosa_faces_sym_ir(40) {
+    color("white") translate([0,0,1])
+        text(str($ps_facet_idx), size = 5, halign="center", valign="center");
+
+    // starts at face centre, points to poly centre
+    color("green")
+        translate([0,0,2-norm($ps_poly_center_local)])
+        cylinder(h = norm($ps_poly_center_local), r = 0.5, center = false);
+}
+
+place_on_vertices_ir(icosahedron(), 40) {
+    color("blue") cylinder($fn = 5, r = $ps_vert_radius/2);
+    color("red") sphere(5);
+    cylinder(h = 10, r = 2, center = false);  // along local +Z
+}
+
+place_on_faces_ir(icosahedron(), 40) {
     cylinder($fn = 3, r = $ps_facet_radius);
 }
 
-icosa_vertices_sym_ir(40) {
+place_on_vertices_ir(icosahedron(), 40) {
     color("blue") cylinder($fn = 5, r = $ps_vert_radius/3);
-    color("white") translate([0,0,1])
+    color("pink") translate([0,0,10])
         text(str($ps_vertex_idx), size = 5, halign="center", valign="center");
 }
 
-icosa_edges_sym_ir(50) {
+place_on_edges_ir(icosahedron(), 50) {
     color("black") sphere(r=3);
+    color("gray") translate([0,0,3])
+        text(str($ps_edge_idx), size = 5, halign="center", valign="center");
 }

@@ -32,3 +32,5 @@ module regular_polygon_2d(n_vertex, edge_len) {
 regular_polygon_frame(5, 40);
 
 translate([0,0,0]) regular_polygon_2d(5, 40);
+
+translate([100,0,0]) edge_mount(40);

@@ -51,8 +51,6 @@ PolySymmetrica/
 ├─ README.md
 ├─ src/
 │   ├─ polysymmetrica/
-│   │   ├─ polysymmetrica.scad      # umbrella include
-│   │   │
 │   │   ├─ core/
 │   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
 │   │   │   ├─ placement.scad       # face/edge/vertex placement
@@ -146,15 +144,15 @@ Each operator:
 * aligns child geometry accordingly,
 * exposes special contextual variables:
 
-| Variable               | Meaning                                               |
-| ---------------------- | ----------------------------------------------------- |
-| `$ps_facet_idx`        | Index of the face being placed                        |
-| `$ps_edge_idx`         | Index of the edge                                     |
-| `$ps_vertex_idx`       | Index of the vertex                                   |
-| `$ps_edge_len`         | Edge length after scaling                             |
-| `$ps_face_poly_radius` | Radius of the face polygon                            |
-| `$ps_face_midradius`   | Distance from center to face center                   |
-| `$ps_center_local`     | Vector from face center to poly center (local coords) |
+| Variable                | Meaning                                                     |
+| ----------------------  | ----------------------------------------------------------- |
+| `$ps_facet_idx`         | Index of the face being placed                              |
+| `$ps_edge_idx`          | Index of the edge                                           |
+| `$ps_vertex_idx`        | Index of the vertex                                         |
+| `$ps_edge_len`          | Edge length after scaling                                   |
+| `$ps_facet_radius`      | Radius of the face polygon                                  |
+| `$ps_face_midradius`    | Distance from center to face center                         |
+| `$ps_poly_center_local` | Vector from face center to polyhedral center (local coords) |
 
 These make the system extremely expressive.
 
@@ -231,7 +229,7 @@ place_on_edges_ir(icosahedron(), 40)
 d = poly_dual(icosahedron());
 
 place_on_faces_ir(d, 40)
-    circle(r = $ps_face_poly_radius, $fn = 5);
+    circle(r = $ps_facet_radius, $fn = 5);
 ```
 
 ### **5.4 Visual debugging: original + dual overlay**
