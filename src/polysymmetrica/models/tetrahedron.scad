@@ -1,4 +1,4 @@
-use <poly-core.scad>
+use <../core/placement.scad>
 
 // ---- Canonical Tetrahedron (edge length = 2*sqrt(2)) ----
 function tetrahedron() = [

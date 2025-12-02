@@ -1,7 +1,7 @@
 use <edge-mount.scad>
-use <tetrahedron.scad>
-use <octahedron.scad>
-use <icosahedron.scad>
+use <../../models/tetrahedron.scad>
+use <../../models/octahedron.scad>
+use <../../models/icosahedron.scad>
 
 
 //translate([-100, 0, 0])

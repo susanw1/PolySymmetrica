@@ -1,7 +1,4 @@
 use <funcs.scad>
-use <polygon-sym.scad>
-use <edge-mount.scad>
-
 
 // ---- Poly descriptor accessors ----
 function poly_verts(poly)      = poly[0];
@@ -10,14 +7,6 @@ function poly_unit_edge(poly)  = poly[2];
 function poly_e_over_ir(poly)  = poly[3];
 
 // ---- Generic face-frame helpers ----
-//function poly_face_center(poly, fi, scale) =
-//    let(f  = poly_faces(poly)[fi],
-//        vs = poly_verts(poly),
-//        v0 = vs[f[0]] * scale,
-//        v1 = vs[f[1]] * scale,
-//        v2 = vs[f[2]] * scale)
-//    (v0 + v1 + v2) / 3;
-
 function poly_face_center(poly, fi, scale) =
     let(
         f   = poly_faces(poly)[fi],

@@ -1,4 +1,4 @@
-use <poly-core.scad>
+use <../core/placement.scad>
 
 // ---- Canonical Octahedron (edge length = sqrt(2)) ----
 function octahedron() = [

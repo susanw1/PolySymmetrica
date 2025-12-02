@@ -1,4 +1,4 @@
-use <funcs.scad>
+use <../../core/funcs.scad>
 use <polygon-sym.scad>
 
 EDGE_DIAM = 5;

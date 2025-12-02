@@ -1,9 +1,5 @@
 use <funcs.scad>
-use <poly-core.scad>
-use <tetrahedron.scad>
-use <octahedron.scad>
-use <icosahedron.scad>
-
+use <placement.scad>
 
 // Ensure face orientation so normal points outward (centroid·normal > 0)
 function orient_face_outward(verts, f) =
@@ -224,18 +220,18 @@ function poly_dual(poly) =
     [ centers, faces_orient, unit_e_dual, e_over_ir_dual ];
 
 
-function dodecahedron() = poly_dual(icosahedron());
-function tetrahedron_dual() = poly_dual(tetrahedron());
-function hexahedron() = poly_dual(octahedron());
-
-
-translate([100, 0, 0]) place_on_faces_ir(hexahedron(), 30) 
-    circle(r = $ph_facet_radius, $fn = 4);
-
-place_on_faces_ir(dodecahedron(), 30) 
-    face_debug();
+//function dodecahedron() = poly_dual(icosahedron());
+//function tetrahedron_dual() = poly_dual(tetrahedron());
+//function hexahedron() = poly_dual(octahedron());
+//
+//
+//translate([100, 0, 0]) place_on_faces_ir(hexahedron(), 30) 
+//    circle(r = $ph_facet_radius, $fn = 4);
+//
+//place_on_faces_ir(dodecahedron(), 30) 
+////    face_debug();
 //    circle(r = $ph_facet_radius, $fn = 5);
-
-//dodeca_faces_sym(40) {
-//    circle(r = $ph_facet_radius, $fn = 5);
-//}
+//
+////dodeca_faces_sym(40) {
+////    circle(r = $ph_facet_radius, $fn = 5);
+////}

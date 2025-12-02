@@ -1,4 +1,4 @@
-use <poly-core.scad>
+use <../core/placement.scad>
 
 phi = (1 + sqrt(5)) / 2;
 

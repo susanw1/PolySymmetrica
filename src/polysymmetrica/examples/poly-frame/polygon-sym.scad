@@ -1,4 +1,4 @@
-use <funcs.scad>
+use <../../core/funcs.scad>
 
 /**
 Applies polygonal symmetry to the supplied children in the X-Y plane. The child objects are repeated to create an instance per vertex and rotating each so their X-axis points along the edge. 
