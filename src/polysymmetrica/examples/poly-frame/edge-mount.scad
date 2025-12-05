@@ -3,6 +3,7 @@ use <polygon-sym.scad>
 
 EDGE_DIAM = 5;
 EDGE_KEEL = 5;
+EDGE_KEEL_IN = 2;
 EDGE_KEEL_T = 2;
 
 $fn = 20;
@@ -13,8 +14,8 @@ module edge_mount(len, edge_diam = EDGE_DIAM) {
         sphere(d = edge_diam);
         translate([len, 0, 0]) sphere(d = edge_diam);
     }
-    translate([EDGE_KEEL-1, -EDGE_KEEL_T/2, -EDGE_KEEL]) 
-        cube([len-EDGE_KEEL*2+2, EDGE_KEEL_T, EDGE_KEEL]);
+    translate([EDGE_KEEL_IN-1, -EDGE_KEEL_T/2, -EDGE_KEEL]) 
+        cube([len-EDGE_KEEL_IN*2+2, EDGE_KEEL_T, EDGE_KEEL]);
 }
 
 module regular_polygon_frame(n_vertex, edge_len) {

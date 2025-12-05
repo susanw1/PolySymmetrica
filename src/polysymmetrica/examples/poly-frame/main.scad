@@ -7,6 +7,7 @@ use <edge-mount.scad>
 use <../../core/duals.scad>
 
 
+
 // triangular-faced regular polyhedra 
 translate([-100, 0, 0])
 place_on_faces_ir(tetrahedron(), 30) {
@@ -36,13 +37,14 @@ place_on_faces_ir(poly_dual(icosahedron()), 30) {
     regular_polygon_frame(5, $ps_edge_len);
 }
 
-
+//d = poly_dual(octahedron());
+//
 //difference() {
-//    N = 3;
-//    place_on_faces_ir(tetrahedron(), 30) {
+//    N = 4;
+//    place_on_faces_ir(d, 30) {
 //        regular_polygon_frame(N, $ps_edge_len);
 //    }
-//    place_on_faces_ir(tetrahedron(), 30) {
+//    place_on_faces_ir(d, 30) {
 //        // main facet base
 //        translate([0, 0, 1]) linear_extrude(height = 5) {
 //            regular_polygon_2d(N, $ps_edge_len);

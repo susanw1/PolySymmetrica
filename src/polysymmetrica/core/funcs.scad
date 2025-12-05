@@ -79,7 +79,29 @@ function poly_vertex_neighbor(poly, vi) =
     ) candidates[0];  // first one is enough
 
 
-
+// Internal: build unique undirected edges from a face list
+function _ps_edges_from_faces(faces) =
+    let(
+        raw_edges = [
+            for (fi = [0 : len(faces)-1])
+                let(f = faces[fi])
+                    for (k = [0 : len(f)-1])
+                        let(
+                            a = f[k],
+                            b = f[(k+1) % len(f)],
+                            e = (a < b) ? [a,b] : [b,a]
+                        ) e
+        ],
+        uniq_edges = [
+            for (i = [0 : len(raw_edges)-1])
+                let(ei = raw_edges[i])
+                    if (sum([
+                            for (j = [0 : 1 : i-1])
+                                edge_equal(raw_edges[j], ei) ? 1 : 0
+                        ]) == 0) ei
+        ]
+    )
+    uniq_edges;
 
 // ---- Generic face-frame helpers ----
 function poly_face_center(poly, fi, scale) =

@@ -37,9 +37,9 @@ function octahedron() = [
 //////
 
 place_on_faces_ir(octahedron(), 40) {
-    color("yellow") cylinder($fn = 3, r = $ps_facet_radius / 2);
+    color("yellow") cylinder($fn = 3, r = $ps_facet_radius / 4);
     color("green")
-        translate([0,0,2-norm($ps_poly_center_local)])
+        translate([0,0,1-norm($ps_poly_center_local)])
         cylinder(h = norm($ps_poly_center_local), r = 0.5, center = false);
 }
 

@@ -16,7 +16,7 @@ module place_on_faces(poly, edge_len) {
         rad_vec = [ for (vid = f) norm(verts[vid] * scale - center) ];
         facet_radius = sum(rad_vec) / len(rad_vec);
         
-        // Vector from face centre to poly centre (which is at world [0,0,0]), expressed in LOCAL coords.
+        // Vector from face centre to polyhedral centre (which is at world [0,0,0]), expressed in LOCAL coords.
         // World-space vector is -center.
         poly_center_local = [
             v_dot(-center, ex),
@@ -25,11 +25,11 @@ module place_on_faces(poly, edge_len) {
         ];
 
         // Per-facet metadata (local-space friendly)
-        $ps_facet_idx        = fi;
-        $ps_edge_len         = edge_len;
+        $ps_facet_idx         = fi;
+        $ps_edge_len          = edge_len;
         $ps_face_midradius    = face_midradius;
         $ps_facet_radius      = facet_radius;
-        $ps_poly_center_local = poly_center_local;
+        $ps_poly_center_local = poly_center_local;  
         
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();
@@ -86,39 +86,12 @@ module place_on_vertices_ir(poly, inter_radius) {
 }
 
 
-
-// Build unique undirected edge list from faces
-function poly_edges(poly) =
-    let(
-        faces = poly_faces(poly),
-        raw_edges = [
-            for (fi = [0 : len(faces)-1]) 
-                let(f = faces[fi])
-                    for (k = [0 : len(f)-1]) 
-                        let(
-                            a = f[k],
-                            b = f[(k+1) % len(f)],
-                            e = (a < b) ? [a, b] : [b, a]
-                        ) e
-        ],
-        uniq_edges = [
-            for (i = [0 : len(raw_edges)-1])
-                let(ei = raw_edges[i])
-                    // include if this is the first occurrence
-                    if (sum([
-                            for (j = [0 : 1 : i-1])
-                                edge_equal(raw_edges[j], ei) ? 1 : 0
-                        ]) == 0) ei
-        ]
-    )
-    uniq_edges;
-
 // ---- Place children on all edges of a polyhedron ----
 module place_on_edges(poly, edge_len) {
 
     scale = edge_len / poly_unit_edge(poly);
     verts = poly_verts(poly);
-    edges = poly_edges(poly);
+    edges = _ps_edges_from_faces(poly_faces(poly));
 
     for (ei = [0 : len(edges)-1]) {
 

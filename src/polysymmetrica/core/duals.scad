@@ -20,30 +20,6 @@ function orient_face_outward(verts, f) =
 function orient_all_faces_outward(verts, faces) =
     [ for (f = faces) orient_face_outward(verts, f) ];
 
-// Build unique undirected edges from faces
-function edges_from_faces(faces) =
-    let(
-        raw_edges = [
-            for (fi = [0 : len(faces)-1])
-                let(f = faces[fi])
-                    for (k = [0 : len(f)-1])
-                        let(
-                            a = f[k],
-                            b = f[(k+1) % len(f)],
-                            e = (a < b) ? [a,b] : [b,a]
-                        ) e
-        ],
-        uniq_edges = [
-            for (i = [0 : len(raw_edges)-1])
-                let(ei = raw_edges[i])
-                    if (sum([
-                            for (j = [0 : 1 : i-1])
-                                edge_equal(raw_edges[j], ei) ? 1 : 0
-                        ]) == 0) ei
-        ]
-    )
-    uniq_edges;
-
 // Does face f contain undirected edge {a,b}?
 function face_has_edge(f, a, b) =
     sum([
@@ -181,7 +157,7 @@ function faces_around_vertex(poly, v, edges, edge_faces) =
 function dual_faces(poly, centers) =
     let(
         faces      = poly_faces(poly),
-        edges      = edges_from_faces(faces),
+        edges      = _ps_edges_from_faces(faces),
         edge_faces = edge_faces_table(faces, edges),
         verts      = poly_verts(poly)
     )
@@ -193,7 +169,7 @@ function dual_faces(poly, centers) =
 
 function dual_unit_edge_and_e_over_ir(verts, faces) =
     let(
-        edges    = edges_from_faces(faces),
+        edges    = _ps_edges_from_faces(faces),
         e0       = edges[0],
         vA       = verts[e0[0]],
         vB       = verts[e0[1]],
