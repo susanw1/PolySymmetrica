@@ -46,7 +46,7 @@ use <polysymmetrica/core/placement.scad>
 use <polysymmetrica/models/octahedron.scad>
 
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ps_face_poly_radius, $fn = 3);
+    circle(r = $ps_facet_radius, $fn = 3);
 ```
 
 Attach geometry to edges:
@@ -56,7 +56,7 @@ use <polysymmetrica/core/placement.scad>
 use <polysymmetrica/models/icosahedron.scad>
 
 place_on_edges_ir(icosahedron(), 40)
-    cube([$ps_edge_len, 1, 1], center = true);
+    cube([$ps_edge_len, 5, 1], center = true);
 ```
 
 Create dual polyhedra:

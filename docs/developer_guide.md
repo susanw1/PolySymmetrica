@@ -213,7 +213,7 @@ Tetrahedron is self-dual.
 
 ```scad
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ps_face_poly_radius, $fn = 3);
+    circle(r = $ps_facet_radius, $fn = 3);
 ```
 
 ### **5.2 Edge frames on an icosahedron**
@@ -237,11 +237,11 @@ place_on_faces_ir(d, 40)
 ```scad
 color("green")
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ps_face_poly_radius, $fn = 3);
+    circle(r = $ps_facet_radius, $fn = 3);
 
-color("gold")
-place_on_faces_ir(hexahedron(), 60)    // note scaling for vertex/face alignment
-    square([$ps_edge_len, $ps_edge_len], center = true);
+color("gold", alpha = 0.2)
+place_on_faces_ir(poly_dual(octahedron(), 60)    // note scaling for vertex/face alignment
+    circle(r = $ps_facet_radius, $fn = 4);
 ```
 
 ---
