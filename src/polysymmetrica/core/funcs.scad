@@ -151,4 +151,18 @@ function frame_matrix(center, ex, ey, ez) = [
 ];
 
 
+// Ensure face orientation so normal points outward (centroid·normal > 0)
+function orient_face_outward(verts, f) =
+    let(
+        c = face_centroid(verts, f),
+        n = face_normal(verts, f)
+    )
+    (v_dot(c, n) >= 0)
+        ? f
+        : [ for (i = [len(f)-1 : -1 : 0]) f[i] ];  // reversed
+
+function orient_all_faces_outward(verts, faces) =
+    [ for (f = faces) orient_face_outward(verts, f) ];
+
+
         

@@ -7,19 +7,6 @@
 use <funcs.scad>
 use <placement.scad>
 
-// Ensure face orientation so normal points outward (centroid·normal > 0)
-function orient_face_outward(verts, f) =
-    let(
-        c = face_centroid(verts, f),
-        n = face_normal(verts, f)
-    )
-    (v_dot(c, n) >= 0)
-        ? f
-        : [ for (i = [len(f)-1 : -1 : 0]) f[i] ];  // reversed
-
-function orient_all_faces_outward(verts, faces) =
-    [ for (f = faces) orient_face_outward(verts, f) ];
-
 // Does face f contain undirected edge {a,b}?
 function face_has_edge(f, a, b) =
     sum([
