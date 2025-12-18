@@ -1,3 +1,9 @@
+// ---------------------------------------------------------------------------
+// PolySymmetrica - Polyhedral Geometry Engine
+// Version: 0.1.0
+// Copyright 2025 Susan Witts
+// SPDX-License-Identifier: MIT
+
 use <funcs.scad>
 
 // ---- Generic face-placement driver ----
@@ -23,14 +29,28 @@ module place_on_faces(poly, edge_len) {
             v_dot(-center, ey),
             v_dot(-center, ez)
         ];
-
-        // Per-facet metadata (local-space friendly)
-        $ps_facet_idx         = fi;
-        $ps_edge_len          = edge_len;
-        $ps_face_midradius    = face_midradius;
-        $ps_facet_radius      = facet_radius;
-        $ps_poly_center_local = poly_center_local;  
         
+        // Face boundary vertices in LOCAL coords (about the face centre)
+        face_verts_local = [
+            for (vid = f)
+                let(p = verts[vid] * scale - center)
+                    [ v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) ]
+        ];
+        // 2D projection for polygon(), in face plane coords
+        face_pts2d = [
+            for (p = face_verts_local)
+                [ p[0], p[1] ]
+        ];
+            
+        // Per-facet metadata (local-space friendly)
+        $ps_facet_idx         = fi;                 // index of this facet, 0..N-1
+        $ps_edge_len          = edge_len;           // length of edge (mean of all, if irregular)
+        $ps_vertex_count      = len(f);             // vertex count for this facet (length of the $ps_face_pts2d list) 
+        $ps_face_midradius    = face_midradius;     // (mean) radius of the face polygon
+        $ps_facet_radius      = facet_radius;       // mean distance from facet centre to vertices
+        $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
+        $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
+            
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();
     }

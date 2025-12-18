@@ -144,15 +144,16 @@ Each operator:
 * aligns child geometry accordingly,
 * exposes special contextual variables:
 
-| Variable                | Meaning                                                     |
-| ----------------------  | ----------------------------------------------------------- |
-| `$ps_facet_idx`         | Index of the face being placed                              |
-| `$ps_edge_idx`          | Index of the edge                                           |
-| `$ps_vertex_idx`        | Index of the vertex                                         |
-| `$ps_edge_len`          | Edge length after scaling                                   |
-| `$ps_facet_radius`      | Radius of the face polygon                                  |
-| `$ps_face_midradius`    | Distance from center to face center                         |
-| `$ps_poly_center_local` | Vector from face center to polyhedral center (local coords) |
+| Variable                | Meaning                                                          |
+| ----------------------  | -----------------------------------------------------------      |
+| `$ps_facet_idx`         | Index of the face being placed                                   |
+| `$ps_edge_idx`          | Index of the edge                                                |
+| `$ps_vertex_idx`        | Index of the vertex                                              |
+| `$ps_edge_len`          | Edge length after scaling                                        |
+| `$ps_facet_radius`      | Radius of the face polygon                                       |
+| `$ps_face_midradius`    | Distance from polyhedral center to face center                   |
+| `$ps_poly_center_local` | Vector from face center to polyhedral center (local coords)      |
+| `$ps_face_pts2d`        | Facet's vertices [[x,y]...] for polygon(points=) (local coords)  |
 
 These make the system extremely expressive.
 

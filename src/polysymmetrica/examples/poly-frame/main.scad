@@ -11,4 +11,3 @@ include <regular-polyhedra-frame.scad>
 include <regular-color-facets.scad>
 
 include <frame-embedded-facets.scad>
-

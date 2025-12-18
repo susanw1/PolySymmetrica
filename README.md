@@ -85,7 +85,7 @@ docs/
 ## 🔶 Documentation
 
 See:
-📄 **docs/developer_guide.md**
+📄 **[Developer Guide](docs/developer_guide.md)**
 for a full explanation of:
 
 * polyhedral descriptors
