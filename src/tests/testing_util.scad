@@ -2,14 +2,14 @@ use <../polysymmetrica/core/placement.scad>
 
 RAD = 40;
 
-module placement_tester(poly, rad=RAD, face_sides=3) {
+module placement_tester(poly, rad=RAD) {
     color("yellow") 
     place_on_faces_ir(poly, rad)
-        cylinder(r = $ps_facet_radius, h = 2, $fn = face_sides);
+        cylinder(r = $ps_facet_radius, h = 2, $fn = $ps_vertex_count);
         
     color("red") 
     place_on_vertices_ir(poly, rad)
-        sphere(5);
+        cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
         
     color("blue") 
     place_on_edges_ir(poly, rad)

@@ -103,6 +103,18 @@ function _ps_edges_from_faces(faces) =
     )
     uniq_edges;
 
+// Does face f contain undirected edge {a,b}?
+function face_has_edge(f, a, b) =
+    sum([
+        for (k = [0 : len(f)-1])
+            let(
+                x = f[k],
+                y = f[(k+1) % len(f)]
+            )
+            ((x==a && y==b) || (x==b && y==a)) ? 1 : 0
+    ]) > 0;
+
+
 // ---- Generic face-frame helpers ----
 function poly_face_center(poly, fi, scale) =
     let(

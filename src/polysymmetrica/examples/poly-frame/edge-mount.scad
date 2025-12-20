@@ -4,7 +4,6 @@ use <polygon-sym.scad>
 // Tools and examples for building various facet styles
 
 
-
 EDGE_DIAM = 5;
 EDGE_KEEL = 5;
 EDGE_KEEL_IN = 2;
@@ -58,8 +57,6 @@ module facet_cushion(n_vertex, edge_len, top_h = 2.5, ledge_h = 1.2, ledge_w = 4
 }
 
 regular_polygon_frame(5, 40);
-
-//translate([-100,0,0]) regular_polygon_2d(5, 40);
 
 translate([100,0,0]) edge_mount(40);
 

@@ -7,17 +7,6 @@
 use <funcs.scad>
 use <placement.scad>
 
-// Does face f contain undirected edge {a,b}?
-function face_has_edge(f, a, b) =
-    sum([
-        for (k = [0 : len(f)-1])
-            let(
-                x = f[k],
-                y = f[(k+1) % len(f)]
-            )
-            ((x==a && y==b) || (x==b && y==a)) ? 1 : 0
-    ]) > 0;
-        
         
 // For each edge, list the indices of the faces incident to it (should be 2)
 function edge_faces_table(faces, edges) =

@@ -42,12 +42,12 @@ module place_on_faces(poly, edge_len) {
                 [ p[0], p[1] ]
         ];
             
-        // Per-facet metadata (local-space friendly)
+        // Per-facet metadata (local-space friendly) - mean average values where faces are irregular
         $ps_facet_idx         = fi;                 // index of this facet, 0..N-1
-        $ps_edge_len          = edge_len;           // length of edge (mean of all, if irregular)
-        $ps_vertex_count      = len(f);             // vertex count for this facet (length of the $ps_face_pts2d list) 
-        $ps_face_midradius    = face_midradius;     // (mean) radius of the face polygon
-        $ps_facet_radius      = facet_radius;       // mean distance from facet centre to vertices
+        $ps_edge_len          = edge_len;           // (mean) length of edge
+        $ps_vertex_count      = len(face_pts2d);    // vertex count for this facet (length of the $ps_face_pts2d list)
+        $ps_face_midradius    = face_midradius;     // (mean) distance of the face polygon centre from polyhedral centre
+        $ps_facet_radius      = facet_radius;       // (mean) distance from facet centre to vertices
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
             
@@ -68,6 +68,8 @@ module place_on_vertices(poly, edge_len) {
 
     scale = edge_len / poly_unit_edge(poly);
     verts = poly_verts(poly);
+    faces = poly_faces(poly);
+    edges = _ps_edges_from_faces(faces);
 
     for (vi = [0 : len(verts)-1]) {
 
@@ -88,11 +90,30 @@ module place_on_vertices(poly, edge_len) {
         center      = v0;             // vertex position
         vert_radius = norm(center);   // distance from poly centre
 
+        // New: full neighbor list from edges
+        neighbors_idx = [
+            for (e = edges)
+                if (e[0] == vi) e[1]
+                else if (e[1] == vi) e[0]
+        ];
+        valence = len(neighbors_idx);
+
+        // Neighbor vectors in LOCAL coords
+        neighbor_pts_local = [
+            for (nj = neighbors_idx)
+                let(pw = verts[nj] * scale - v0)
+                    [ v_dot(pw, ex), v_dot(pw, ey), v_dot(pw, ez) ]
+        ];
+
         // Metadata for children (local-space friendly)
-        $ps_vertex_idx        = vi;
-        $ps_edge_len          = edge_len;
-        $ps_vert_radius       = vert_radius;
-        $ps_poly_center_local = [0, 0, -vert_radius];  // by construction
+        $ps_vertex_idx              = vi;
+        $ps_vertex_valence          = valence;
+        $ps_vertex_neighbors_idx    = neighbors_idx;
+        $ps_vertex_neighbor_pts_local = neighbor_pts_local;
+
+        $ps_edge_len                = edge_len;      // (target edge length parameter)
+        $ps_vert_radius             = vert_radius;
+        $ps_poly_center_local       = [0, 0, -vert_radius];  // by construction
 
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();
@@ -111,7 +132,8 @@ module place_on_edges(poly, edge_len) {
 
     scale = edge_len / poly_unit_edge(poly);
     verts = poly_verts(poly);
-    edges = _ps_edges_from_faces(poly_faces(poly));
+    faces = poly_faces(poly);
+    edges = _ps_edges_from_faces(faces);
 
     for (ei = [0 : len(edges)-1]) {
 
@@ -124,7 +146,8 @@ module place_on_edges(poly, edge_len) {
         ez     = v_norm(center);         // radial, outward from origin
         ey     = v_cross(ez, ex);        // completes basis
 
-        edge_midradius    = norm(center);
+        edge_midradius   = norm(center);
+        edge_len_actual  = norm(v1 - v0);
 
         // vector from edge centre to poly centre in local coords
         poly_center_local = [
@@ -133,11 +156,24 @@ module place_on_edges(poly, edge_len) {
             v_dot(-center, ez)
         ];
 
+        // Edge endpoints in LOCAL coords
+        edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]];
+
+        // Adjacent faces (indices)
+        adj_faces_idx = [
+            for (fi = [0 : len(faces)-1])
+                if (face_has_edge(faces[fi], e[0], e[1])) fi
+        ];
+
         // Metadata for children (edge-local)
-        $ps_edge_idx          = ei;
-        $ps_edge_len          = edge_len;
-        $ps_edge_midradius    = edge_midradius;
-        $ps_poly_center_local = poly_center_local;
+        $ps_edge_idx            = ei;
+        $ps_edge_len            = edge_len_actual;      // actual length of this edge (vs supplied edge_len = scaling factor arg)
+        $ps_edge_midradius      = edge_midradius;        
+        $ps_poly_center_local   = poly_center_local;
+
+        $ps_edge_pts_local      = edge_pts_local;
+        $ps_edge_verts_idx      = e;
+        $ps_edge_adj_faces_idx  = adj_faces_idx;
 
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();

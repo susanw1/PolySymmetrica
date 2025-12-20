@@ -1,3 +1,9 @@
+// ---------------------------------------------------------------------------
+// PolySymmetrica - Polyhedral Geometry Engine
+// Version: 0.1.0
+// Copyright 2025 Susan Witts
+// SPDX-License-Identifier: MIT
+
 use <../../core/placement.scad>
 use <../../models/tetrahedron.scad>
 use <../../models/octahedron.scad>
