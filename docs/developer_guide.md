@@ -144,18 +144,87 @@ Each operator:
 * aligns child geometry accordingly,
 * exposes special contextual variables:
 
-| Variable                | Meaning                                                          |
-| ----------------------  | -----------------------------------------------------------      |
-| `$ps_facet_idx`         | Index of the face being placed                                   |
-| `$ps_edge_idx`          | Index of the edge                                                |
-| `$ps_vertex_idx`        | Index of the vertex                                              |
-| `$ps_edge_len`          | Edge length after scaling                                        |
-| `$ps_facet_radius`      | Radius of the face polygon                                       |
-| `$ps_face_midradius`    | Distance from polyhedral center to face center                   |
-| `$ps_poly_center_local` | Vector from face center to polyhedral center (local coords)      |
-| `$ps_face_pts2d`        | Facet's vertices [[x,y]...] for polygon(points=) (local coords)  |
+PolySymmetrica exposes per-placement metadata via `$ps_*` variables. 
+
+(Conventions: ✅ = available, ☐ = not set)
+
+| Variable                        | Faces | Edges | Verts | Meaning                                                                                                                                                        |
+| ------------------------------- | :---: | :---: | :---: | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$ps_facet_idx`                 |   ✅   |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
+| `$ps_edge_idx`                  |   ☐   |   ✅   |   ☐   | Index of the edge being placed (0..M-1)                                                                                                                        |
+| `$ps_vertex_idx`                |   ☐   |   ☐   |   ✅   | Index of the vertex being placed (0..K-1)                                                                                                                      |
+| `$ps_edge_len`                  |   ✅   |   ✅   |   ✅   | **Faces:** mean edge length for the face (scale-derived); **Edges:** *actual* length of this edge; **Verts:** target edge length parameter passed to placement |
+| `$ps_vertex_count`              |   ✅   |   ☐   |   ☐   | Number of vertices of this face (length of `$ps_face_pts2d`)                                                                                                   |
+| `$ps_face_midradius`            |   ✅   |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
+| `$ps_facet_radius`              |   ✅   |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
+| `$ps_face_pts2d`                |   ✅   |   ☐   |   ☐   | Face polygon vertices in **face-local 2D coords** `[[x,y]...]` suitable for `polygon(points=...)`                                                              |
+| `$ps_edge_midradius`            |   ☐   |   ✅   |   ☐   | Distance from poly centre to edge midpoint (world units; scale-derived)                                                                                        |
+| `$ps_edge_pts_local`            |   ☐   |   ✅   |   ☐   | Edge endpoints in **edge-local coords**, typically `[[ -L/2,0,0 ], [ +L/2,0,0 ]]`                                                                              |
+| `$ps_edge_verts_idx`            |   ☐   |   ✅   |   ☐   | Vertex indices of this edge `[v0, v1]`                                                                                                                         |
+| `$ps_edge_adj_faces_idx`        |   ☐   |   ✅   |   ☐   | Face indices adjacent to this edge (usually 2 for closed manifold polys)                                                                                       |
+| `$ps_vertex_valence`            |   ☐   |   ☐   |   ✅   | Number of incident edges at this vertex                                                                                                                        |
+| `$ps_vertex_neighbors_idx`      |   ☐   |   ☐   |   ✅   | Neighbor vertex indices incident to this vertex (order currently unspecified)                                                                                  |
+| `$ps_vertex_neighbor_pts_local` |   ☐   |   ☐   |   ✅   | Vectors from vertex to each neighbor in **vertex-local coords** `[[x,y,z]...]`                                                                                 |
+| `$ps_vert_radius`               |   ☐   |   ☐   |   ✅   | Distance from poly centre to this vertex (world units; scale-derived)                                                                                          |
+| `$ps_poly_center_local`         |   ✅  |   ✅   |   ✅   | Poly centre vector expressed in the current local coord frame (Faces/Edges/Verts). For vertices: `[0,0,-$ps_vert_radius]` by construction                      |
 
 These make the system extremely expressive.
+
+#### Naming conventions for `$ps_*` variables
+
+The following conventions are used consistently to make their meaning predictable:
+
+##### Index vs geometry
+
+* `*_idx`
+  An **index** into the polyhedral descriptor (e.g. face index, edge index, vertex index).
+
+  * Examples: `$ps_facet_idx`, `$ps_edge_idx`, `$ps_vertex_idx`
+* `*_idx` (plural values)
+  A list of indices.
+
+  * Examples: `$ps_edge_verts_idx`, `$ps_edge_adj_faces_idx`, `$ps_vertex_neighbors_idx`
+
+##### Coordinate systems
+
+* `*_local`
+  Values expressed in the **local coordinate frame** of the current placement (face / edge / vertex).
+
+  * Examples: `$ps_poly_center_local`, `$ps_edge_pts_local`, `$ps_vertex_neighbor_pts_local`
+* `*_pts2d`
+  2D points in the local XY plane, suitable for `polygon(points=...)`.
+
+  * Example: `$ps_face_pts2d`
+
+##### Distances and radii
+
+* `*_radius`
+  A distance measured from the polyhedral centre to a geometric feature.
+
+  * Examples: `$ps_face_midradius`, `$ps_edge_midradius`, `$ps_vert_radius`
+* `*_len`
+  A linear length (edge length or scale-derived length).
+  Note: `$ps_edge_len` may represent either an actual edge length (edge placement) or a scale-derived / target value (face or vertex placement), depending on context.
+
+##### Counts
+
+* `*_count`
+  Cardinality of a local feature.
+
+  * Example: `$ps_vertex_count` (number of vertices in a face)
+
+---
+
+##### Design intent
+
+These conventions aim to:
+
+* keep `$ps_*` variables **self-describing**
+* avoid ambiguity between indices and coordinates
+* make it obvious which coordinate system a value belongs to
+* allow child modules to remain geometry-agnostic and reusable
+
+
 
 ---
 
