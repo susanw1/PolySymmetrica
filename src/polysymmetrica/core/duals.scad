@@ -7,7 +7,7 @@
 use <funcs.scad>
 use <placement.scad>
 
-        
+
 // For each edge, list the indices of the faces incident to it (should be 2)
 function edge_faces_table(faces, edges) =
     [
@@ -17,8 +17,7 @@ function edge_faces_table(faces, edges) =
                 for (fi = [0 : len(faces)-1])
                     if (face_has_edge(faces[fi], e[0], e[1])) fi
             ]
-    ];  
-
+    ];
 
 function poly_face_centers_unscaled(poly) =
     let(
@@ -50,6 +49,7 @@ function edges_incident_to_vertex(edges, v) =
             if (e[0] == v || e[1] == v) ei
     ];
 
+
 function find_edge_index(edges, a, b) =
     let(
         e = (a < b) ? [a,b] : [b,a],
@@ -57,24 +57,6 @@ function find_edge_index(edges, a, b) =
     )
     idxs[0];   // assume the edge exists
 
-function next_face_around_vertex1(v, f_cur, f_prev, faces, edges, edge_faces) =
-    let(
-        incEdges = edges_incident_to_vertex(edges, v),
-
-        candidates = [
-            for (ei = incEdges)
-                let(ef = edge_faces[ei])
-                // edge has exactly 2 faces and one is f_cur
-                if (len(ef) == 2 && (ef[0] == f_cur || ef[1] == f_cur))
-                    (ef[0] == f_cur ? ef[1] : ef[0])
-        ],
-
-        filtered = [
-            for (cf = candidates)
-                if (cf != f_prev) cf
-        ]
-    )
-    filtered[0];  // there should always be exactly 1 in a convex poly
 
 function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
     let(
@@ -106,6 +88,7 @@ function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
     )
     filtered[0];   // in a convex poly this is unique
 
+
 function faces_around_vertex_rec(v, f_cur, f_prev, f_start,
                                  faces, edges, edge_faces, acc = []) =
     let(next = next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces))
@@ -129,7 +112,7 @@ function faces_around_vertex(poly, v, edges, edge_faces) =
     )
     faces_around_vertex_rec(v, start, -1, start, faces, edges, edge_faces);
 
-               
+
 function dual_faces(poly, centers) =
     let(
         faces      = poly_faces(poly),
@@ -157,39 +140,136 @@ function dual_unit_edge_and_e_over_ir(verts, faces) =
     [unit_e, e_over_ir];
 
 
-// ---- Generic dual of a convex polyhedron ----
-// poly = [ verts, faces, unit_edge, e_over_ir ]
+function poly_verts_world(poly, edge_len) =
+    let(scale = edge_len / poly_unit_edge(poly))
+    poly_verts(poly) * scale;
+
+
+// Polar dual vertices from face planes.
+// verts: vertex positions (unit-edge OR world-space; doesn't matter as long as origin is inside)
+// faces: outward oriented faces
+function ps_face_polar_verts(verts, faces) =
+    [
+        for (fi = [0 : len(faces)-1])
+            let(
+                f = faces[fi],
+                n = face_normal(verts, f),        // unit outward normal (given your face_normal)
+                d = v_dot(n, verts[f[0]])         // plane offset along n
+            )
+            assert(d > 0, str("ps_face_polar_verts: d<=0 at face ", fi))
+            (n / d)
+    ];
+
+
+function poly_face_polar_verts(poly) =
+    ps_face_polar_verts(poly_verts(poly), poly_faces(poly));
+
+
+
+// Build polar dual in the *same world units* as the given verts/faces.
+// verts_world: already scaled positions (not unit-edge)
+// faces: oriented outward
+function poly_dual_polar_vf(verts, faces) =
+    let(
+        dual_verts  = ps_face_polar_verts(verts, faces),
+        faces_raw   = dual_faces([verts, faces, 1, 1], dual_verts),
+        faces_orient = orient_all_faces_outward(dual_verts, faces_raw)
+    )
+    [dual_verts, faces_orient];
+
+
+function poly_dual_polar_world(verts_world, faces) =
+    poly_dual_polar_vf(verts_world, faces);
+
+// Scale a poly descriptor's verts by k (faces unchanged; unit_edge/e_over_ir recomputed later)
+function _ps_poly_scale_verts(poly, k) =
+    [ poly_verts(poly) * k, poly_faces(poly), poly_unit_edge(poly), poly_e_over_ir(poly) ];
+
+
+
+function ps_mean(a) =
+    assert(len(a) > 0, "ps_mean: empty")
+    sum(a) / len(a);
+
+function ps_vertex_radii(poly) =
+    [ for (v = poly_verts(poly)) norm(v) ];
+
+function ps_vertex_radius_stat(poly, mode) =
+    let(r = ps_vertex_radii(poly))
+    assert(len(r) > 0, "ps_vertex_radius_stat: no verts")
+    (mode == "vertex_max") ? max(r) : ps_mean(r);
+
+// “Apparent vertex radius per unit IR” under place_on_*_ir scaling
+function ps_apparent_radius_per_ir(poly, mode) =
+    let(
+        r_stat = ps_vertex_radius_stat(poly, mode),
+        s_ir   = poly_e_over_ir(poly) / poly_unit_edge(poly)
+    )
+    r_stat * s_ir;
+
+// Scale factor to apply to IR for 'dual' so it overlays nicely with 'poly'
+function ps_scale_dual_pair(poly, dual, mode="vertex_mean") =
+    let(
+        rp = ps_apparent_radius_per_ir(poly, mode),
+        rd = ps_apparent_radius_per_ir(dual, mode)
+    )
+    assert(rp > 0 && rd > 0, "ps_scale_dual_pair: nonpositive radii")
+    (rp / rd);
+
+// Return k such that: (your dual verts) q = k * (raw polar verts) p
+function ps_dual_polar_k(poly, dual) =
+    let(
+        verts = poly_verts(poly),
+        faces = orient_all_faces_outward(verts, poly_faces(poly)),
+        dv    = poly_verts(dual),
+
+        ks = [
+            for (fi = [0 : len(faces)-1])
+                let(
+                    f = faces[fi],
+                    n = face_normal(verts, f),          // unit outward normal
+                    d = v_dot(n, verts[f[0]]),          // plane offset
+                    q = dv[fi],                         // dual vertex corresponding to face fi
+                    _ = assert(d > 0, str("ps_dual_polar_k: d<=0 at face ", fi)),
+                    k_i = d * v_dot(q, n)
+                )
+                k_i
+        ]
+    )
+    ps_mean(ks);
+
+// Factor to multiply IR when placing 'dual' to get polar/reciprocal overlay with 'poly'
+function ps_scale_dual_polar(poly, dual) =
+    let(k = ps_dual_polar_k(poly, dual))
+    assert(k != 0, "ps_scale_dual_polar: k==0")
+    (1 / k);
+
+
+// Public: polar dual, returned as a normalised poly descriptor.
+// Default behaviour: returns a descriptor with unit_edge = 1 (library convention).
 function poly_dual(poly) =
     let(
-        // 1) new vertices: face centres of original
-        centers      = poly_face_centers_unscaled(poly),
+        // Ensure input faces are outward for correct polar normals
+        verts0 = poly_verts(poly),
+        faces0 = orient_all_faces_outward(verts0, poly_faces(poly)),
 
-        // 2) raw dual faces: one per original vertex
-        faces_raw    = dual_faces(poly, centers),
+        // Build raw polar dual in same coordinate system as verts0
+        dual_vf_raw = poly_dual_polar_vf(verts0, faces0),
+        dv_raw = dual_vf_raw[0],
+        df_raw = dual_vf_raw[1],
 
-        // 3) orient faces so normals point outward
-        faces_orient = orient_all_faces_outward(centers, faces_raw),
+        // Compute metrics for raw dual
+        ue_eir_raw = dual_unit_edge_and_e_over_ir(dv_raw, df_raw),
+        unit_e_raw = ue_eir_raw[0],
+        e_over_ir_raw = ue_eir_raw[1],
 
-        // 4) compute new unit_edge and e_over_ir
-        ue_eir       = dual_unit_edge_and_e_over_ir(centers, faces_orient),
-        unit_e_dual  = ue_eir[0],
-        e_over_ir_dual = ue_eir[1]
+        // Renormalise so returned descriptor follows convention unit_edge = 1
+        k = 1 / unit_e_raw,
+        dv = dv_raw * k,
+
+        // Recompute metrics after renormalisation
+        ue_eir = dual_unit_edge_and_e_over_ir(dv, df_raw),
+        unit_e = ue_eir[0],          // should be ~1
+        e_over_ir = ue_eir[1]
     )
-    [ centers, faces_orient, unit_e_dual, e_over_ir_dual ];
-
-
-//function dodecahedron() = poly_dual(icosahedron());
-//function tetrahedron_dual() = poly_dual(tetrahedron());
-//function hexahedron() = poly_dual(octahedron());
-//
-//
-//translate([100, 0, 0]) place_on_faces_ir(hexahedron(), 30) 
-//    circle(r = $ps_facet_radius, $fn = 4);
-//
-//place_on_faces_ir(dodecahedron(), 30) 
-////    face_debug();
-//    circle(r = $ps_facet_radius, $fn = 5);
-//
-////dodeca_faces_sym(40) {
-////    circle(r = $ps_facet_radius, $fn = 5);
-////}
+    make_poly(dv, df_raw, unit_e, e_over_ir);
