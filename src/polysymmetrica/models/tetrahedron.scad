@@ -4,10 +4,11 @@
 // Copyright 2025 Susan Witts
 // SPDX-License-Identifier: MIT
 
+use <../core/funcs.scad>
 use <../core/placement.scad>
 
 // ---- Canonical Tetrahedron (edge length = 2*sqrt(2)) ----
-function tetrahedron() = [
+function tetrahedron() = make_poly(
     // verts (index 0)
     [
         [ 1,  1,  1],   // 0
@@ -29,7 +30,7 @@ function tetrahedron() = [
 
     // e_over_ir (index 3): edge_len / inter_radius
     2 * sqrt(2)
-];
+);
 
 
 //////

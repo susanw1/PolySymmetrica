@@ -12,6 +12,48 @@ function poly_faces(poly)      = poly[1];
 function poly_unit_edge(poly)  = poly[2];
 function poly_e_over_ir(poly)  = poly[3];
 
+// Constructor with full validation and optional auto-computation
+function make_poly(verts, faces, unit_edge=undef, e_over_ir=undef) =
+    let(
+        // Validation
+        _0 = assert(len(verts) >= 4, "Polyhedron must have at least 4 vertices"),
+        _1 = assert(len(faces) >= 4, "Polyhedron must have at least 4 faces"),
+        _2 = assert(all_faces_valid(verts, faces), "Invalid face indices"),
+        
+        // Auto-compute if not provided
+        edges = _ps_edges_from_faces(faces),
+        _ = assert(len(edges) >= 6, "Polyhedron must have at least 6 edges"),
+        
+        // Calculate unit_edge from first edge if not given
+        e0 = edges[0],
+        computed_unit_edge = is_undef(unit_edge) 
+            ? norm(verts[e0[1]] - verts[e0[0]])
+            : unit_edge,
+        
+        // Calculate e_over_ir from first edge midpoint if not given
+        mid = (verts[e0[0]] + verts[e0[1]]) / 2,
+        ir = norm(mid),
+        computed_e_over_ir = is_undef(e_over_ir)
+            ? computed_unit_edge / ir
+            : e_over_ir,
+        
+        _3 = assert(computed_unit_edge > 0, "unit_edge must be positive"),
+        _4 = assert(computed_e_over_ir > 0, "e_over_ir must be positive")
+    )
+    [verts, faces, computed_unit_edge, computed_e_over_ir];
+
+// Helper validation
+function all_faces_valid(verts, faces) =
+    len([
+        for (f = faces)
+            if (len(f) >= 3 && all_indices_in_range(f, len(verts)))
+                1
+    ]) == len(faces);
+
+function all_indices_in_range(face, max_idx) =
+    len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
+
+
 
 ///////////////////////////////////////
 // Handy vector functions (and aliases)

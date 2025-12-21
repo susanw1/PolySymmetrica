@@ -4,10 +4,11 @@
 // Copyright 2025 Susan Witts
 // SPDX-License-Identifier: MIT
 
+use <../core/funcs.scad>
 use <../core/placement.scad>
 
 // ---- Canonical Octahedron (edge length = sqrt(2)) ----
-function octahedron() = [
+function octahedron() = make_poly(
     // verts (index 0)
     [
         [ 1, 0, 0],  // 0
@@ -29,7 +30,7 @@ function octahedron() = [
 
     // e_over_ir (index 3): edge_len / inter_radius
     2
-];
+);
 
 
 //////

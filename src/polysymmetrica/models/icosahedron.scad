@@ -4,13 +4,13 @@
 // Copyright 2025 Susan Witts
 // SPDX-License-Identifier: MIT
 
+use <../core/funcs.scad>
 use <../core/placement.scad>
 
 phi = (1 + sqrt(5)) / 2;
 
 // ---- Canonical Icosahedron: edge length = 2 ----
-function icosahedron() = [
-
+function icosahedron() = make_poly(
     // verts (index 0)
     [
         // (0, ±1, ±φ)
@@ -65,7 +65,7 @@ function icosahedron() = [
 
     // e_over_ir (index 3): edge_len / inter_radius
     2 / phi
-];
+);
 
 
 ////////////////////////////////////////////////////////////////////////
