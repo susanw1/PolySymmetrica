@@ -47,7 +47,8 @@ function _ps_face_points_to_indices(uniq, face_pts, eps) =
 // --- main truncation ---
 
 function poly_truncate(poly, t, eps = 1e-8) =
-    assert(t >= 0 && t < 0.5, "'t' out of range")
+    let(t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t)
+    assert(t_eff >= 0 && t_eff < 0.5, "'t' out of range")
     let(
         verts = poly_verts(poly),
         faces = poly_faces(poly),
@@ -61,8 +62,8 @@ function poly_truncate(poly, t, eps = 1e-8) =
                     b = edges[ei][1],
                     A = verts[a],
                     B = verts[b],
-                    P_a = A + t*(B-A),
-                    P_b = B + t*(A-B)
+                    P_a = A + t_eff*(B-A),
+                    P_b = B + t_eff*(A-B)
                 )
                 [P_a, P_b]
         ],
@@ -89,18 +90,18 @@ function poly_truncate(poly, t, eps = 1e-8) =
         // vertex faces: one per original vertex
         // We use faces_around_vertex to get cyclic face order, then derive neighbor vertices
         // by intersecting consecutive faces at v; simplest is to use edges_incident_to_vertex + angular order later.
-        // For now: derive from incident edges and the same "walk" logic you already have.
+        // For now: derive from incident edges and the same "walk" logic we already have.
         edge_faces = edge_faces_table(faces, edges),
 
         vert_faces_pts = [
             for (vi = [0:len(verts)-1])
                 let(
-                    // get faces around vertex in cyclic order (you already have this)
+                    // get faces around vertex in cyclic order
                     fc = faces_around_vertex(poly, vi, edges, edge_faces),
 
                     // turn that into an ordered list of neighbor vertices around vi:
                     // take each face in the cycle, find the two neighbors of vi in that face,
-                    // and pick the "next" neighbor consistently. This is a bit fiddly but works on your current families.
+                    // and pick the "next" neighbor consistently. Bit fiddly.
                     neigh = [
                         for (idx = [0:len(fc)-1])
                             let(
@@ -145,3 +146,58 @@ function poly_truncate(poly, t, eps = 1e-8) =
         e_over_ir = unit_e / ir
     )
     [ uniq_verts, faces_out, unit_e, e_over_ir ];
+
+
+
+// Compute per-corner truncation estimate t = 1/(2+r),
+// where r = |B-C| / mean(|V-B|,|V-C|) for face corner (...B,V,C...).
+function _ps_corner_t(verts, face, k) =
+    let(
+        n  = len(face),
+        vm = face[(k-1+n) % n],
+        v  = face[k],
+        vp = face[(k+1) % n],
+        V  = verts[v],
+        B  = verts[vm],
+        C  = verts[vp],
+
+        LB = norm(V - B),
+        LC = norm(V - C),
+        L  = (LB + LC) / 2,
+
+        chord = norm(B - C),
+        r = (L == 0) ? 0 : chord / L,
+
+        t = (2 + r == 0) ? 0 : 1 / (2 + r)
+    )
+    t;
+
+// Return a “best guess” truncation t if user passes t=undef.
+// - If the poly is locally uniform, returns the mean corner t.
+// - Otherwise returns fallback (default 0.2).
+//
+// tol is an absolute tolerance on (t_max - t_min).
+function _ps_truncate_default_t(poly, tol = 1e-3, fallback = 0.2) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+
+        // gather per-corner t estimates
+        ts = [
+            for (f = faces)
+                for (k = [0 : len(f)-1])
+                    _ps_corner_t(verts, f, k)
+        ],
+
+        _ = assert(len(ts) > 0, "ps_truncate_default_t: no face corners found"),
+
+        tmin = min(ts),
+        tmax = max(ts),
+        tavg = sum(ts) / len(ts),
+
+        // decide if "uniform enough"
+        ok = (tmax - tmin) <= tol,
+
+        t0 = ok ? tavg : fallback
+    )
+    t0;

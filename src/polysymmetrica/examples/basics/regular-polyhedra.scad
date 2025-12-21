@@ -27,32 +27,32 @@ IR = 30;
 
 translate([0,0,DISPLAY_OFFSET_PLACE_ON_FACES_EXAMPLE]) {
     translate([-100, 0, 0]) 
-    color("grey")
+    color("green")
     place_on_faces_ir(tetrahedron(), IR) {
         translate([0,0,-1]) cylinder(h = 1, r = $ps_facet_radius, $fn = $ps_vertex_count);
     }
 
     translate([0, 0, 0])
-    color("grey")
+    color("blue")
     place_on_faces_ir(octahedron(), IR) {
         translate([0,0,-1]) cylinder(h = 1, r = $ps_facet_radius, $fn = $ps_vertex_count);
     }
 
     translate([100, 0, 0])
-    color("grey")
+    color("red")
     place_on_faces_ir(icosahedron(), IR) {
         translate([0,0,-1]) cylinder(h = 1, r = $ps_facet_radius, $fn = $ps_vertex_count);
     }
 
     // Duals
     translate([0, 100, 0])
-    color("grey")
+    color("cyan")
     place_on_faces_ir(hexahedron(), IR) {
         translate([0,0,-1]) cylinder(h = 1, r = $ps_facet_radius, $fn = $ps_vertex_count);
     }
 
     translate([100, 100, 0])
-    color("grey")
+    color("pink")
     place_on_faces_ir(dodecahedron(), IR) {
         translate([0,0,-1]) cylinder(h = 1, r = $ps_facet_radius, $fn = $ps_vertex_count);
     }
