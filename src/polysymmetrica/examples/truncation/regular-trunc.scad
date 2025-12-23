@@ -57,13 +57,11 @@ translate([100, 100, LAYER2]) demo(poly_dual(poly_truncate(dodecahedron())));
 trunc_tet = poly_truncate(tetrahedron());
 triakis_tet = poly_dual(trunc_tet);
 
-m = scale_dual(trunc_tet, triakis_tet);
-
 color("blue", 0.4) 
 place_on_faces_ir(trunc_tet, IR) {
     translate([0,0,-0.001]) cylinder(h=0.001, r = $ps_facet_radius, $fn = $ps_vertex_count);
 }
 color("yellow", 1) 
-place_on_faces_ir(triakis_tet, IR * m) {
+place_on_faces_ir(triakis_tet, IR * scale_dual(trunc_tet, triakis_tet)) {
     translate([0,0,-T]) linear_extrude(height=T) polygon(points = $ps_face_pts2d);
 }
