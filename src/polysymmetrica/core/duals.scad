@@ -8,25 +8,14 @@ use <funcs.scad>
 use <placement.scad>
 
 
-// For each edge, list the indices of the faces incident to it (should be 2)
-function edge_faces_table(faces, edges) =
-    [
-        for (ei = [0 : len(edges)-1])
-            let(e = edges[ei])
-            [
-                for (fi = [0 : len(faces)-1])
-                    if (face_has_edge(faces[fi], e[0], e[1])) fi
-            ]
-    ];
-
-function poly_face_centers_unscaled(poly) =
-    let(
-        faces = poly_faces(poly),
-        verts = poly_verts(poly)
-    )
-    [ for (fi = [0 : len(faces)-1])
-        face_centroid(verts, faces[fi])
-    ];
+//function poly_face_centers_unscaled(poly) =
+//    let(
+//        faces = poly_faces(poly),
+//        verts = poly_verts(poly)
+//    )
+//    [ for (fi = [0 : len(faces)-1])
+//        face_centroid(verts, faces[fi])
+//    ];
 
 
 function vertex_incident_faces(poly, vi) =
@@ -42,12 +31,12 @@ function vertex_incident_faces(poly, vi) =
     ];
 
 
-function edges_incident_to_vertex(edges, v) =
-    [
-        for (ei = [0 : 1 : len(edges)-1])
-            let(e = edges[ei])
-            if (e[0] == v || e[1] == v) ei
-    ];
+//function edges_incident_to_vertex(edges, v) =
+//    [
+//        for (ei = [0 : 1 : len(edges)-1])
+//            let(e = edges[ei])
+//            if (e[0] == v || e[1] == v) ei
+//    ];
 
 
 function find_edge_index(edges, a, b) =
@@ -140,9 +129,9 @@ function dual_unit_edge_and_e_over_ir(verts, faces) =
     [unit_e, e_over_ir];
 
 
-function poly_verts_world(poly, edge_len) =
-    let(scale = edge_len / poly_unit_edge(poly))
-    poly_verts(poly) * scale;
+//function poly_verts_world(poly, edge_len) =
+//    let(scale = edge_len / poly_unit_edge(poly))
+//    poly_verts(poly) * scale;
 
 
 // Polar dual vertices from face planes.
@@ -161,9 +150,9 @@ function ps_face_polar_verts(verts, faces) =
     ];
 
 
-function poly_face_polar_verts(poly) =
-    ps_face_polar_verts(poly_verts(poly), poly_faces(poly));
-
+//function poly_face_polar_verts(poly) =
+//    ps_face_polar_verts(poly_verts(poly), poly_faces(poly));
+//
 
 
 // Build polar dual in the *same world units* as the given verts/faces.
@@ -178,12 +167,12 @@ function poly_dual_polar_vf(verts, faces) =
     [dual_verts, faces_orient];
 
 
-function poly_dual_polar_world(verts_world, faces) =
-    poly_dual_polar_vf(verts_world, faces);
+//function poly_dual_polar_world(verts_world, faces) =
+//    poly_dual_polar_vf(verts_world, faces);
 
-// Scale a poly descriptor's verts by k (faces unchanged; unit_edge/e_over_ir recomputed later)
-function _ps_poly_scale_verts(poly, k) =
-    [ poly_verts(poly) * k, poly_faces(poly), poly_unit_edge(poly), poly_e_over_ir(poly) ];
+//// Scale a poly descriptor's verts by k (faces unchanged; unit_edge/e_over_ir recomputed later)
+//function _ps_poly_scale_verts(poly, k) =
+//    [ poly_verts(poly) * k, poly_faces(poly), poly_unit_edge(poly), poly_e_over_ir(poly) ];
 
 
 
@@ -191,58 +180,166 @@ function ps_mean(a) =
     assert(len(a) > 0, "ps_mean: empty")
     sum(a) / len(a);
 
-function ps_vertex_radii(poly) =
-    [ for (v = poly_verts(poly)) norm(v) ];
+//function ps_vertex_radii(poly) =
+//    [ for (v = poly_verts(poly)) norm(v) ];
+//
+//function ps_vertex_radius_stat(poly, mode) =
+//    let(r = ps_vertex_radii(poly))
+//    assert(len(r) > 0, "ps_vertex_radius_stat: no verts")
+//    (mode == "vertex_max") ? max(r) : ps_mean(r);
 
-function ps_vertex_radius_stat(poly, mode) =
-    let(r = ps_vertex_radii(poly))
-    assert(len(r) > 0, "ps_vertex_radius_stat: no verts")
-    (mode == "vertex_max") ? max(r) : ps_mean(r);
+//// “Apparent vertex radius per unit IR” under place_on_*_ir scaling
+//function ps_apparent_radius_per_ir(poly, mode) =
+//    let(
+//        r_stat = ps_vertex_radius_stat(poly, mode),
+//        s_ir   = poly_e_over_ir(poly) / poly_unit_edge(poly)
+//    )
+//    r_stat * s_ir;
 
-// “Apparent vertex radius per unit IR” under place_on_*_ir scaling
-function ps_apparent_radius_per_ir(poly, mode) =
-    let(
-        r_stat = ps_vertex_radius_stat(poly, mode),
-        s_ir   = poly_e_over_ir(poly) / poly_unit_edge(poly)
-    )
-    r_stat * s_ir;
+//// Scale factor to apply to IR for 'dual' so it overlays nicely with 'poly'
+//function ps_scale_dual_pair(poly, dual, mode="vertex_mean") =
+//    let(
+//        rp = ps_apparent_radius_per_ir(poly, mode),
+//        rd = ps_apparent_radius_per_ir(dual, mode)
+//    )
+//    assert(rp > 0 && rd > 0, "ps_scale_dual_pair: nonpositive radii")
+//    (rp / rd);
 
-// Scale factor to apply to IR for 'dual' so it overlays nicely with 'poly'
-function ps_scale_dual_pair(poly, dual, mode="vertex_mean") =
-    let(
-        rp = ps_apparent_radius_per_ir(poly, mode),
-        rd = ps_apparent_radius_per_ir(dual, mode)
-    )
-    assert(rp > 0 && rd > 0, "ps_scale_dual_pair: nonpositive radii")
-    (rp / rd);
+//// Return k such that: (your dual verts) q = k * (raw polar verts) p
+//function ps_dual_polar_k(poly, dual) =
+//    let(
+//        verts = poly_verts(poly),
+//        faces = orient_all_faces_outward(verts, poly_faces(poly)),
+//        dv    = poly_verts(dual),
+//
+//        ks = [
+//            for (fi = [0 : len(faces)-1])
+//                let(
+//                    f = faces[fi],
+//                    n = face_normal(verts, f),          // unit outward normal
+//                    d = v_dot(n, verts[f[0]]),          // plane offset
+//                    q = dv[fi],                         // dual vertex corresponding to face fi
+//                    _ = assert(d > 0, str("ps_dual_polar_k: d<=0 at face ", fi)),
+//                    k_i = d * v_dot(q, n)
+//                )
+//                k_i
+//        ]
+//    )
+//    ps_mean(ks);
 
-// Return k such that: (your dual verts) q = k * (raw polar verts) p
-function ps_dual_polar_k(poly, dual) =
+//// Factor to multiply IR when placing 'dual' to get polar/reciprocal overlay with 'poly'
+//function ps_scale_dual_polar(poly, dual) =
+//    let(k = ps_dual_polar_k(poly, dual))
+//    assert(k != 0, "ps_scale_dual_polar: k==0")
+//    (1 / k);
+//
+//
+//// argmax index for a numeric list (no sort required)
+//function _ps_argmax(vals, i=0, best_i=0, best_v=-1e100) =
+//    (i >= len(vals)) ? best_i :
+//    (vals[i] > best_v)
+//        ? _ps_argmax(vals, i+1, i,      vals[i])
+//        : _ps_argmax(vals, i+1, best_i, best_v);
+
+//// Find dual vertex that best matches face normal direction
+//function _ps_match_dual_vert_idx(dverts, n_unit) =
+//    let(
+//        scores = [
+//            for (j = [0 : len(dverts)-1])
+//                let(q = dverts[j])
+//                    v_dot(n_unit, v_norm(q))   // cosine similarity
+//        ]
+//    )
+//    _ps_argmax(scores);
+
+//// IR multiplier so that when overlaid, each face plane of 'poly' passes through
+//// its corresponding dual vertex of 'dual' (direction-matched, order-independent).
+//function ps_scale_dual_overlay_on_faces(poly, dual) =
+//    let(
+//        pv = poly_verts(poly),
+//        pf = orient_all_faces_outward(pv, poly_faces(poly)),
+//        dv = poly_verts(dual),
+//
+//        sp = poly_e_over_ir(poly) / poly_unit_edge(poly),
+//        sd = poly_e_over_ir(dual) / poly_unit_edge(dual),
+//
+//        _0 = assert(len(dv) > 0, "ps_scale_dual_overlay_on_faces: dual has no verts"),
+//        _1 = assert(len(pf) > 0, "ps_scale_dual_overlay_on_faces: poly has no faces"),
+//
+//        ms = [
+//            for (fi = [0 : len(pf)-1])
+//                let(
+//                    f  = pf[fi],
+//                    n  = face_normal(pv, f),          // unit outward normal
+//                    d  = v_dot(n, pv[f[0]]),          // plane offset
+//                    j  = _ps_match_dual_vert_idx(dv, n),
+//                    q  = dv[j],
+//                    nq = v_dot(n, q),
+//                    m_i = (sp * d) / (sd * nq),
+//                    _ = echo("face", fi, " -> dual vert", j, " d=", d, " n·q=", nq, " m_i=", m_i)
+//                )
+//                assert(d > 0,  str("ps_scale_dual_overlay_on_faces: d<=0 at face ", fi))
+//                assert(abs(nq) > 1e-12, str("ps_scale_dual_overlay_on_faces: n·q ~ 0 at face ", fi))
+//                m_i
+//        ],
+//        _3 = echo("overlay multiplier (mean)", sum(ms)/len(ms), "min", min(ms), "max", max(ms))
+//    )
+//        ps_mean(ms);
+
+// ---- Edge midradius helpers ----
+
+// Return list of edge midpoint radii for a poly in its own coordinate system (unit-edge verts)
+function ps_edge_midradius_list(poly) =
     let(
         verts = poly_verts(poly),
-        faces = orient_all_faces_outward(verts, poly_faces(poly)),
-        dv    = poly_verts(dual),
-
-        ks = [
-            for (fi = [0 : len(faces)-1])
+        edges = _ps_edges_from_faces(poly_faces(poly)),
+        rs = [
+            for (e = edges)
                 let(
-                    f = faces[fi],
-                    n = face_normal(verts, f),          // unit outward normal
-                    d = v_dot(n, verts[f[0]]),          // plane offset
-                    q = dv[fi],                         // dual vertex corresponding to face fi
-                    _ = assert(d > 0, str("ps_dual_polar_k: d<=0 at face ", fi)),
-                    k_i = d * v_dot(q, n)
+                    m = (verts[e[0]] + verts[e[1]]) / 2
                 )
-                k_i
+                norm(m)
         ]
     )
-    ps_mean(ks);
+    assert(len(rs) > 0, "ps_edge_midradius_list: poly has no edges")
+    rs;
 
-// Factor to multiply IR when placing 'dual' to get polar/reciprocal overlay with 'poly'
-function ps_scale_dual_polar(poly, dual) =
-    let(k = ps_dual_polar_k(poly, dual))
-    assert(k != 0, "ps_scale_dual_polar: k==0")
-    (1 / k);
+function ps_edge_midradius_stat(poly, mode="min") =
+    let(rs = ps_edge_midradius_list(poly))
+    (mode == "min") ? min(rs)
+  : (mode == "max") ? max(rs)
+  : ps_mean(rs);
+
+
+
+// ---- IR overlay multiplier so dual's edges line up with poly's edges (mid-sphere style) ----
+// Returns multiplier 'm' such that using IR*m for the dual tends to align edge crossings.
+function scale_dual(poly, dual, mode="min") =
+    let(
+        // scaling from unit-edge coords to "per-IR world coords":
+        // world = IR * (e_over_ir/unit_edge) * verts_unit
+        sp = poly_e_over_ir(poly)  / poly_unit_edge(poly),
+        sd = poly_e_over_ir(dual)  / poly_unit_edge(dual),
+
+        rp = ps_edge_midradius_stat(poly,  mode),
+        rd = ps_edge_midradius_stat(dual,  mode),
+
+        _0 = assert(abs(rd) > 1e-12, "ps_scale_dual_overlay_on_edges: dual edge midradius ~ 0")
+    )
+    (sp * rp) / (sd * rd);
+
+
+//function ps_scale_dual_polar_correct(poly, dual) =
+//    let(
+//        ir_poly = poly_unit_edge(poly) / poly_e_over_ir(poly),
+//        ir_dual = poly_unit_edge(dual) / poly_e_over_ir(dual),
+//        // For polar reciprocity: ir_poly * (ir_dual * scale) = 1
+//        // So: scale = 1 / (ir_poly * ir_dual)
+//        scale = 1.0 / (ir_poly * ir_dual)
+//    )
+//    scale;
+
+
 
 
 // Public: polar dual, returned as a normalised poly descriptor.

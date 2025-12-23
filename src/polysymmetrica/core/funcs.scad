@@ -145,6 +145,20 @@ function _ps_edges_from_faces(faces) =
     )
     uniq_edges;
 
+
+// For each edge, list the indices of the faces incident to it (should be 2)
+function edge_faces_table(faces, edges) =
+    [
+        for (ei = [0 : len(edges)-1])
+            let(e = edges[ei])
+            [
+                for (fi = [0 : len(faces)-1])
+                    if (face_has_edge(faces[fi], e[0], e[1])) fi
+            ]
+    ];
+
+
+
 // Does face f contain undirected edge {a,b}?
 function face_has_edge(f, a, b) =
     sum([
