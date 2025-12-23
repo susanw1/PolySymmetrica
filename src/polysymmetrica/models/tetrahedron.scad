@@ -8,14 +8,14 @@ use <../core/funcs.scad>
 use <../core/placement.scad>
 
 // ---- Canonical Tetrahedron (edge length = 2*sqrt(2)) ----
-function tetrahedron() = make_poly(
+function tetrahedron() = let(unit_edge = 2 * sqrt(2)) make_poly(
     // verts (index 0)
     [
         [ 1,  1,  1],   // 0
         [-1, -1,  1],   // 1
         [-1,  1, -1],   // 2
         [ 1, -1, -1]    // 3
-    ],
+    ]/ unit_edge,
 
     // faces (index 1) – triangles by vertex index, oriented consistently
     [
@@ -25,9 +25,6 @@ function tetrahedron() = make_poly(
         [1, 2, 3]
     ],
     
-    // unit_edge (index 2): canonical edge length
-    2 * sqrt(2),
-
     // e_over_ir (index 3): edge_len / inter_radius
     2 * sqrt(2)
 );

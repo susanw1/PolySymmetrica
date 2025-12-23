@@ -172,8 +172,8 @@ function scale_dual(poly, dual, mode="min") =
     let(
         // scaling from unit-edge coords to "per-IR world coords":
         // world = IR * (e_over_ir/unit_edge) * verts_unit
-        sp = poly_e_over_ir(poly)  / poly_unit_edge(poly),
-        sd = poly_e_over_ir(dual)  / poly_unit_edge(dual),
+        sp = poly_e_over_ir(poly),
+        sd = poly_e_over_ir(dual),
 
         rp = ps_edge_midradius_stat(poly,  mode),
         rd = ps_edge_midradius_stat(dual,  mode),
@@ -211,4 +211,4 @@ function poly_dual(poly) =
         unit_e = ue_eir[0],          // should be ~1
         e_over_ir = ue_eir[1]
     )
-    make_poly(dv, df_raw, unit_e, e_over_ir);
+    make_poly(dv / unit_e, df_raw, e_over_ir);

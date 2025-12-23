@@ -10,7 +10,7 @@ use <../core/placement.scad>
 phi = (1 + sqrt(5)) / 2;
 
 // ---- Canonical Icosahedron: edge length = 2 ----
-function icosahedron() = make_poly(
+function icosahedron() = let(unit_edge = 2) make_poly(
     // verts (index 0)
     [
         // (0, ±1, ±φ)
@@ -30,7 +30,7 @@ function icosahedron() = make_poly(
         [-phi,  0,  1],   // 9
         [ phi,  0, -1],   // 10
         [-phi,  0, -1]    // 11
-    ],
+    ] / unit_edge,
 
     // faces (index 1) – oriented so normals point OUTWARDS
     [
@@ -59,9 +59,6 @@ function icosahedron() = make_poly(
         [6,10,  8],
         [7, 9, 11]
     ],
-
-    // unit_edge (index 2)
-    2,
 
     // e_over_ir (index 3): edge_len / inter_radius
     2 / phi

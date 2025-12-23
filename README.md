@@ -73,7 +73,7 @@ place_on_edges_ir(dual_dodeca, 40)
 
 ```
 src/polysymmetrica/
-    core/        # math, placement, duals
+    core/        # math, placement, duals, truncation
     models/      # tetra, octa, icosa…
     examples/    # 3D printable frames
 docs/

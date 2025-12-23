@@ -52,9 +52,7 @@ translate([100, 0, LAYER2]) demo(poly_dual(poly_truncate(icosahedron())));
 translate([0, 100, LAYER2]) demo(poly_dual(poly_truncate(hexahedron())));
 translate([100, 100, LAYER2]) demo(poly_dual(poly_truncate(dodecahedron())));
 
-
-
-trunc_tet = poly_truncate(tetrahedron());
+trunc_tet = poly_truncate(octahedron());
 triakis_tet = poly_dual(trunc_tet);
 
 color("blue", 0.4) 

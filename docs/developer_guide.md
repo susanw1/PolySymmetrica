@@ -86,17 +86,16 @@ Each module is deliberately small so that users can take only what they need.
 Every polyhedron in PolySymmetrica is defined as:
 
 ```
-[ verts, faces, unit_edge, e_over_ir ]
+[ verts, faces, e_over_ir ]
 ```
 
 Where:
 
-| Field       | Meaning                                                   |
-| ----------- | --------------------------------------------------------- |
-| `verts`     | List of 3D vertex coordinates                             |
-| `faces`     | List of faces, each face = ordered list of vertex indices |
-| `unit_edge` | Edge length in the canonical embedding                    |
-| `e_over_ir` | Ratio of edge length to **inter-radius**                  |
+| Field       | Meaning                                                                  |
+| ----------- | ---------------------------------------------------------                |
+| `verts`     | List of 3D vertex coordinates, with edge length normalized to 1          |
+| `faces`     | List of faces, each face = ordered list of vertex indices                |
+| `e_over_ir` | Ratio of edge length to **inter-radius**                                 |
 
 This compact representation allows:
 
@@ -153,7 +152,7 @@ PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 | `$ps_facet_idx`                 |   ✅   |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
 | `$ps_edge_idx`                  |   ☐   |   ✅   |   ☐   | Index of the edge being placed (0..M-1)                                                                                                                        |
 | `$ps_vertex_idx`                |   ☐   |   ☐   |   ✅   | Index of the vertex being placed (0..K-1)                                                                                                                      |
-| `$ps_edge_len`                  |   ✅   |   ✅   |   ✅   | **Faces:** mean edge length for the face (scale-derived); **Edges:** *actual* length of this edge; **Verts:** target edge length parameter passed to placement |
+| `$ps_edge_len`                  |   ✅   |   ✅   |   ✅  | **Faces:** mean edge length for the face (scale-derived); **Edges:** *actual* length of this edge; **Verts:** target edge length parameter passed to placement |
 | `$ps_vertex_count`              |   ✅   |   ☐   |   ☐   | Number of vertices of this face (length of `$ps_face_pts2d`)                                                                                                   |
 | `$ps_face_midradius`            |   ✅   |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
 | `$ps_facet_radius`              |   ✅   |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
@@ -242,7 +241,8 @@ Algorithm:
 2. **Dual faces** = cyclic lists of faces around original vertices
    (computed combinatorially)
 3. **Face orientation** corrected via normals
-4. **unit_edge** and **e_over_ir** computed automatically
+4. **e_over_ir** computed automatically
+5. Scaling helper function to match dual size to original for overlay
 
 This gives:
 
@@ -283,14 +283,14 @@ Tetrahedron is self-dual.
 
 ```scad
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ps_facet_radius, $fn = 3);
+    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
 ```
 
 ### **5.2 Edge frames on an icosahedron**
 
 ```scad
 place_on_edges_ir(icosahedron(), 40)
-    edge_mount($ps_edge_len);
+    cube([$ps_edge_len, 2, 2], center = true);
 ```
 
 ### **5.3 Dodecahedron from dual of icosa**
@@ -299,7 +299,17 @@ place_on_edges_ir(icosahedron(), 40)
 d = poly_dual(icosahedron());
 
 place_on_faces_ir(d, 40)
-    circle(r = $ps_facet_radius, $fn = 5);
+    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
+```
+
+### **5.4 Catalan from dual of truncated octahedron**
+
+```scad
+d = poly_dual(poly_truncate(icosahedron()));
+
+place_on_faces_ir(d, 40)
+    linear_extrude(height = 0.2) polygon(points = $ps_face_pts2d)
+
 ```
 
 ### **5.4 Visual debugging: original + dual overlay**
@@ -307,11 +317,11 @@ place_on_faces_ir(d, 40)
 ```scad
 color("green")
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ps_facet_radius, $fn = 3);
+    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
 
 color("gold", alpha = 0.2)
 place_on_faces_ir(poly_dual(octahedron(), 60)    // note scaling for vertex/face alignment
-    circle(r = $ps_facet_radius, $fn = 4);
+    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
 ```
 
 ---
@@ -324,10 +334,7 @@ Any convex polyhedron may be added by supplying:
 
 * list of vertices,
 * list of faces (cyclic order),
-* or even just vertices + faces and letting PolySymmetrica compute:
-
-  * unit_edge,
-  * e_over_ir.
+* or even just vertices + faces and letting PolySymmetrica compute *e_over_ir*.
 
 The descriptor is then compatible with all placement operators.
 
@@ -375,13 +382,9 @@ Check:
 
 Confirm:
 
-* `unit_edge`,
 * `e_over_ir`,
-* inter_radius argument.
-
-### **Child geometry rotated oddly?**
-
-Use `$ps_*` variables (especially `$ps_center_local`) to confirm the local frame orientation.
+* inter_radius argument,
+* use scale_dual(poly, dual) to calculate dual's inter_radius.
 
 ---
 
@@ -391,12 +394,12 @@ Use `$ps_*` variables (especially `$ps_center_local`) to confirm the local frame
 * ✔ Face/edge/vertex placement operators
 * ✔ Primitive Platonic descriptors
 * ✔ Dual-generated cube and dodecahedron
+* ✔ General truncation operator
+* ✔ Archimedean generation via truncation
+* ✔ Catalan generation via duals
 
 **Planned enhancements:**
 
-* ☐ General truncation operator
-* ☐ Archimedean generation via truncation
-* ☐ Catalan generation via duals
 * ☐ Stellation tools
 * ☐ Better debugging visualizers
 * ☐ PolySymmetrica web documentation / diagrams

@@ -8,7 +8,7 @@ use <funcs.scad>
 
 // ---- Generic face-placement driver ----
 module place_on_faces(poly, edge_len) {
-    scale = edge_len / poly_unit_edge(poly);
+    scale = edge_len;
     verts = poly_verts(poly);
     
     for (fi = [0 : len(poly_faces(poly))-1]) {
@@ -66,7 +66,7 @@ module place_on_faces_ir(poly, inter_radius) {
 // ---- Place children on all vertices of a polyhedron ----
 module place_on_vertices(poly, edge_len) {
 
-    scale = edge_len / poly_unit_edge(poly);
+    scale = edge_len;
     verts = poly_verts(poly);
     faces = poly_faces(poly);
     edges = _ps_edges_from_faces(faces);
@@ -130,7 +130,7 @@ module place_on_vertices_ir(poly, inter_radius) {
 // ---- Place children on all edges of a polyhedron ----
 module place_on_edges(poly, edge_len) {
 
-    scale = edge_len / poly_unit_edge(poly);
+    scale = edge_len;
     verts = poly_verts(poly);
     faces = poly_faces(poly);
     edges = _ps_edges_from_faces(faces);

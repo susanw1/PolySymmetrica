@@ -145,7 +145,7 @@ function poly_truncate(poly, t, eps = 1e-8) =
         ir  = norm(mid),
         e_over_ir = unit_e / ir
     )
-    make_poly(uniq_verts, faces_out, unit_e, e_over_ir);
+    make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
 
 
 
