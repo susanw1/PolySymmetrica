@@ -147,25 +147,25 @@ PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 
 (Conventions: ✅ = available, ☐ = not set)
 
-| Variable                        | Faces | Edges | Verts | Meaning                                                                                                                                                        |
+| Variable                        | Faces | Verts | Edges | Meaning                                                                                                                                                        |
 | ------------------------------- | :---: | :---: | :---: | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `$ps_facet_idx`                 |   ✅   |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
-| `$ps_edge_idx`                  |   ☐   |   ✅   |   ☐   | Index of the edge being placed (0..M-1)                                                                                                                        |
-| `$ps_vertex_idx`                |   ☐   |   ☐   |   ✅   | Index of the vertex being placed (0..K-1)                                                                                                                      |
-| `$ps_edge_len`                  |   ✅   |   ✅   |   ✅  | **Faces:** mean edge length for the face (scale-derived); **Edges:** *actual* length of this edge; **Verts:** target edge length parameter passed to placement |
-| `$ps_vertex_count`              |   ✅   |   ☐   |   ☐   | Number of vertices of this face (length of `$ps_face_pts2d`)                                                                                                   |
-| `$ps_face_midradius`            |   ✅   |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
-| `$ps_facet_radius`              |   ✅   |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
-| `$ps_face_pts2d`                |   ✅   |   ☐   |   ☐   | Face polygon vertices in **face-local 2D coords** `[[x,y]...]` suitable for `polygon(points=...)`                                                              |
-| `$ps_edge_midradius`            |   ☐   |   ✅   |   ☐   | Distance from poly centre to edge midpoint (world units; scale-derived)                                                                                        |
-| `$ps_edge_pts_local`            |   ☐   |   ✅   |   ☐   | Edge endpoints in **edge-local coords**, typically `[[ -L/2,0,0 ], [ +L/2,0,0 ]]`                                                                              |
-| `$ps_edge_verts_idx`            |   ☐   |   ✅   |   ☐   | Vertex indices of this edge `[v0, v1]`                                                                                                                         |
-| `$ps_edge_adj_faces_idx`        |   ☐   |   ✅   |   ☐   | Face indices adjacent to this edge (usually 2 for closed manifold polys)                                                                                       |
-| `$ps_vertex_valence`            |   ☐   |   ☐   |   ✅   | Number of incident edges at this vertex                                                                                                                        |
-| `$ps_vertex_neighbors_idx`      |   ☐   |   ☐   |   ✅   | Neighbor vertex indices incident to this vertex (order currently unspecified)                                                                                  |
-| `$ps_vertex_neighbor_pts_local` |   ☐   |   ☐   |   ✅   | Vectors from vertex to each neighbor in **vertex-local coords** `[[x,y,z]...]`                                                                                 |
-| `$ps_vert_radius`               |   ☐   |   ☐   |   ✅   | Distance from poly centre to this vertex (world units; scale-derived)                                                                                          |
-| `$ps_poly_center_local`         |   ✅  |   ✅   |   ✅   | Poly centre vector expressed in the current local coord frame (Faces/Edges/Verts). For vertices: `[0,0,-$ps_vert_radius]` by construction                      |
+| `$ps_facet_idx`                 |   ✅  |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
+| `$ps_vertex_count`              |   ✅  |   ☐   |   ☐   | Number of vertices of this face (length of `$ps_face_pts2d`)                                                                                                   |
+| `$ps_face_midradius`            |   ✅  |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
+| `$ps_facet_radius`              |   ✅  |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
+| `$ps_face_pts2d`                |   ✅  |   ☐   |   ☐   | Face polygon vertices in **face-local 2D coords** `[[x,y]...]` suitable for `polygon(points=...)`                                                              |
+| `$ps_vertex_valence`            |   ☐   |   ✅   |   ☐   | Number of incident edges at this vertex                                                                                                                       |
+| `$ps_vertex_neighbors_idx`      |   ☐   |   ✅   |   ☐   | Neighbor vertex indices incident to this vertex (order currently unspecified)                                                                                 |
+| `$ps_vertex_neighbor_pts_local` |   ☐   |   ✅   |   ☐   | Vectors from vertex to each neighbor in **vertex-local coords** `[[x,y,z]...]`                                                                                |
+| `$ps_vert_radius`               |   ☐   |   ✅   |   ☐   | Distance from poly centre to this vertex (world units; scale-derived)                                                                                         |
+| `$ps_vertex_idx`                |   ☐   |   ✅   |   ☐   | Index of the vertex being placed (0..K-1)                                                                                                                     |
+| `$ps_edge_idx`                  |   ☐   |   ☐   |   ✅  | Index of the edge being placed (0..M-1)                                                                                                                        |
+| `$ps_edge_midradius`            |   ☐   |   ☐   |   ✅  | Distance from poly centre to edge midpoint (world units; scale-derived)                                                                                        |
+| `$ps_edge_pts_local`            |   ☐   |   ☐   |   ✅  | Edge endpoints in **edge-local coords**, typically `[[ -L/2,0,0 ], [ +L/2,0,0 ]]`                                                                              |
+| `$ps_edge_verts_idx`            |   ☐   |   ☐   |   ✅  | Vertex indices of this edge `[v0, v1]`                                                                                                                         |
+| `$ps_edge_adj_faces_idx`        |   ☐   |   ☐   |   ✅  | Face indices adjacent to this edge (usually 2 for closed manifold polys)                                                                                       |
+| `$ps_edge_len`                  |   ✅  |   ✅   |   ✅  | **Faces:** mean edge length for the face (scale-derived); **Edges:** *actual* length of this edge; **Verts:** target edge length parameter passed to placement |
+| `$ps_poly_center_local`         |   ✅  |   ✅   |   ✅  | Poly centre vector expressed in the current local coord frame (Faces/Edges/Verts). For vertices: `[0,0,-$ps_vert_radius]` by construction                     |
 
 These make the system extremely expressive.
 
@@ -290,7 +290,7 @@ place_on_faces_ir(octahedron(), 30)
 
 ```scad
 place_on_edges_ir(icosahedron(), 40)
-    cube([$ps_edge_len, 2, 2], center = true);
+    cube([$ps_edge_len, 5, 1], center = true);
 ```
 
 ### **5.3 Dodecahedron from dual of icosa**
@@ -299,29 +299,37 @@ place_on_edges_ir(icosahedron(), 40)
 d = poly_dual(icosahedron());
 
 place_on_faces_ir(d, 40)
-    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
+    translate([0,0, -$ps_face_midradius + 20]) 
+        cylinder(r1 = 0, r2 = $ps_facet_radius, h = $ps_face_midradius, $fn = $ps_vertex_count);
 ```
 
-### **5.4 Catalan from dual of truncated octahedron**
+### **5.4 Truncated icosa**
+
+```scad
+!place_on_faces_ir(poly_truncate(icosahedron()), 40)
+    color($ps_vertex_count == 5? "blue" : "orange")
+        cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
+```
+
+### **5.5 Catalan from dual of truncated octahedron**
 
 ```scad
 d = poly_dual(poly_truncate(icosahedron()));
 
 place_on_faces_ir(d, 40)
-    linear_extrude(height = 0.2) polygon(points = $ps_face_pts2d)
-
+    linear_extrude(height = 0.2) polygon(points = $ps_face_pts2d);
 ```
 
-### **5.4 Visual debugging: original + dual overlay**
+### **5.6 Visual debugging: original + dual overlay**
 
 ```scad
-color("green")
+color("red", alpha = 0.5)
 place_on_faces_ir(octahedron(), 30)
-    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
+    cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
 
-color("gold", alpha = 0.2)
-place_on_faces_ir(poly_dual(octahedron(), 60)    // note scaling for vertex/face alignment
-    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
+color("gold", alpha = 0.3)
+place_on_faces_ir(poly_dual(octahedron()), 30)    // note scaling for vertex/face alignment
+    cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
 ```
 
 ---
