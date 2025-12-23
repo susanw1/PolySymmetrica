@@ -285,6 +285,7 @@ Tetrahedron is self-dual.
 place_on_faces_ir(octahedron(), 30)
     circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
 ```
+<img src="images/5.1 octa.png" alt="Simple octahedron" width="200px"/>
 
 ### **5.2 Edge frames on an icosahedron**
 
@@ -292,6 +293,7 @@ place_on_faces_ir(octahedron(), 30)
 place_on_edges_ir(icosahedron(), 40)
     cube([$ps_edge_len, 5, 1], center = true);
 ```
+<img src="images/5.2 icosa.png" alt="Edge frames on an icosahedron" width="200px"/>
 
 ### **5.3 Dodecahedron from dual of icosa**
 
@@ -302,6 +304,7 @@ place_on_faces_ir(d, 40)
     translate([0,0, -$ps_face_midradius + 20]) 
         cylinder(r1 = 0, r2 = $ps_facet_radius, h = $ps_face_midradius, $fn = $ps_vertex_count);
 ```
+<img src="images/5.3 dodeca-exploded.png" alt="Exploded dodecahedron" width="200px"/>
 
 ### **5.4 Truncated icosa**
 
@@ -310,8 +313,9 @@ place_on_faces_ir(d, 40)
     color($ps_vertex_count == 5? "blue" : "orange")
         cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
 ```
+<img src="images/5.4 trunc-icosa.png" alt="Truncated icosahedron" width="200px"/>
 
-### **5.5 Catalan from dual of truncated octahedron**
+### **5.5 Catalan from dual of truncated icosahedron**
 
 ```scad
 d = poly_dual(poly_truncate(icosahedron()));
@@ -319,6 +323,7 @@ d = poly_dual(poly_truncate(icosahedron()));
 place_on_faces_ir(d, 40)
     linear_extrude(height = 0.2) polygon(points = $ps_face_pts2d);
 ```
+<img src="images/5.5 dual-trunc-icosa.png" alt="Dual of truncated icosahedron" width="200px"/>
 
 ### **5.6 Visual debugging: original + dual overlay**
 
@@ -331,6 +336,7 @@ color("gold", alpha = 0.3)
 place_on_faces_ir(poly_dual(octahedron()), 30)    // note scaling for vertex/face alignment
     cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
 ```
+<img src="images/5.6 cube-octa.png" alt="Overlayed cube on octahedron" width="200px"/>
 
 ---
 
