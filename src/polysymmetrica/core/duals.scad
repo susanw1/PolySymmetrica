@@ -119,7 +119,7 @@ function ps_face_polar_verts(verts, faces) =
         for (fi = [0 : len(faces)-1])
             let(
                 f = faces[fi],
-                n = face_normal(verts, f),        // unit outward normal (given your face_normal)
+                n = face_normal(verts, f),        // unit outward normal
                 d = v_dot(n, verts[f[0]])         // plane offset along n
             )
             assert(d > 0, str("ps_face_polar_verts: d<=0 at face ", fi))
@@ -208,7 +208,6 @@ function poly_dual(poly) =
 
         // Recompute metrics after renormalisation
         ue_eir = dual_unit_edge_and_e_over_ir(dv, df_raw),
-        unit_e = ue_eir[0],          // should be ~1
         e_over_ir = ue_eir[1]
     )
-    make_poly(dv / unit_e, df_raw, e_over_ir);
+    make_poly(dv, df_raw, e_over_ir);

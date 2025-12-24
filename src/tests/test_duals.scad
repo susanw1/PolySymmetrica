@@ -12,8 +12,8 @@ use <testing_util.scad>
 p1 = octahedron();
 p2 = poly_dual(poly_dual(octahedron()));
 
-_0 = assert_verts_matches(poly_verts(p1), poly_verts(p2));
-_1 = assert_facet_matches(p1, p2);
+assert_verts_matches(poly_verts(p1), poly_verts(p2));
+assert_facet_matches(p1, p2);
 
 translate([-200,0,0]) placement_tester(poly_dual(tetrahedron()), 60);
 

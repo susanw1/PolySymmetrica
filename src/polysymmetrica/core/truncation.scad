@@ -49,6 +49,9 @@ function _ps_face_points_to_indices(uniq, face_pts, eps) =
 function poly_truncate(poly, t, eps = 1e-8) =
     let(t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t)
     assert(t_eff >= 0 && t_eff < 0.5, "'t' out of range")
+    (t_eff == 0) 
+        ? poly
+        :
     let(
         verts = poly_verts(poly),
         faces = poly_faces(poly),

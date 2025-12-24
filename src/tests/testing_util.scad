@@ -100,10 +100,11 @@ function _ta_j(M, i, j, matchR, seen) =
  echo(facets_eq_rot(A,C));  // false
 
 
-function assert_facet_matches(p1, p2) =
+module assert_facet_matches(p1, p2) {
     assert(facets_eq_rot(poly_faces(p1), poly_faces(p2)));
+}
 
-function assert_verts_matches(A, B, eps=1e-9) =
+module assert_verts_matches(A, B, eps=1e-9) {
     let(
         same_len = (len(A) == len(B)),
         diffs_ok =
@@ -112,7 +113,49 @@ function assert_verts_matches(A, B, eps=1e-9) =
                 for (i = [0 : len(A)-1])
                     norm(v_sub(A[i], B[i])) <= eps ? 1 : 0
             ]) == 1
-    )
-    assert(same_len, "Vertex arrays have different lengths")
-    assert(diffs_ok, "Vertex coordinates differ beyond epsilon")
-    true;
+    ) {
+        assert(same_len, "Vertex arrays have different lengths");
+        assert(diffs_ok, "Vertex coordinates differ beyond epsilon");
+    }    
+}
+            
+// --- poly validity checks ---
+
+function _ps_face_has_distinct_indices(f) =
+    let(n = len(f))
+    n == len([ for (i=[0:n-1]) if (len([for (j=[0:n-1]) if (f[j]==f[i]) 1]) == 1) 1 ]);
+
+function _ps_faces_in_range(verts, faces) =
+    all_faces_valid(verts, faces);
+
+function _ps_faces_min_arity(faces, min_k=3) =
+    min([ for (f=faces) len(f) ]) >= min_k;
+
+// Basic outwardness check based on the library definition.
+// NOTE: This assumes the poly is centered at origin (true for standard models & ops).
+function _ps_faces_outward(verts, faces, eps=1e-9) =
+    min([
+        for (f = faces)
+            let(c = face_centroid(verts, f),
+                n = face_normal(verts, f))
+            (v_dot(c,n) >= -eps) ? 1 : 0
+    ]) == 1;
+
+module assert_poly_valid(poly, eps=1e-9) {
+    verts = poly_verts(poly);
+    faces = poly_faces(poly);
+
+    assert(len(verts) >= 4, "poly invalid: <4 verts");
+    assert(len(faces) >= 4, "poly invalid: <4 faces");
+    assert(_ps_faces_in_range(verts, faces), "poly invalid: face index out of range");
+    assert(_ps_faces_min_arity(faces, 3), "poly invalid: face with <3 verts");
+
+    // distinct vertex indices per face (catches [0,1,1] etc)
+    assert(min([for (f=faces) _ps_face_has_distinct_indices(f) ? 1 : 0]) == 1,
+                "poly invalid: face has repeated vertex indices");
+
+    // outward check (good for the centered polys)
+    assert(_ps_faces_outward(verts, faces, eps), "poly invalid: faces not outward");
+
+    assert(poly_e_over_ir(poly) > 0, "poly invalid: e_over_ir <= 0");
+}
