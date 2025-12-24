@@ -144,7 +144,7 @@ Each operator:
 * aligns child geometry accordingly,
 * exposes special contextual variables:
 
-PolySymmetrica exposes per-placement metadata via `$ps_*` variables. 
+PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 
 (Conventions: ✅ = available, ☐ = not set)
 
@@ -302,7 +302,7 @@ place_on_edges(icosahedron(), 40)
 d = poly_dual(icosahedron());
 
 place_on_faces(d, 40)
-    translate([0,0, -$ps_face_midradius + 20]) 
+    translate([0,0, -$ps_face_midradius + 20])
         cylinder(r1 = 0, r2 = $ps_facet_radius, h = $ps_face_midradius, $fn = $ps_vertex_count);
 ```
 <img src="images/5.3 dodeca-exploded.png" alt="Exploded dodecahedron" width="200px"/>

@@ -12,7 +12,7 @@ use <../../core/truncation.scad>
 translate([-100,0,0])
 place_on_faces(octahedron(), 30)
     circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
-    
+
 // 5.2 Edge frames on an icosahedron
 place_on_edges(icosahedron(), 40)
     cube([$ps_edge_len, 5, 1], center = true);

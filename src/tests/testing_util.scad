@@ -4,15 +4,15 @@ use <../polysymmetrica/core/placement.scad>
 RAD = 40;
 
 module placement_tester(poly, rad=RAD) {
-    color("yellow") 
+    color("yellow")
     place_on_faces(poly, rad)
         cylinder(r = $ps_facet_radius, h = 2, $fn = $ps_vertex_count);
-        
-    color("red") 
+
+    color("red")
     place_on_vertices(poly, rad)
         cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
-        
-    color("blue") 
+
+    color("blue")
     place_on_edges(poly, rad)
         rotate([0,90,0]) cylinder(r1 = 5, r2 = 1, h = $ps_edge_len/2);
 }
@@ -109,7 +109,7 @@ function assert_verts_matches(A, B, eps=1e-9) =
         diffs_ok =
             same_len &&
             min([
-                for (i = [0 : len(A)-1]) 
+                for (i = [0 : len(A)-1])
                     norm(v_sub(A[i], B[i])) <= eps ? 1 : 0
             ]) == 1
     )

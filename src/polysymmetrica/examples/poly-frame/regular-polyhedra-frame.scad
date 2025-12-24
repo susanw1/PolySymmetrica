@@ -13,8 +13,8 @@ use <edge-mount.scad>
 use <../../core/duals.scad>
 
 
-// triangular-faced regular polyhedra 
-translate([-100, 0, -100]) 
+// triangular-faced regular polyhedra
+translate([-100, 0, -100])
 color("grey")
 place_on_faces(tetrahedron(), 30) {
     regular_polygon_frame(3, $ps_edge_len);

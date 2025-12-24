@@ -17,7 +17,7 @@ module edge_mount(len, edge_diam = EDGE_DIAM) {
         sphere(d = edge_diam);
         translate([len, 0, 0]) sphere(d = edge_diam);
     }
-    translate([EDGE_KEEL_IN-1, -EDGE_KEEL_T/2, -EDGE_KEEL]) 
+    translate([EDGE_KEEL_IN-1, -EDGE_KEEL_T/2, -EDGE_KEEL])
         cube([len-EDGE_KEEL_IN*2+2, EDGE_KEEL_T, EDGE_KEEL]);
 }
 
@@ -26,7 +26,7 @@ module regular_polygon_frame(n_vertex, edge_len) {
     polygon_rad = calc_radius(n_vertex, edge_len);
     apply_polygon_sym(n_vertex, polygon_rad) {
         edge_mount(edge_len);
-    } 
+    }
 }
 
 
@@ -43,7 +43,7 @@ module facet_cushion(n_vertex, edge_len, top_h = 2.5, ledge_h = 1.2, ledge_w = 4
     hull() {
         apply_polygon_sym(n_vertex, polygon_rad) {
             cube([0.01, 0.01, ledge_h]);
-        } 
+        }
     }
     hull() {
         apply_polygon_sym(n_vertex, polygon_rad - ledge_w * 2) {
@@ -52,7 +52,7 @@ module facet_cushion(n_vertex, edge_len, top_h = 2.5, ledge_h = 1.2, ledge_w = 4
                 sphere(r = H, $fn = 25);
                 translate([-H, -H, 0]) cube([H * 2, H * 2, H]);
             }
-        } 
+        }
     }
 }
 

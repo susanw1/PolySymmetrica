@@ -81,7 +81,7 @@ function v_sum(list) = [
 /** Calculate polygon edge, given N and radius */
 function calc_edge(n_vertex, rad) = 2 * rad * sin(180 / n_vertex);
 
-/** Calculate polygon radius, given N and edge length */ 
+/** Calculate polygon radius, given N and edge length */
 function calc_radius(n_vertex, edge_len) = edge_len / (2 * sin(180 / n_vertex));
 
 

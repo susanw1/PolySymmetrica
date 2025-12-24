@@ -8,7 +8,7 @@ use <../../core/placement.scad>
 use <../../models/regular_all.scad>
 
 // Inter-radius - sets the size of the shapes
-IR = 30; 
+IR = 30;
 
 DISPLAY_OFFSET_EXAMPLE = 200; // set to 0 to overlay edge examples onto other examples
 
@@ -16,7 +16,7 @@ COLORS = [ "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"
 module color_map(L, i) { color(COLORS[L[i]]) children(); }
 
 translate([0,0,DISPLAY_OFFSET_EXAMPLE]) {
-    // Triangular-faced regular polyhedra 
+    // Triangular-faced regular polyhedra
     translate([-100, 0, 0])
     place_on_faces(tetrahedron(), IR) {
         color_map([1, 4, 2, 3], $ps_facet_idx)

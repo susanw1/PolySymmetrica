@@ -60,34 +60,34 @@ translate([0,0,DISPLAY_OFFSET_PLACE_ON_FACES_EXAMPLE]) {
 //////////////////////////////////////////////
 // PLACE ON VERTICES (Gold)
 
-// Triangular-faced regular polyhedra 
+// Triangular-faced regular polyhedra
 
-translate([-100, 0, 0]) 
+translate([-100, 0, 0])
 color("gold")
 place_on_vertices(tetrahedron(), IR) {
     cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
 }
 
-translate([0, 0, 0]) 
+translate([0, 0, 0])
 color("gold")
 place_on_vertices(octahedron(), IR) {
     cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
 }
 
-translate([100, 0, 0]) 
+translate([100, 0, 0])
 color("gold")
 place_on_vertices(icosahedron(), IR) {
     cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
 }
 
 // Duals
-translate([0, 100, 0]) 
+translate([0, 100, 0])
 color("gold")
 place_on_vertices(hexahedron(), IR) {
     cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
 }
 
-translate([100, 100, 0]) 
+translate([100, 100, 0])
 color("gold")
 place_on_vertices(dodecahedron(), IR) {
     cylinder(h = 5, r = 5, $fn = $ps_vertex_valence);
@@ -97,35 +97,35 @@ place_on_vertices(dodecahedron(), IR) {
 //////////////////////////////////////////////
 // PLACE ON EDGES (Silver)
 
-// Triangular-faced regular polyhedra 
+// Triangular-faced regular polyhedra
 
 translate([0,0,DISPLAY_OFFSET_PLACE_ON_EDGES_EXAMPLE]) {
-    translate([-100, 0, 0]) 
+    translate([-100, 0, 0])
     color("silver")
     place_on_edges(tetrahedron(), IR) {
         rotate([0,90,0]) translate([0,0,-$ps_edge_len/2]) cylinder(h = $ps_edge_len, r = 2, $fn = 20);
     }
 
-    translate([0, 0, 0]) 
+    translate([0, 0, 0])
     color("silver")
     place_on_edges(octahedron(), IR) {
         rotate([0,90,0]) translate([0,0,-$ps_edge_len/2]) cylinder(h = $ps_edge_len, r = 2, $fn = 20);
     }
 
-    translate([100, 0, 0]) 
+    translate([100, 0, 0])
     color("silver")
     place_on_edges(icosahedron(), IR) {
         rotate([0,90,0]) translate([0,0,-$ps_edge_len/2]) cylinder(h = $ps_edge_len, r = 2, $fn = 20);
     }
 
     // Duals
-    translate([0, 100, 0]) 
+    translate([0, 100, 0])
     color("silver")
     place_on_edges(hexahedron(), IR) {
         rotate([0,90,0]) translate([0,0,-$ps_edge_len/2]) cylinder(h = $ps_edge_len, r = 2, $fn = 20);
     }
 
-    translate([100, 100, 0]) 
+    translate([100, 100, 0])
     color("silver")
     place_on_edges(dodecahedron(), IR) {
         rotate([0,90,0]) translate([0,0,-$ps_edge_len/2]) cylinder(h = $ps_edge_len, r = 2, $fn = 20);

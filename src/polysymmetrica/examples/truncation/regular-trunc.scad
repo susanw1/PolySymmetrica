@@ -20,14 +20,14 @@ module demo(p) {
         }
     }
 
-    color("silver") 
+    color("silver")
     place_on_edges(p, IR) {
         cube([$ps_edge_len, 1, 1], center = true);
 //        translate($ps_poly_center_local) cube([1,1,$ps_edge_midradius], center = false);
 //        translate([0,0,2]) text(str($ps_edge_idx), halign="center",valign="center", size=3);
     }
 
-    color("gold") 
+    color("gold")
     place_on_vertices(p, IR) {
         sphere(1.5, $fn=30);
 //        translate([0,0,2]) text(str($ps_vertex_idx), halign="center",valign="center", size=2);
