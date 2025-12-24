@@ -24,7 +24,7 @@ function tetrahedron() = let(unit_edge = 2 * sqrt(2)) make_poly(
         [0, 3, 2],
         [1, 2, 3]
     ],
-    
+
     // e_over_ir (index 3): edge_len / inter_radius
     2 * sqrt(2)
 );

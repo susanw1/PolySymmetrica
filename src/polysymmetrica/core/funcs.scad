@@ -18,21 +18,21 @@ function make_poly(verts, faces, e_over_ir=undef) =
         _0 = assert(len(verts) >= 4, "Polyhedron must have at least 4 vertices"),
         _1 = assert(len(faces) >= 4, "Polyhedron must have at least 4 faces"),
         _2 = assert(all_faces_valid(verts, faces), "Invalid face indices"),
-        
+
         // Auto-compute if not provided
         edges = _ps_edges_from_faces(faces),
         _ = assert(len(edges) >= 6, "Polyhedron must have at least 6 edges"),
-        
+
         // Calculate unit_edge from first edge if not given
         e0 = edges[0],
-        
+
         // Calculate e_over_ir from first edge midpoint if not given
         mid = (verts[e0[0]] + verts[e0[1]]) / 2,
         ir = norm(mid),
         computed_e_over_ir = is_undef(e_over_ir)
             ? norm(verts[e0[1]] - verts[e0[0]]) / ir
             : e_over_ir,
-        
+
         _3 = assert(computed_e_over_ir > 0, "e_over_ir must be positive")
     )
     [verts, faces, computed_e_over_ir];
@@ -65,7 +65,7 @@ function v_norm(a)     = let(L = norm(a)) (L == 0 ? [0,0,0] : a / L);
 function edge_equal(e1, e2) = (e1[0] == e2[0] && e1[1] == e2[1]);
 
 /** Sum of vector */
-function sum(a, i = 0) = 
+function sum(a, i = 0) =
     i >= len(a) ? 0 : a[i] + sum(a, i + 1);
 
 /** Sum of vector list (3D) */
@@ -78,13 +78,12 @@ function v_sum(list) = [
 ///////////////////////////////////////
 // Polygon helpers
 
-/** Calculate polygon edge, given N and radius */ 
+/** Calculate polygon edge, given N and radius */
 function calc_edge(n_vertex, rad) = 2 * rad * sin(180 / n_vertex);
 
 /** Calculate polygon radius, given N and edge length */ 
 function calc_radius(n_vertex, edge_len) = edge_len / (2 * sin(180 / n_vertex));
 
-    
 
 ///////////////////////////////////////
 // Geometry helpers
@@ -101,7 +100,7 @@ function face_normal(verts, f) =
         verts[f[1]] - verts[f[0]],
         verts[f[2]] - verts[f[0]]
     ));
-    
+
 
 // Return index of some neighbour vertex of vi (from the face list)
 function poly_vertex_neighbor(poly, vi) =
@@ -227,5 +226,3 @@ function orient_face_outward(verts, f) =
 function orient_all_faces_outward(verts, faces) =
     [ for (f = faces) orient_face_outward(verts, f) ];
 
-
-        

@@ -19,10 +19,10 @@ d = icosahedron();
 difference() {
     N = 3;
 
-    place_on_faces_ir(d, 30) {
+    place_on_faces(d, 30) {
         regular_polygon_frame(N, $ps_edge_len);
     }
-    place_on_faces_ir(d, 30) {
+    place_on_faces(d, 30) {
         // main facet base
         translate([0, 0, 1]) {
             linear_extrude(height = 5)

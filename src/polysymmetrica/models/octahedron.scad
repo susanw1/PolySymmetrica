@@ -34,7 +34,7 @@ function octahedron() = let(unit_edge = sqrt(2)) make_poly(
 // TEST DEMOS
 //////
 
-place_on_faces_ir(octahedron(), 40) {
+place_on_faces(octahedron(), 40) {
     color("yellow") cylinder($fn = 3, r = $ps_facet_radius / 4);
     color("green")
         translate([0,0,1-norm($ps_poly_center_local)])
@@ -57,6 +57,6 @@ place_on_faces(octahedron(), 40) {
     face_debug();
 }
 
-place_on_edges_ir(octahedron(), 40) {
+place_on_edges(octahedron(), 40) {
     color("black") cube([$ps_edge_len/2,1,1], center=true);
 }

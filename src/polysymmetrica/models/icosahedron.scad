@@ -69,7 +69,7 @@ function icosahedron() = let(unit_edge = 2) make_poly(
 // TEST DEMOS
 //////
 
-place_on_faces_ir(icosahedron(), 40) {
+place_on_faces(icosahedron(), 40) {
     cylinder($fn = 3, r = $ps_facet_radius );
 
     color("white") translate([0,0,1])
@@ -81,23 +81,23 @@ place_on_faces_ir(icosahedron(), 40) {
         cylinder(h = norm($ps_poly_center_local), r = 0.5, center = false);
 }
 
-place_on_vertices_ir(icosahedron(), 40) {
+place_on_vertices(icosahedron(), 40) {
     color("blue") cylinder($fn = 5, r = $ps_vert_radius/2);
     color("red") sphere(5);
     cylinder(h = 10, r = 2, center = false);  // along local +Z
 }
 
-place_on_faces_ir(icosahedron(), 40) {
+place_on_faces(icosahedron(), 40) {
     cylinder($fn = 3, r = $ps_facet_radius);
 }
 
-place_on_vertices_ir(icosahedron(), 40) {
+place_on_vertices(icosahedron(), 40) {
     color("blue") cylinder($fn = 5, r = $ps_vert_radius/3);
     color("pink") translate([0,0,10])
         text(str($ps_vertex_idx), size = 5, halign="center", valign="center");
 }
 
-place_on_edges_ir(icosahedron(), 50) {
+place_on_edges(icosahedron(), 50) {
     color("black") sphere(r=3);
     color("gray") translate([0,0,3])
         text(str($ps_edge_idx), size = 5, halign="center", valign="center");

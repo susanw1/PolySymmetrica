@@ -28,5 +28,5 @@ module demo_vertex_neighbors(spike_len = 8, spike_d = 1, tip_d = 2.0) {
     text(str($ps_vertex_valence), size=5);
 }
 
-place_on_vertices_ir(hexahedron(), 30)
+place_on_vertices(hexahedron(), 30)
     demo_vertex_neighbors(spike_d = 2);

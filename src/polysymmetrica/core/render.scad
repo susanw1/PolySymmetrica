@@ -23,20 +23,20 @@ module poly_describe(poly, name = undef) {
     echo ("==========", is_undef(name)? "Polyhedron" : name, "============");
     verts = poly_verts(poly);
     faces = poly_faces(poly);
-    
+
     echo ("#vertices: ", len(verts));
     echo ("#faces: ", len(faces));
     echo ("e_over_ir: ", poly_e_over_ir(poly));
     place_on_faces(poly, 1) {
-        echo (str("  facet#", $ps_facet_idx, ": (", $ps_vertex_count, " verts), poly_rad: ", $ps_face_midradius, 
+        echo (str("  facet#", $ps_facet_idx, ": (", $ps_vertex_count, " verts), poly_rad: ", $ps_face_midradius,
             " vert_idx: ", faces[$ps_facet_idx], ", verts: ", [for (f = faces[$ps_facet_idx]) verts[f]]));
     }
     place_on_vertices(poly, 1) {
-        echo (str("  vertex#", $ps_vertex_idx, ": (", $ps_vertex_valence, " edges), poly_rad: ", $ps_vert_radius, 
+        echo (str("  vertex#", $ps_vertex_idx, ": (", $ps_vertex_valence, " edges), poly_rad: ", $ps_vert_radius,
             " vert_idx: ", verts[$ps_vertex_idx], ", neighbours_idx: ", $ps_vertex_neighbors_idx));
     }
     place_on_edges(poly, 1) {
-        echo (str("  edge#", $ps_edge_idx, ": len: ", $ps_edge_len, ", poly_rad: ", $ps_edge_midradius, 
+        echo (str("  edge#", $ps_edge_idx, ": len: ", $ps_edge_len, ", poly_rad: ", $ps_edge_midradius,
             ", verts_idx: ", $ps_edge_verts_idx, ", faces_idx: ", $ps_edge_adj_faces_idx));
     }
     echo ("======================");
