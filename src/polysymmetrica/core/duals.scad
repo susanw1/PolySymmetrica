@@ -178,7 +178,7 @@ function scale_dual(poly, dual, mode="min") =
         rp = ps_edge_midradius_stat(poly,  mode),
         rd = ps_edge_midradius_stat(dual,  mode),
 
-        _0 = assert(abs(rd) > 1e-12, "ps_scale_dual_overlay_on_edges: dual edge midradius ~ 0")
+        _0 = assert(abs(rd) > 1e-12, "scale_dual: dual edge midradius ~ 0")
     )
     (sp * rp) / (sd * rd);
 
