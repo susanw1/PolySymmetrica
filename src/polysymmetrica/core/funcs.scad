@@ -21,19 +21,25 @@ function make_poly(verts, faces, e_over_ir=undef) =
 
         // Auto-compute if not provided
         edges = _ps_edges_from_faces(faces),
-        _ = assert(len(edges) >= 6, "Polyhedron must have at least 6 edges"),
+        _3 = assert(len(edges) >= 6, "Polyhedron must have at least 6 edges"),
 
-        // Calculate unit_edge from first edge if not given
-        e0 = edges[0],
+        // compute ir from min edge-midradius, not just the first edge
+        mids = [
+            for (e = edges)
+                norm((verts[e[0]] + verts[e[1]]) / 2)
+        ],
+        ir = min(mids),
+        _ir_ok = assert(ir > 0, "make_poly: inter-radius (min edge-midradius) must be positive"),
 
-        // Calculate e_over_ir from first edge midpoint if not given
-        mid = (verts[e0[0]] + verts[e0[1]]) / 2,
-        ir = norm(mid),
+        // choose an edge achieving that min (first one that matches)
+        ei_ir = [ for (i = [0:len(edges)-1]) if (abs(mids[i] - ir) < 1e-12) i ][0],
+        e_ir  = edges[ei_ir],
+
         computed_e_over_ir = is_undef(e_over_ir)
-            ? norm(verts[e0[1]] - verts[e0[0]]) / ir
+            ? norm(verts[e_ir[1]] - verts[e_ir[0]]) / ir
             : e_over_ir,
-
-        _3 = assert(computed_e_over_ir > 0, "e_over_ir must be positive")
+        
+        _5 = assert(computed_e_over_ir > 0, "e_over_ir must be positive")
     )
     [verts, faces, computed_e_over_ir];
 
