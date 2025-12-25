@@ -9,3 +9,6 @@ run_TestDuals();
 run_TestTruncation();
 
 echo("=== PolySymmetrica tests: PASS ===");
+
+linear_extrude(height = 2)
+    text(str("Tests Passed!"));
