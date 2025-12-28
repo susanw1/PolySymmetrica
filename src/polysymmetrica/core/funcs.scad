@@ -85,7 +85,7 @@ function v_sum(list) = [
 
 function find_edge_index(edges, a, b) =
     let(
-        e = (a < b) ? [a,b] : [b,a],
+        e = v_ordered(a, b),
         idxs = [for (i = [0 : len(edges)-1]) if (edge_equal(edges[i], e)) i]
     )
     idxs[0];   // assume the edge exists
