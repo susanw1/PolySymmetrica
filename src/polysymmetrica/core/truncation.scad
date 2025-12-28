@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>
-use <duals.scad>  // for faces_around_vertex helpers if you keep them there
+use <duals.scad>  // for faces_around_vertex helpers
 
 // --- internal helpers ---
 
@@ -17,13 +17,11 @@ function _ps_edge_point_near(edges, edge_pts, a, b, near_v) =
     )
     (near_v == e[0]) ? edge_pts[ei][0] : edge_pts[ei][1];
 
-// point equality within eps
-function _ps_peq(p,q,eps) = norm(p-q) <= eps;
 
 // index of point p in list (or -1)
 function _ps_find_point(list, p, eps, i=0) =
     (i >= len(list)) ? -1 :
-    (_ps_peq(list[i], p, eps) ? i : _ps_find_point(list, p, eps, i+1));
+    (point_eq(list[i], p, eps) ? i : _ps_find_point(list, p, eps, i+1));
 
 // Build unique vertex list from a flat list of points
 function _ps_unique_points(points, eps, acc=[], i=0) =
@@ -142,6 +140,71 @@ function poly_truncate(poly, t, eps = 1e-8) =
         e_over_ir = unit_e / ir
     )
     make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+
+// Rectification: replace each vertex with the midpoint of each incident edge.
+function poly_rectify(poly) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        edges = _ps_edges_from_faces(faces),
+
+        edge_mid = [
+            for (e = edges)
+                (verts[e[0]] + verts[e[1]]) / 2
+        ],
+
+        // Faces corresponding to original faces: walk edges in face order.
+        face_faces = [
+            for (f = faces)
+                let(n = len(f))
+                [
+                    for (k = [0:n-1])
+                        let(
+                            a = f[k],
+                            b = f[(k+1)%n],
+                            ei = find_edge_index(edges, a, b)
+                        )
+                        ei
+                ]
+        ],
+
+        // Faces corresponding to original vertices: cycle around the vertex.
+        edge_faces = edge_faces_table(faces, edges),
+        vert_faces = [
+            for (vi = [0:len(verts)-1])
+                let(
+                    fc = faces_around_vertex(poly, vi, edges, edge_faces),
+                    neigh = [
+                        for (idx = [0:len(fc)-1])
+                            let(
+                                f = faces[fc[idx]],
+                                m = len(f),
+                                pos = [ for (k = [0:m-1]) if (f[k]==vi) k ][0],
+                                v_next = f[(pos+1)%m]
+                            )
+                            v_next
+                    ]
+                )
+                [
+                    for (vn = neigh)
+                        let(ei = find_edge_index(edges, vi, vn))
+                        ei
+                ]
+        ],
+
+        faces_idx = concat(face_faces, vert_faces),
+        faces_out = orient_all_faces_outward(edge_mid, faces_idx),
+
+        edges_new = _ps_edges_from_faces(faces_out),
+        e0 = edges_new[0],
+        vA = edge_mid[e0[0]],
+        vB = edge_mid[e0[1]],
+        unit_e = norm(vB - vA),
+        mid = (vA + vB) / 2,
+        ir  = norm(mid),
+        e_over_ir = unit_e / ir
+    )
+    make_poly(edge_mid / unit_e, faces_out, e_over_ir);
 
 
 

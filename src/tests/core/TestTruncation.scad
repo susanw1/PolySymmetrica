@@ -102,6 +102,17 @@ module test_poly_truncate_then_dual__counts_relations() {
     assert_int_eq(len(poly_faces(d)), len(poly_verts(q)), "dual faces==verts");
 }
 
+module test_poly_rectify__tetra_counts() {
+    p=_tetra_poly();
+    q=poly_rectify(p);
+    assert_poly_valid(q);
+
+    // rectified tetrahedron is an octahedron
+    assert(len(poly_verts(q)) == 6, "rectify tetra verts");
+    assert(len(poly_faces(q)) == 8, "rectify tetra faces");
+    assert(_count_faces_of_size(q,3) == 8, "rectify tetra: 8 triangles");
+}
+
 module test_truncate__tetra_archimedean_counts() {
     p = poly_truncate(tetrahedron(), 1/3);
     assert_poly_valid(p);
@@ -174,6 +185,7 @@ module run_TestTruncation() {
     test_poly_truncate__tetra_counts_at_one_third();
     test_poly_truncate__t_zero_counts_preserved();
     test_poly_truncate_then_dual__counts_relations();
+    test_poly_rectify__tetra_counts();
     
     test_truncate__tetra_archimedean_counts();
     test_truncate__octa_archimedean_counts();

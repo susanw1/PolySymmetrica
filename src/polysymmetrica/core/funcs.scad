@@ -90,6 +90,10 @@ function find_edge_index(edges, a, b) =
     )
     idxs[0];   // assume the edge exists
 
+// point equality within eps
+function point_eq(p,q,eps) = norm(p-q) <= eps;
+
+
 ///////////////////////////////////////
 // Polygon helpers
 
