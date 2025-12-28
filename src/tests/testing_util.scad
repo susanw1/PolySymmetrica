@@ -18,6 +18,13 @@ module placement_tester(poly, rad=RAD) {
 }
 
 
+// Small helper to build a unit-edge tetra-ish poly (doesn’t need to be perfect)
+function _tetra_poly() =
+    make_poly(
+        [[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]],
+        [[0,1,2],[0,3,1],[0,2,3],[1,3,2]]
+    );
+
 // --- facet equivalence helpers ---
 
 // rotate list left by k (k can be >= len)

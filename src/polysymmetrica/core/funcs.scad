@@ -54,8 +54,6 @@ function all_faces_valid(verts, faces) =
 function all_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
 
-
-
 ///////////////////////////////////////
 // Handy vector functions (and aliases)
 
@@ -66,6 +64,9 @@ function v_dot(a, b)   = a * b;             // dot product
 function v_cross(a, b) = cross(a, b);       // OpenSCAD built-in
 function v_len(a)      = norm(a);           // built-in length
 function v_norm(a)     = let(L = norm(a)) (L == 0 ? [0,0,0] : a / L);
+
+function v_ordered(a, b) = (a < b) ? [a,b] : [b,a];
+
 
 // Edge equality
 function edge_equal(e1, e2) = (e1[0] == e2[0] && e1[1] == e2[1]);
@@ -80,6 +81,14 @@ function v_sum(list) = [
     sum([for (v = list) v[1]]),
     sum([for (v = list) v[2]])
 ];
+
+
+function find_edge_index(edges, a, b) =
+    let(
+        e = (a < b) ? [a,b] : [b,a],
+        idxs = [for (i = [0 : len(edges)-1]) if (edge_equal(edges[i], e)) i]
+    )
+    idxs[0];   // assume the edge exists
 
 ///////////////////////////////////////
 // Polygon helpers

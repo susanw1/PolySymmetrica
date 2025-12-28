@@ -9,17 +9,10 @@ use <duals.scad>  // for faces_around_vertex helpers if you keep them there
 
 // --- internal helpers ---
 
-function _ps_edge_sorted(a,b) = (a < b) ? [a,b] : [b,a];
-
-// Find edge index in edges[] for undirected edge (a,b)
-function _ps_edge_index(edges, a, b) =
-    let(e = _ps_edge_sorted(a,b))
-    [ for (i = [0:len(edges)-1]) if (edge_equal(edges[i], e)) i ][0];
-
 // For edge ei=[a,b], edge_pts[ei]=[P_a,P_b] (near a and near b)
 function _ps_edge_point_near(edges, edge_pts, a, b, near_v) =
     let(
-        ei = _ps_edge_index(edges, a, b),
+        ei = find_edge_index(edges, a, b),
         e  = edges[ei]
     )
     (near_v == e[0]) ? edge_pts[ei][0] : edge_pts[ei][1];

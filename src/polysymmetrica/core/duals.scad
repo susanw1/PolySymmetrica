@@ -21,14 +21,6 @@ function vertex_incident_faces(poly, vi) =
     ];
 
 
-function find_edge_index(edges, a, b) =
-    let(
-        e = (a < b) ? [a,b] : [b,a],
-        idxs = [for (i = [0 : len(edges)-1]) if (edge_equal(edges[i], e)) i]
-    )
-    idxs[0];   // assume the edge exists
-
-
 function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
     let(
         f = faces[f_cur],

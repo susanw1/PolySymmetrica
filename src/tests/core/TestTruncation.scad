@@ -13,30 +13,11 @@ module assert_int_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
 }
 
-// Small helper to build a unit-edge tetra-ish poly (doesn’t need to be perfect)
-function _tetra_poly() =
-    make_poly(
-        [[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]],
-        [[0,1,2],[0,3,1],[0,2,3],[1,3,2]]
-    );
-
 function _count_faces_of_size(poly, k) =
     sum([ for (f = poly_faces(poly)) (len(f)==k) ? 1 : 0 ]);
 
 
-// internal helpers: _ps_edge_sorted, _ps_edge_index, _ps_edge_point_near, equality/find/unique/remap
-module test__ps_edge_sorted__orders() {
-    assert(_ps_edge_sorted(1,2) == [1,2], "sorted 1,2");
-    assert(_ps_edge_sorted(2,1) == [1,2], "sorted 2,1");
-}
-
-module test__ps_edge_index__finds() {
-    faces = poly_faces(_tetra_poly());
-    edges = _ps_edges_from_faces(faces);
-    i = _ps_edge_index(edges, 0, 1);
-    assert(i >= 0, "edge exists");
-    assert(edges[i] == [0,1], "stored sorted");
-}
+// internal helpers: _ps_edge_point_near, equality/find/unique/remap
 
 module test__ps_edge_point_near__picks_correct_end() {
     p=_tetra_poly();
@@ -53,7 +34,7 @@ module test__ps_edge_point_near__picks_correct_end() {
 
     // pick edge (0,1) near 0 should equal first point of that edge entry
     P0 = _ps_edge_point_near(edges, edge_pts, 0, 1, 0);
-    ei = _ps_edge_index(edges, 0, 1);
+    ei = find_edge_index(edges, 0, 1);
     assert(norm(P0 - edge_pts[ei][0]) < 1e-12, "near 0 uses [0]");
 }
 
@@ -183,8 +164,6 @@ module test_truncate__dodeca_archimedean_counts() {
 
 // suite
 module run_TestTruncation() {
-    test__ps_edge_sorted__orders();
-    test__ps_edge_index__finds();
     test__ps_edge_point_near__picks_correct_end();
     test__ps_unique_points__dedups_with_eps();
     test__ps_face_points_to_indices__maps();

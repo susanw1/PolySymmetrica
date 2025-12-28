@@ -61,6 +61,11 @@ module test_v_ops__dot_cross_norm() {
     assert_vec3_near(v_norm([3,0,0]), [1,0,0], EPS, "v_norm axis");
 }
 
+// internal helpers: v_ordered
+module test_v_ordered() {
+    assert(v_ordered(1,2) == [1,2], "sorted 1,2");
+    assert(v_ordered(2,1) == [1,2], "sorted 2,1");
+}
 
 // --- edge_equal ---
 module test_edge_equal__ordered() {
@@ -79,6 +84,14 @@ module test_v_sum__vec3_list() {
     assert_vec3_near(v_sum([[1,2,3],[4,5,6]]), [5,7,9], EPS, "v_sum");
 }
 
+
+module test_find_edge_index__finds() {
+    faces = poly_faces(_tetra_poly());
+    edges = _ps_edges_from_faces(faces);
+    i = find_edge_index(edges, 0, 1);
+    assert(i >= 0, "edge exists");
+    assert(edges[i] == [0,1], "stored sorted");
+}
 
 // --- polygon helpers ---
 module test_calc_edge_radius_roundtrip() {
@@ -206,9 +219,11 @@ module run_TestFuncs() {
     test_make_poly__valid_tetra_computes_e_over_ir();
 
     test_v_ops__dot_cross_norm();
+//    test_v_ordered();
     test_edge_equal__ordered();
     test_sum__numbers();
     test_v_sum__vec3_list();
+    test_find_edge_index__finds();
 
     test_calc_edge_radius_roundtrip();
     test_calc_edge__known_values();
@@ -228,3 +243,5 @@ module run_TestFuncs() {
     test_orient_face_outward__makes_centroid_dot_normal_nonnegative();
     test_orient_all_faces_outward__length_preserved();
 }
+
+run_TestFuncs();
