@@ -34,4 +34,5 @@ jobs:
         run: |
           openscad --version
           openscad -o passed.stl  src/tests/run_all.scad
+          # openscad -o main_trunc.png src/polysymmetrica/examples/truncation/main_trunc.scad
           
