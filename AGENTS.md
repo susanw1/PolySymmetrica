@@ -1,0 +1,34 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+- `src/polysymmetrica/core/`: core math, placement, duals, truncation utilities.
+- `src/polysymmetrica/models/`: base polyhedra (tetrahedron, octahedron, icosahedron) and derived solids.
+- `src/polysymmetrica/examples/`: runnable OpenSCAD examples (basics, truncation, poly-frame).
+- `src/tests/` and `src/tests/core/`: OpenSCAD unit tests and test runner files.
+- `docs/`: developer guide and images used in documentation.
+
+## Build, Test, and Development Commands
+This repo is OpenSCAD-first; there is no separate build system.
+- Render an example locally:
+  `openscad -o /tmp/ps-preview.stl src/polysymmetrica/examples/basics/main-basics.scad`
+- Run the full test suite (check console for PASS):
+  `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
+- Negative test (expects a failure):
+  `openscad -o /tmp/ps-neg.stl src/tests/run_negative.scad`
+
+## Coding Style & Naming Conventions
+- Indentation: 4 spaces; keep blank lines between logical blocks.
+- Functions/modules: `snake_case` (e.g., `poly_dual`, `place_on_faces`).
+- Files: lower snake case (e.g., `placement.scad`, `test_duals.scad`).
+- Poly descriptor shape is `[verts, faces, e_over_ir]`; use the accessor helpers in `core/funcs.scad`.
+- Preserve `$ps_*` variable naming conventions for placement metadata (see `docs/developer_guide.md`).
+
+## Testing Guidelines
+- Tests are plain OpenSCAD modules that call `assert(...)` in `src/tests/core/`.
+- Add new test modules with a `test_*` prefix and register them in `src/tests/run_all.scad`.
+- Keep numeric tolerances explicit (see `EPS` in `TestFuncs.scad`).
+
+## Commit & Pull Request Guidelines
+- Commit messages are short, imperative, and capitalized (e.g., "Consolidate utility funcs").
+- PRs should include a brief summary, affected `.scad` paths, and screenshots or renders for geometry changes.
+- Note any new tests or expected output changes in the PR description.
