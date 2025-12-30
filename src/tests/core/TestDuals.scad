@@ -1,5 +1,7 @@
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/duals.scad>
+use <../../polysymmetrica/core/truncation.scad>
+use <../../polysymmetrica/models/regular_all.scad>
 use <../testing_util.scad>
 
 EPS = 1e-7;
@@ -120,8 +122,38 @@ module test_poly_dual__tetra_self_dual_counts() {
 module test_scale_dual__sane_range() {
     p=_octa_poly();
     d=poly_dual(p);
-    m = scale_dual(p, d, "min");
+    m = scale_dual(p, d);
     assert(m > 0.1 && m < 10, "scale_dual sane");
+}
+
+// face-family helpers
+module test_face_family_helpers__rectified_octa() {
+    p = poly_rectify(octahedron()); // cubocta: 8 triangles, 6 squares
+    mode = ps_face_family_mode(p);
+    maxf = ps_face_family_max(p);
+    assert_int_eq(mode[0], 3, "mode face size 3");
+    assert_int_eq(mode[1], 8, "mode count 8");
+    assert_int_eq(maxf[0], 4, "max face size 4");
+    assert_int_eq(maxf[1], 6, "max count 6");
+}
+
+module test_face_family_helpers__truncated_octa() {
+    p = poly_truncate(octahedron(), 1/3); // 6 squares, 8 hexagons
+    mode = ps_face_family_mode(p);
+    maxf = ps_face_family_max(p);
+    assert_int_eq(mode[0], 6, "mode face size 6");
+    assert_int_eq(mode[1], 8, "mode count 8");
+    assert_int_eq(maxf[0], 6, "max face size 6");
+    assert_int_eq(maxf[1], 8, "max count 8");
+}
+
+module test_scale_dual_edge_cross__octa_consistent() {
+    p = octahedron();
+    d = poly_dual(p);
+    s0 = scale_dual_edge_cross(p, d, 0, 0);
+    s1 = scale_dual_edge_cross(p, d, 0, 1);
+    assert_near(s0, s1, 1e-6, "edge_cross consistent");
+    assert(s0 > 0, "edge_cross positive");
 }
 
 
@@ -145,5 +177,8 @@ module run_TestDuals() {
     test_poly_dual__octa_to_cube_counts();
     test_poly_dual__tetra_self_dual_counts();
     test_scale_dual__sane_range();
+    test_face_family_helpers__rectified_octa();
+    test_face_family_helpers__truncated_octa();
+    test_scale_dual_edge_cross__octa_consistent();
     test_poly_dual__dual_dual_facet_match_octa();
 }

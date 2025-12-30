@@ -93,6 +93,22 @@ function find_edge_index(edges, a, b) =
 // point equality within eps
 function point_eq(p,q,eps) = norm(p-q) <= eps;
 
+// ---- List helpers ----
+function _ps_list_min(list, i=0, cur=undef) =
+    (i >= len(list)) ? cur :
+    let(v = list[i])
+    _ps_list_min(list, i+1, is_undef(cur) ? v : (v < cur ? v : cur));
+
+function _ps_remove_first(list, v, i=0) =
+    (i >= len(list)) ? [] :
+    (list[i] == v) ? [for (j = [i+1:1:len(list)-1]) list[j]]
+                  : concat([list[i]], _ps_remove_first(list, v, i+1));
+
+function _ps_sort(list, acc=[]) =
+    (len(list) == 0) ? acc :
+    let(mn = _ps_list_min(list))
+    _ps_sort(_ps_remove_first(list, mn), concat(acc, [mn]));
+
 
 ///////////////////////////////////////
 // Polygon helpers
@@ -244,4 +260,3 @@ function orient_face_outward(verts, f) =
 
 function orient_all_faces_outward(verts, faces) =
     [ for (f = faces) orient_face_outward(verts, f) ];
-

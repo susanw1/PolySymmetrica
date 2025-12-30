@@ -28,6 +28,11 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Add new test modules with a `test_*` prefix and register them in `src/tests/run_all.scad`.
 - Keep numeric tolerances explicit (see `EPS` in `TestFuncs.scad`).
 
+## Scaling & Dual Alignment Notes
+- Dual overlays are sensitive to which geometric feature you choose to align (edge midpoints vs face families).
+- `scale_dual()` aligns edge-mid spheres; for edge-crossing alignment of a specific edge family, use `scale_dual_edge_cross(poly, dual, face_idx, edge_pos)`.
+- For non-uniform truncations, no single scale aligns every edge family; pick the family you want to prioritize.
+
 ## Commit & Pull Request Guidelines
 - Commit messages are short, imperative, and capitalized (e.g., "Consolidate utility funcs").
 - PRs should include a brief summary, affected `.scad` paths, and screenshots or renders for geometry changes.

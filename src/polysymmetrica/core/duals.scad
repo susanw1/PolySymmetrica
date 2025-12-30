@@ -150,29 +150,226 @@ function ps_edge_midradius_list(poly) =
     assert(len(rs) > 0, "ps_edge_midradius_list: poly has no edges")
     rs;
 
-function ps_edge_midradius_stat(poly, mode="min") =
+function ps_edge_midradius_stat(poly) =
     let(rs = ps_edge_midradius_list(poly))
-    (mode == "min") ? min(rs)
-  : (mode == "max") ? max(rs)
-  : sum(rs) / len(rs);
+        min(rs);
 
+// ---- Face facet-radius helpers ----
+
+// Mean vertex distance from face centroid for each face (unit-edge coords).
+function ps_face_facet_radius_list(poly) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly)
+    )
+    [
+        for (f = faces)
+            let(
+                c = face_centroid(verts, f),
+                rs = [ for (vid = f) norm(verts[vid] - c) ]
+            )
+            sum(rs) / len(rs)
+    ];
+
+function ps_face_facet_radius_stat(poly, face_k=undef) =
+    let(
+        faces = poly_faces(poly),
+        rs_all = ps_face_facet_radius_list(poly),
+        rs = is_undef(face_k)
+            ? rs_all
+            : [ for (i = [0:len(faces)-1]) if (len(faces[i]) == face_k) rs_all[i] ],
+        _0 = assert(len(rs) > 0, "ps_face_facet_radius_stat: no faces of that size")
+    )
+    min(rs);
+
+// ---- Face-family helpers ----
+
+// Return [k, count] for the face size that appears most frequently.
+// Ties are resolved by choosing the smallest k.
+function ps_face_family_mode(poly) =
+    let(
+        faces = poly_faces(poly),
+        sizes = [ for (f = faces) len(f) ],
+        uniq = [
+            for (i = [0:len(sizes)-1])
+                let(k = sizes[i])
+                    if (sum([ for (j = [0:1:i-1]) sizes[j] == k ? 1 : 0 ]) == 0) k
+        ],
+        counts = [ for (k = uniq) sum([ for (s = sizes) s == k ? 1 : 0 ]) ],
+        max_count = max(counts),
+        best = [
+            for (i = [0:len(uniq)-1])
+                if (counts[i] == max_count) uniq[i]
+        ],
+        k = min(best)
+    )
+    [k, max_count];
+
+// Return [k, count] for the largest face size.
+function ps_face_family_max(poly) =
+    let(
+        faces = poly_faces(poly),
+        sizes = [ for (f = faces) len(f) ],
+        k = max(sizes),
+        count = sum([ for (s = sizes) s == k ? 1 : 0 ])
+    )
+    [k, count];
+
+// ---- Edge-crossing scale helpers ----
+
+function _ps_det3(m) =
+    m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) -
+    m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0]) +
+    m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+
+function _ps_replace_col(m, col, b) =
+    [
+        [ col == 0 ? b[0] : m[0][0], col == 1 ? b[0] : m[0][1], col == 2 ? b[0] : m[0][2] ],
+        [ col == 0 ? b[1] : m[1][0], col == 1 ? b[1] : m[1][1], col == 2 ? b[1] : m[1][2] ],
+        [ col == 0 ? b[2] : m[2][0], col == 1 ? b[2] : m[2][1], col == 2 ? b[2] : m[2][2] ]
+    ];
+
+// Solve 3x3 linear system M*x = b via Cramer's rule; returns [x0,x1,x2] or undef.
+function _ps_solve3(m, b, eps=1e-12) =
+    let(
+        det = _ps_det3(m),
+        _0 = det == 0 ? 0 : 0
+    )
+    (abs(det) < eps) ? undef
+  : [
+        _ps_det3(_ps_replace_col(m, 0, b)) / det,
+        _ps_det3(_ps_replace_col(m, 1, b)) / det,
+        _ps_det3(_ps_replace_col(m, 2, b)) / det
+    ];
+
+function _ps_vertex_valence_list(verts, edges) =
+    [
+        for (vi = [0:len(verts)-1])
+            sum([
+                for (e = edges)
+                    (e[0] == vi || e[1] == vi) ? 1 : 0
+            ])
+    ];
+
+function _ps_edge_signature_full(edges, faces, edge_faces, valences, ei) =
+    let(
+        fpair = edge_faces[ei],
+        k0 = len(faces[fpair[0]]),
+        k1 = len(faces[fpair[1]]),
+        ks = (k0 < k1) ? [k0, k1] : [k1, k0],
+        e = edges[ei],
+        v0 = valences[e[0]],
+        v1 = valences[e[1]],
+        vs = (v0 < v1) ? [v0, v1] : [v1, v0]
+    )
+    [ks[0], ks[1], vs[0], vs[1]];
+
+// Return edge index for an edge on face face_idx at edge_pos.
+function ps_edge_from_face(poly, face_idx, edge_pos) =
+    let(
+        faces = poly_faces(poly),
+        f = faces[face_idx],
+        n = len(f),
+        a = f[edge_pos % n],
+        b = f[(edge_pos + 1) % n],
+        edges = _ps_edges_from_faces(faces)
+    )
+    find_edge_index(edges, a, b);
+
+// Compute a scale that makes dual edges intersect the selected edge family.
+// face_idx selects a face; edge_pos selects the reference edge within that face.
+// The edge family is defined by matching adjacent face sizes and endpoint valences.
+function scale_dual_edge_cross(poly, dual, face_idx, edge_pos=0, eps=1e-12, len_eps=1e-6) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        edges = _ps_edges_from_faces(faces),
+        edge_faces = edge_faces_table(faces, edges),
+        valences = _ps_vertex_valence_list(verts, edges),
+
+        ref_ei = ps_edge_from_face(poly, face_idx, edge_pos),
+        ref_sig = _ps_edge_signature_full(edges, faces, edge_faces, valences, ref_ei),
+        ref_len = norm(verts[edges[ref_ei][1]] - verts[edges[ref_ei][0]]),
+
+        // gather edges matching the signature
+        edge_ids = [
+            for (ei = [0:len(edges)-1])
+                let(
+                    sig = _ps_edge_signature_full(edges, faces, edge_faces, valences, ei),
+                    len_e = norm(verts[edges[ei][1]] - verts[edges[ei][0]])
+                )
+                if (sig == ref_sig && abs(len_e - ref_len) <= len_eps) ei
+        ],
+
+        dverts = poly_verts(dual),
+        sp = poly_e_over_ir(poly),
+        sd = poly_e_over_ir(dual),
+
+        scales = [
+            for (ei = edge_ids)
+                let(
+                    e = edges[ei],
+                    A = verts[e[0]],
+                    B = verts[e[1]],
+                    d_f = edge_faces[ei],
+                    D0 = dverts[d_f[0]],
+                    D1 = dverts[d_f[1]],
+                    E = D1 - D0,
+                    M = [
+                        [ (B-A)[0], -D0[0], -E[0] ],
+                        [ (B-A)[1], -D0[1], -E[1] ],
+                        [ (B-A)[2], -D0[2], -E[2] ]
+                    ],
+                    sol = _ps_solve3(M, -A, eps)
+                )
+                is_undef(sol) ? undef
+              : let(
+                    v = sol[0],
+                    s = sol[1],
+                    y = sol[2],
+                    u = (abs(s) < eps) ? undef : y / s,
+                    ok = (s > 0) && (v >= 0) && (v <= 1) && (!is_undef(u)) && (u >= 0) && (u <= 1)
+                )
+                ok ? (s * sp / sd) : undef
+        ],
+
+        s_vals = [ for (s = scales) if (!is_undef(s)) s ],
+        _0 = assert(len(s_vals) > 0, "scale_dual_edge_cross: no valid edges found"),
+        sorted = _ps_sort(s_vals),
+        n = len(sorted)
+    )
+    (n % 2 == 1)
+        ? sorted[(n-1)/2]
+        : (sorted[n/2 - 1] + sorted[n/2]) / 2;
 
 
 // ---- IR overlay multiplier so dual's edges line up with poly's edges (mid-sphere style) ----
 // Returns multiplier 'm' such that using IR*m for the dual tends to align edge crossings.
-function scale_dual(poly, dual, mode="min") =
+function scale_dual(poly, dual) =
     let(
         // scaling from unit-edge coords to "per-IR world coords":
         // world = IR * (e_over_ir/unit_edge) * verts_unit
         sp = poly_e_over_ir(poly),
         sd = poly_e_over_ir(dual),
 
-        rp = ps_edge_midradius_stat(poly,  mode),
-        rd = ps_edge_midradius_stat(dual,  mode),
+        rp = ps_edge_midradius_stat(poly),
+        rd = ps_edge_midradius_stat(dual),
 
         _0 = assert(abs(rd) > 1e-12, "scale_dual: dual edge midradius ~ 0")
     )
     (sp * rp) / (sd * rd);
+
+// ---- Face-radius scaling to align face overlays ----
+// Returns multiplier 'm' so that the unit-edge facet radius of poly matches the dual's.
+// Use face_k (vertex count) to select a face family on the poly (e.g., 4 for squares).
+// For world-space overlays, multiply this by scale_dual(poly, dual).
+function scale_dual_face_radius(poly, dual, face_k=undef, dual_face_k=undef) =
+    let(
+        rp = ps_face_facet_radius_stat(poly, face_k),
+        rd = ps_face_facet_radius_stat(dual, dual_face_k),
+        _0 = assert(abs(rd) > 1e-12, "scale_dual_face_radius: dual face radius ~ 0")
+    )
+    rp / rd * scale_dual(poly, dual);
 
 
 

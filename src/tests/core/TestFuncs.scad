@@ -209,6 +209,25 @@ module test_orient_all_faces_outward__length_preserved() {
     assert_int_eq(len(out), len(faces), "face count preserved");
 }
 
+module test_ps_sort__numbers() {
+    v = [3,1,4,1,5,9,2];
+    s = _ps_sort(v);
+    assert(s == [1,1,2,3,4,5,9], "sort ints");
+}
+
+module test_ps_sort__floats() {
+    v = [0.3, 0.1, 0.2];
+    s = _ps_sort(v);
+    assert_near(s[0], 0.1, 1e-12, "sort floats 0");
+    assert_near(s[1], 0.2, 1e-12, "sort floats 1");
+    assert_near(s[2], 0.3, 1e-12, "sort floats 2");
+}
+
+module test_ps_sort__empty() {
+    s = _ps_sort([]);
+    assert_int_eq(len(s), 0, "sort empty");
+}
+
 
 // ---- suite ----
 module run_TestFuncs() {
@@ -242,6 +261,9 @@ module run_TestFuncs() {
 
     test_orient_face_outward__makes_centroid_dot_normal_nonnegative();
     test_orient_all_faces_outward__length_preserved();
+    test_ps_sort__numbers();
+    test_ps_sort__floats();
+    test_ps_sort__empty();
 }
 
 run_TestFuncs();
