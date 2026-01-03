@@ -287,50 +287,58 @@ function poly_cantellate(poly, df, dv, de = 0, eps = 1e-8, len_eps = 1e-6) =
 
         // Faces from original faces
         face_faces_pts = [
-            for (fi = [0:len(faces0)-1])
+            for (fi = [0:1:len(faces0)-1])
                 let(
                     f = faces0[fi],
                     n = len(f)
                 )
                 [
-                    for (k = [0:n-1])
+                    for (k = [0:1:n-1])
                         let(
+                            v_prev = f[(k-1+n)%n],
                             v = f[k],
                             v_next = f[(k+1)%n],
-                            ei = find_edge_index(edges, v, v_next),
-                            fpos = (edge_faces[ei][0] == fi) ? 0 : 1,
-                            vpos = (edges[ei][0] == v) ? 0 : 1
+                            ei_prev = find_edge_index(edges, v_prev, v),
+                            ei_next = find_edge_index(edges, v, v_next),
+                            fpos_prev = (edge_faces[ei_prev][0] == fi) ? 0 : 1,
+                            fpos_next = (edge_faces[ei_next][0] == fi) ? 0 : 1,
+                            vpos_prev = (edges[ei_prev][0] == v) ? 0 : 1,
+                            vpos_next = (edges[ei_next][0] == v) ? 0 : 1
                         )
-                        edge_pts[ei][fpos][vpos]
+                        each [
+                            edge_pts[ei_prev][fpos_prev][vpos_prev],
+                            edge_pts[ei_next][fpos_next][vpos_next]
+                        ]
                 ]
         ],
 
         // Faces from original vertices
         vert_faces_pts = [
-            for (vi = [0:len(verts0)-1])
+            for (vi = [0:1:len(verts0)-1])
                 let(
                     fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces),
-                    neigh = [
-                        for (idx = [0:len(fc)-1])
-                            let(
-                                f = faces0[fc[idx]],
-                                m = len(f),
-                                pos = [ for (k=[0:m-1]) if (f[k]==vi) k ][0],
-                                v_next = f[(pos+1)%m]
-                            )
-                            v_next
-                    ]
+                    n = len(fc)
                 )
                 [
-                    for (j = [0:len(fc)-1])
+                    for (j = [0:1:n-1])
                         let(
                             fidx = fc[j],
-                            vn = neigh[j],
-                            ei = find_edge_index(edges, vi, vn),
-                            fpos = (edge_faces[ei][0] == fidx) ? 0 : 1,
-                            vpos = (edges[ei][0] == vi) ? 0 : 1
+                            f = faces0[fidx],
+                            m = len(f),
+                            pos = [ for (k = [0:1:m-1]) if (f[k]==vi) k ][0],
+                            v_prev = f[(pos-1+m)%m],
+                            v_next = f[(pos+1)%m],
+                            ei_prev = find_edge_index(edges, v_prev, vi),
+                            ei_next = find_edge_index(edges, vi, v_next),
+                            fpos_prev = (edge_faces[ei_prev][0] == fidx) ? 0 : 1,
+                            fpos_next = (edge_faces[ei_next][0] == fidx) ? 0 : 1,
+                            vpos_prev = (edges[ei_prev][0] == vi) ? 0 : 1,
+                            vpos_next = (edges[ei_next][0] == vi) ? 0 : 1
                         )
-                        edge_pts[ei][fpos][vpos]
+                        each [
+                            edge_pts[ei_prev][fpos_prev][vpos_prev],
+                            edge_pts[ei_next][fpos_next][vpos_next]
+                        ]
                 ]
         ],
 
