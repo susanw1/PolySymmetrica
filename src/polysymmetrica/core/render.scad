@@ -42,6 +42,9 @@ module poly_describe(poly, name = undef) {
     echo ("======================");
 }
 
+
+//// TESTING
+
 use <../models/octahedron.scad>
 use <../core/duals.scad>
 use <../core/truncation.scad>

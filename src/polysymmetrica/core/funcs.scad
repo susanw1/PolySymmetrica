@@ -109,6 +109,32 @@ function _ps_sort(list, acc=[]) =
     let(mn = _ps_list_min(list))
     _ps_sort(_ps_remove_first(list, mn), concat(acc, [mn]));
 
+// ---- Linear algebra helpers ----
+function _ps_det3(m) =
+    m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) -
+    m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0]) +
+    m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+
+function _ps_replace_col(m, col, b) =
+    [
+        [ col == 0 ? b[0] : m[0][0], col == 1 ? b[0] : m[0][1], col == 2 ? b[0] : m[0][2] ],
+        [ col == 0 ? b[1] : m[1][0], col == 1 ? b[1] : m[1][1], col == 2 ? b[1] : m[1][2] ],
+        [ col == 0 ? b[2] : m[2][0], col == 1 ? b[2] : m[2][1], col == 2 ? b[2] : m[2][2] ]
+    ];
+
+// Solve 3x3 linear system M*x = b via Cramer's rule; returns [x0,x1,x2] or undef.
+function _ps_solve3(m, b, eps=1e-12) =
+    let(
+        det = _ps_det3(m),
+        _0 = det == 0 ? 0 : 0
+    )
+    (abs(det) < eps) ? undef
+  : [
+        _ps_det3(_ps_replace_col(m, 0, b)) / det,
+        _ps_det3(_ps_replace_col(m, 1, b)) / det,
+        _ps_det3(_ps_replace_col(m, 2, b)) / det
+    ];
+
 
 ///////////////////////////////////////
 // Polygon helpers

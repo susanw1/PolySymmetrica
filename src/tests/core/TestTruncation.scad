@@ -113,6 +113,16 @@ module test_poly_rectify__tetra_counts() {
     assert(_count_faces_of_size(q,3) == 8, "rectify tetra: 8 triangles");
 }
 
+module test_poly_cantellate__tetra_counts() {
+    p = _tetra_poly();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantellate(p, 0.2, 0.2);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantellate faces count");
+}
+
 module test_truncate__tetra_archimedean_counts() {
     p = poly_truncate(tetrahedron(), 1/3);
     assert_poly_valid(p);
@@ -186,6 +196,7 @@ module run_TestTruncation() {
     test_poly_truncate__t_zero_counts_preserved();
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
+    test_poly_cantellate__tetra_counts();
     
     test_truncate__tetra_archimedean_counts();
     test_truncate__octa_archimedean_counts();
