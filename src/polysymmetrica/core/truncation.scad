@@ -312,17 +312,16 @@ function poly_cantellate(poly, df, dv, de = 0, eps = 1e-8, len_eps = 1e-6) =
                 ]
         ],
 
-        // Faces from original vertices
+        // Faces from original vertices:
+        // intersect vertex plane with the two incident edge planes per face
         vert_faces_pts = [
             for (vi = [0:1:len(verts0)-1])
                 let(
-                    fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces),
-                    n = len(fc)
+                    fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces)
                 )
                 [
-                    for (j = [0:1:n-1])
+                    for (fidx = fc)
                         let(
-                            fidx = fc[j],
                             f = faces0[fidx],
                             m = len(f),
                             pos = [ for (k = [0:1:m-1]) if (f[k]==vi) k ][0],
@@ -330,15 +329,14 @@ function poly_cantellate(poly, df, dv, de = 0, eps = 1e-8, len_eps = 1e-6) =
                             v_next = f[(pos+1)%m],
                             ei_prev = find_edge_index(edges, v_prev, vi),
                             ei_next = find_edge_index(edges, vi, v_next),
-                            fpos_prev = (edge_faces[ei_prev][0] == fidx) ? 0 : 1,
-                            fpos_next = (edge_faces[ei_next][0] == fidx) ? 0 : 1,
-                            vpos_prev = (edges[ei_prev][0] == vi) ? 0 : 1,
-                            vpos_next = (edges[ei_next][0] == vi) ? 0 : 1
+                            n_v = vert_n[vi],
+                            d_v = vert_d[vi],
+                            n_e0 = edge_n[ei_prev],
+                            d_e0 = edge_d[ei_prev],
+                            n_e1 = edge_n[ei_next],
+                            d_e1 = edge_d[ei_next]
                         )
-                        each [
-                            edge_pts[ei_prev][fpos_prev][vpos_prev],
-                            edge_pts[ei_next][fpos_next][vpos_next]
-                        ]
+                        _ps_solve3([n_v, n_e0, n_e1], [d_v, d_e0, d_e1], eps)
                 ]
         ],
 
