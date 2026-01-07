@@ -123,7 +123,11 @@ function _ps_poly_convex(verts, faces, eps=1e-9) =
 
 // ---- public validators ----
 
-// mode: "struct" | "closed" | "convex" | "star_ok"
+// mode meanings:
+// - "struct": structural + planarity checks only (no manifoldness or intersections)
+// - "closed": structural + planarity + manifoldness + no self-intersections
+// - "star_ok": structural + planarity + manifoldness (allows self-intersections)
+// - "convex": closed + outward orientation + convexity
 function poly_valid(poly, mode="closed", eps=1e-9) =
     let(
         verts = poly_verts(poly),

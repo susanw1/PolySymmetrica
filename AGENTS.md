@@ -33,6 +33,12 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `scale_dual()` aligns edge-mid spheres; for edge-crossing alignment of a specific edge family, use `scale_dual_edge_cross(poly, dual, face_idx, edge_pos)`.
 - For non-uniform truncations, no single scale aligns every edge family; pick the family you want to prioritize.
 
+## Validation Modes
+- `poly_valid(poly, "struct")`: structural + planarity only.
+- `poly_valid(poly, "closed")`: adds manifoldness + no self-intersections.
+- `poly_valid(poly, "star_ok")`: allows self-intersections but keeps manifoldness.
+- `poly_valid(poly, "convex")`: adds outward orientation + convexity.
+
 ## Commit & Pull Request Guidelines
 - Commit messages are short, imperative, and capitalized (e.g., "Consolidate utility funcs").
 - PRs should include a brief summary, affected `.scad` paths, and screenshots or renders for geometry changes.
