@@ -37,3 +37,9 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Commit messages are short, imperative, and capitalized (e.g., "Consolidate utility funcs").
 - PRs should include a brief summary, affected `.scad` paths, and screenshots or renders for geometry changes.
 - Note any new tests or expected output changes in the PR description.
+
+## Session Notes (Cantellation Debugging)
+- `poly_cantellate` is sensitive to how face, edge, and vertex faces are ordered. Visual crossings can occur even when `assert_poly_valid` passes.
+- The test failure we saw was duplicate indices in vertex faces; it was fixed by constructing vertex faces as intersections of the vertex plane and the two incident edge planes per face (see `poly_cantellate` in `src/polysymmetrica/core/truncation.scad`).
+- Debugging helpers live in `src/polysymmetrica/examples/truncation/debug_cant_vertex.scad` and can isolate face families or print edge/face mappings.
+- A generic validity suite is not enough for cantellation; operation-specific tests (face-family counts, edge-face adjacency) should be added once design stabilizes.
