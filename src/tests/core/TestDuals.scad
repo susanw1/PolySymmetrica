@@ -1,6 +1,7 @@
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/duals.scad>
 use <../../polysymmetrica/core/truncation.scad>
+use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/regular_all.scad>
 use <../testing_util.scad>
 
@@ -64,6 +65,11 @@ module test_dual_faces__count_equals_original_vertices() {
     centers = ps_face_polar_verts(v, f);
     df = dual_faces(p, centers);
     assert_int_eq(len(df), len(v), "dual faces == original vertices");
+}
+
+module test_dual__validity() {
+    d = poly_dual(octahedron());
+    assert_poly_valid_mode(d, "closed");
 }
 
 
@@ -172,6 +178,7 @@ module run_TestDuals() {
     test_find_edge_index__finds_sorted_edge();
     test_faces_around_vertex__tetra_cycle_len3();
     test_dual_faces__count_equals_original_vertices();
+    test_dual__validity();
     test_dual_unit_edge_and_e_over_ir__positive();
     test_ps_face_polar_verts__incidence_relation();
     test_poly_dual__octa_to_cube_counts();

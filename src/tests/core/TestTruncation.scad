@@ -1,6 +1,7 @@
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/duals.scad>
 use <../../polysymmetrica/core/truncation.scad>
+use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/regular_all.scad>
 use <../testing_util.scad>
 
@@ -118,9 +119,15 @@ module test_poly_cantellate__tetra_counts() {
     edges = _ps_edges_from_faces(poly_faces(p));
     q = poly_cantellate(p, 0.2, 0.2);
     assert_poly_valid(q);
+    assert_poly_valid_mode(q, "struct");
 
     expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
     assert_int_eq(len(poly_faces(q)), expected_faces, "cantellate faces count");
+}
+
+module test_truncate__validity() {
+    p = poly_truncate(tetrahedron(), 1/3);
+    assert_poly_valid_mode(p, "closed");
 }
 
 module test_truncate__tetra_archimedean_counts() {
@@ -197,6 +204,7 @@ module run_TestTruncation() {
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
     test_poly_cantellate__tetra_counts();
+    test_truncate__validity();
     
     test_truncate__tetra_archimedean_counts();
     test_truncate__octa_archimedean_counts();
