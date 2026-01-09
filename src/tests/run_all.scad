@@ -12,5 +12,6 @@ run_TestValidity();
 
 echo("=== PolySymmetrica tests: PASS ===");
 
+color("green") 
 linear_extrude(height = 2)
     text(str("Tests Passed!"));

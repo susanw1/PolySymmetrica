@@ -25,7 +25,7 @@ module demo(p, ir = IR) {
 
     color("gold")
     place_on_vertices(p, ir) {
-        sphere(1.5, $fn=30);
+        sphere(1.5, $fn=15);
 //        translate([0,0,2]) text(str($ps_vertex_idx), halign="center",valign="center", size=2);
     }
 }

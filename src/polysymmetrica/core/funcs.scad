@@ -54,6 +54,14 @@ function all_faces_valid(verts, faces) =
 function all_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
 
+// Basic list helpers (numeric)
+function _ps_list_contains(list, v) =
+    len([for (x = list) if (x == v) 1]) > 0;
+
+function _ps_index_of(list, v) =
+    let(idx = [for (i = [0:1:len(list)-1]) if (list[i] == v) i])
+    (len(idx) == 0) ? -1 : idx[0];
+
 ///////////////////////////////////////
 // Handy vector functions (and aliases)
 
