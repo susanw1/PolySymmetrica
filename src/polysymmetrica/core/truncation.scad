@@ -206,143 +206,58 @@ function poly_rectify(poly) =
     )
     make_poly(edge_mid / unit_e, faces_out, e_over_ir);
 
-// Cantellation/expansion: offset faces and vertices, insert edge faces.
-// df: face offset (outward along face normals)
-// dv: vertex offset (outward along vertex directions)
-// de: edge offset along edge-bisector plane (default 0)
-function poly_cantellate(poly, df, dv, de = 0, eps = 1e-8, len_eps = 1e-6) =
+// Cantellation/expansion:
+// - face faces remain n-gons (one point per original vertex)
+// - edge faces are quads (rectangles/squares)
+// - vertex faces are valence-gons
+// df offsets faces along their normals; edge/vertex faces are derived from those offsets.
+function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     let(
         verts0 = poly_verts(poly),
         faces0 = orient_all_faces_outward(verts0, poly_faces(poly)),
         edges = _ps_edges_from_faces(faces0),
         edge_faces = edge_faces_table(faces0, edges),
 
-        // face planes (n·x = d)
         face_n = [ for (f = faces0) face_normal(verts0, f) ],
-        face_d = [
-            for (fi = [0:len(faces0)-1])
-                v_dot(face_n[fi], verts0[faces0[fi][0]]) + df
-        ],
-
-        // vertex planes (n·x = d)
-        vert_n = [ for (v = verts0) v_norm(v) ],
-        vert_d = [ for (v = verts0) norm(v) + dv ],
-
-        // edge planes (bisector between adjacent faces)
-        edge_n = [
-            for (ei = [0:len(edges)-1])
-                let(fpair = edge_faces[ei])
-                    v_norm(face_n[fpair[0]] + face_n[fpair[1]])
-        ],
-        edge_d = [
-            for (ei = [0:len(edges)-1])
-                let(
-                    e = edges[ei],
-                    mid = (verts0[e[0]] + verts0[e[1]]) / 2
-                )
-                v_dot(edge_n[ei], mid) + de
-        ],
-
-        // intersection point for (edge, face, vertex) triple
-        edge_pts = [
-            for (ei = [0:len(edges)-1])
-                let(
-                    e = edges[ei],
-                    fpair = edge_faces[ei],
-                    f0 = fpair[0],
-                    f1 = fpair[1],
-                    v0 = e[0],
-                    v1 = e[1],
-
-                    n_edge = edge_n[ei],
-                    d_edge = edge_d[ei],
-
-                    n_f0 = face_n[f0],
-                    n_f1 = face_n[f1],
-                    d_f0 = face_d[f0],
-                    d_f1 = face_d[f1],
-
-                    n_v0 = vert_n[v0],
-                    n_v1 = vert_n[v1],
-                    d_v0 = vert_d[v0],
-                    d_v1 = vert_d[v1],
-
-                    // solve for each combination (face, vertex)
-                    p_f0_v0 = _ps_solve3([n_f0, n_v0, n_edge], [d_f0, d_v0, d_edge], eps),
-                    p_f0_v1 = _ps_solve3([n_f0, n_v1, n_edge], [d_f0, d_v1, d_edge], eps),
-                    p_f1_v0 = _ps_solve3([n_f1, n_v0, n_edge], [d_f1, d_v0, d_edge], eps),
-                    p_f1_v1 = _ps_solve3([n_f1, n_v1, n_edge], [d_f1, d_v1, d_edge], eps)
-                )
-                [[p_f0_v0, p_f0_v1], [p_f1_v0, p_f1_v1]]
-        ],
-
-        _ = assert(min([
-            for (ei = [0:len(edge_pts)-1])
-                min([
-                    for (fi = [0:1])
-                        for (vi = [0:1])
-                            is_undef(edge_pts[ei][fi][vi]) ? 0 : 1
-                ])
-        ]) == 1, "poly_cantellate: plane intersection failed"),
-
-        // Faces from original faces
-        face_faces_pts = [
+        // offset face corners: one point per (face, vertex) incidence
+        face_pts = [
             for (fi = [0:1:len(faces0)-1])
                 let(
                     f = faces0[fi],
-                    n = len(f)
+                    n = len(f),
+                    n_f = face_n[fi]
                 )
                 [
                     for (k = [0:1:n-1])
-                        let(
-                            v_prev = f[(k-1+n)%n],
-                            v = f[k],
-                            v_next = f[(k+1)%n],
-                            ei_prev = find_edge_index(edges, v_prev, v),
-                            ei_next = find_edge_index(edges, v, v_next),
-                            fpos_prev = (edge_faces[ei_prev][0] == fi) ? 0 : 1,
-                            fpos_next = (edge_faces[ei_next][0] == fi) ? 0 : 1,
-                            vpos_prev = (edges[ei_prev][0] == v) ? 0 : 1,
-                            vpos_next = (edges[ei_next][0] == v) ? 0 : 1
-                        )
-                        each [
-                            edge_pts[ei_prev][fpos_prev][vpos_prev],
-                            edge_pts[ei_next][fpos_next][vpos_next]
-                        ]
+                        let(v = f[k])
+                        verts0[v] + df * n_f
                 ]
         ],
 
-        // Faces from original vertices:
-        // intersect vertex plane with the two incident edge planes per face
+        // Faces from original faces (n-gons)
+        face_faces_pts = face_pts,
+
+        // Faces from original vertices (valence-gons)
         vert_faces_pts = [
             for (vi = [0:1:len(verts0)-1])
                 let(
-                    fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces)
+                    fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces),
+                    idxs = [for (k = [0:1:len(fc)-1]) k]
                 )
                 [
-                    for (fidx = fc)
+                    for (k = idxs)
                         let(
-                            f = faces0[fidx],
-                            m = len(f),
-                            pos = [ for (k = [0:1:m-1]) if (f[k]==vi) k ][0],
-                            v_prev = f[(pos-1+m)%m],
-                            v_next = f[(pos+1)%m],
-                            ei_prev = find_edge_index(edges, v_prev, vi),
-                            ei_next = find_edge_index(edges, vi, v_next),
-                            n_v = vert_n[vi],
-                            d_v = vert_d[vi],
-                            n_e0 = edge_n[ei_prev],
-                            d_e0 = edge_d[ei_prev],
-                            n_e1 = edge_n[ei_next],
-                            d_e1 = edge_d[ei_next]
+                            fi = fc[k],
+                            f = faces0[fi],
+                            pos = [ for (j=[0:1:len(f)-1]) if (f[j]==vi) j ][0]
                         )
-                        _ps_solve3([n_v, n_e0, n_e1], [d_v, d_e0, d_e1], eps)
+                        face_pts[fi][pos]
                 ]
         ],
 
-        // Faces from original edges
+        // Faces from original edges (quads): connect corresponding offset edges
         edge_faces_pts = [
-            for (ei = [0:len(edges)-1])
+            for (ei = [0:1:len(edges)-1])
                 let(
                     e = edges[ei],
                     fpair = edge_faces[ei],
@@ -350,16 +265,16 @@ function poly_cantellate(poly, df, dv, de = 0, eps = 1e-8, len_eps = 1e-6) =
                     f1 = fpair[1],
                     v0 = e[0],
                     v1 = e[1],
-                    f0pos = 0,
-                    f1pos = 1,
-                    v0pos = 0,
-                    v1pos = 1
+                    pos0 = _ps_index_of(faces0[f0], v0),
+                    pos1 = _ps_index_of(faces0[f0], v1),
+                    pos2 = _ps_index_of(faces0[f1], v1),
+                    pos3 = _ps_index_of(faces0[f1], v0)
                 )
                 [
-                    edge_pts[ei][f0pos][v0pos],
-                    edge_pts[ei][f0pos][v1pos],
-                    edge_pts[ei][f1pos][v1pos],
-                    edge_pts[ei][f1pos][v0pos]
+                    face_pts[f0][pos0],
+                    face_pts[f0][pos1],
+                    face_pts[f1][pos2],
+                    face_pts[f1][pos3]
                 ]
         ],
 
@@ -379,6 +294,7 @@ function poly_cantellate(poly, df, dv, de = 0, eps = 1e-8, len_eps = 1e-6) =
         e_over_ir = unit_e / ir
     )
     make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+
 
 
 

@@ -10,7 +10,9 @@ use <util_demo.scad>
 
 LAYER1 = -100;
 
-//demo(poly_cantellate_norm(hexahedron(), 0.1));
+demo(poly_cantellate(hexahedron(), 0.1));
+poly_describe(poly_cantellate(hexahedron(), 0.1));
 //demo(hexahedron());
+poly_describe(hexahedron());
 
-poly_describe(poly_cantellate_norm(tetrahedron()));
+//poly_describe(poly_cantellate(tetrahedron()));
