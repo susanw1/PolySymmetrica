@@ -29,3 +29,12 @@ needed to catch issues early.
 - Edge-face adjacency: edge faces should connect the two adjacent vertex-face points
   at each endpoint (prevents crossing across the vertex hex).
 - Uniform edge-length checks (optional, for uniform parameter sets).
+
+## Cantellation Normalization (Why We Search)
+`poly_cantellate_norm` maps a 0–1 slider to a geometric offset `df` and chooses the
+midpoint where edge-faces are squares. There is no simple closed-form formula that
+works for arbitrary convex polys because the square condition depends on local
+dihedral geometry and edge families. A small numeric search is the most robust
+general solution. Closed-form solutions are possible for specific shapes (e.g., cube)
+but do not generalize; a search keeps the API uniform across convex polyhedra and
+Johnson solids.

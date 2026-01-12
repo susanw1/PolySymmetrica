@@ -295,6 +295,71 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     )
     make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
 
+// Measure how square an edge face is (edge length spread).
+function _ps_face_edge_spread(verts, face) =
+    let(
+        n = len(face),
+        ls = (n < 2) ? [] : [for (i = [0:1:n-1]) norm(verts[face[i]] - verts[face[(i+1)%n]])]
+    )
+    (n == 4) ? (max(ls) - min(ls)) : undef;
+
+// Solve df so that the chosen edge-face family is as square as possible.
+function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0, eps=1e-9) =
+    let(
+        faces0 = orient_all_faces_outward(poly_verts(poly), poly_faces(poly)),
+        edges0 = _ps_edges_from_faces(faces0),
+        edge_faces0 = edge_faces_table(faces0, edges0),
+        fpair = edge_faces0[family_edge_idx],
+        key = (len(fpair) == 2) ? ((len(faces0[fpair[0]]) <= len(faces0[fpair[1]]))
+            ? [len(faces0[fpair[0]]), len(faces0[fpair[1]])]
+            : [len(faces0[fpair[1]]), len(faces0[fpair[0]])]) : [0,0],
+        family_edges = [
+            for (ei = [0:1:len(edge_faces0)-1])
+                let(
+                    fpair_i = edge_faces0[ei],
+                    key_i = (len(fpair_i) == 2) ? ((len(faces0[fpair_i[0]]) <= len(faces0[fpair_i[1]]))
+                        ? [len(faces0[fpair_i[0]]), len(faces0[fpair_i[1]])]
+                        : [len(faces0[fpair_i[1]]), len(faces0[fpair_i[0]])]) : [0,0]
+                )
+                if (key_i == key) ei
+        ],
+        df_vals = [for (i = [0:1:steps]) df_min + (df_max - df_min) * i / steps],
+        cands = [
+            for (df = df_vals)
+                let(
+                    q = poly_cantellate(poly, df),
+                    faces_q = poly_faces(q),
+                    face_count = len(faces0),
+                    errs = [for (ei = family_edges) _ps_face_edge_spread(poly_verts(q), faces_q[face_count + ei])],
+                    ok = len([for (e = errs) if (!is_undef(e)) 1]) == len(errs)
+                )
+                if (ok) [df, sum(errs)]
+        ],
+        _ = assert(len(cands) > 0, "cantellate_square_df: no valid candidates"),
+        errs = [for (c = cands) c[1]],
+        e_min = min(errs),
+        idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0]
+    )
+    cands[idx][0];
+
+// Normalized cantellation: map c in [0,1] to df in [0, df_max],
+// with c=0.5 hitting the computed square-edge df.
+function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6) =
+    let(
+        c0 = (c < 0) ? 0 : ((c > 1) ? 1 : c),
+        verts = poly_verts(poly),
+        edges = _ps_edges_from_faces(poly_faces(poly)),
+        e0 = edges[0],
+        edge_len = norm(verts[e0[1]] - verts[e0[0]]),
+        ir = edge_len / poly_e_over_ir(poly),
+        df_max_eff = is_undef(df_max) ? (2 * ir) : df_max,
+        df_mid = cantellate_square_df(poly, 0, df_max_eff, steps, family_edge_idx),
+        df = (c0 <= 0.5)
+            ? (2 * c0 * df_mid)
+            : (df_mid + (c0 - 0.5) * 2 * (df_max_eff - df_mid))
+    )
+    poly_cantellate(poly, df, eps, len_eps);
+
 
 
 

@@ -1,5 +1,6 @@
 use <../../core/placement.scad>
 use <../../core/duals.scad>
+use <../../core/render.scad>
 
 IR = 30;
 T = 0.01;
@@ -7,6 +8,7 @@ T = 0.01;
 COLORS = [ "", "", "", "yellow", "red", "green", "blue", "gray", "red", "white", "red" ];
 
 module demo(p, ir = IR) {
+    poly_describe(p, detail = 1);
     place_on_faces(p, ir) {
         let (col = COLORS[$ps_vertex_count]) {
             color(col) {
