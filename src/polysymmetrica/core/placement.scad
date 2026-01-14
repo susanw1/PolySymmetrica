@@ -12,9 +12,14 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
     scale = exp_edge_len;
 
     verts = poly_verts(poly);
+    faces = poly_faces(poly);
+    faces0 = orient_all_faces_outward(verts, faces);
+    edges = _ps_edges_from_faces(faces0);
+    edge_faces = edge_faces_table(faces0, edges);
+    face_n = [ for (f = faces0) face_normal(verts, f) ];
 
-    for (fi = [0 : len(poly_faces(poly))-1]) {
-        f      = poly_faces(poly)[fi];
+    for (fi = [0 : 1 : len(faces)-1]) {
+        f      = faces[fi];
         center = poly_face_center(poly, fi, scale);
         ex     = poly_face_ex(poly, fi, scale);
         ey     = poly_face_ey(poly, fi, scale);
@@ -52,6 +57,33 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
         $ps_facet_radius      = facet_radius;       // (mean) distance from facet centre to vertices
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
+        
+        // Adjacent faces per edge (aligned with face vertex order)
+        $ps_facet_neighbors_idx = [
+            for (k = [0:1:len(f)-1])
+                let(
+                    v0 = f[k],
+                    v1 = f[(k+1)%len(f)],
+                    ei = find_edge_index(edges, v0, v1),
+                    adj = edge_faces[ei]
+                )
+                (len(adj) < 2) ? undef : ((adj[0] == fi) ? adj[1] : adj[0])
+        ];
+        // Dihedral angles per edge (degrees, aligned with face vertex order)
+        $ps_facet_dihedrals = [
+            for (k = [0:1:len(f)-1])
+                let(
+                    v0 = f[k],
+                    v1 = f[(k+1)%len(f)],
+                    ei = find_edge_index(edges, v0, v1),
+                    adj = edge_faces[ei],
+                    n0 = face_n[fi],
+                    n1 = (len(adj) < 2) ? n0 : face_n[(adj[0] == fi) ? adj[1] : adj[0]],
+                    dotn = v_dot(n0, n1),
+                    c = (dotn > 1) ? 1 : ((dotn < -1) ? -1 : dotn)
+                )
+                180 - acos(c)
+        ];
 
         multmatrix(frame_matrix(center, ex, ey, ez))
             children();
@@ -67,7 +99,7 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef) {
     faces = poly_faces(poly);
     edges = _ps_edges_from_faces(faces);
 
-    for (vi = [0 : len(verts)-1]) {
+    for (vi = [0 : 1 : len(verts)-1]) {
 
         v0 = verts[vi] * scale;              // world-space vertex position
         ez = v_norm(v0);                     // outward: from centre to vertex
@@ -124,7 +156,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
     faces = poly_faces(poly);
     edges = _ps_edges_from_faces(faces);
 
-    for (ei = [0 : len(edges)-1]) {
+    for (ei = [0 :  1 : len(edges)-1]) {
 
         e  = edges[ei];
         v0 = verts[e[0]] * scale;
@@ -150,7 +182,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
 
         // Adjacent faces (indices)
         adj_faces_idx = [
-            for (fi = [0 : len(faces)-1])
+            for (fi = [0 :  1 : len(faces)-1])
                 if (face_has_edge(faces[fi], e[0], e[1])) fi
         ];
 
@@ -183,6 +215,5 @@ module face_debug() {
     // Radial line to centre
     color("yellow") cylinder(h = -$ps_poly_center_local[2], r = 0.5, center=false);
 }
-
 
 
