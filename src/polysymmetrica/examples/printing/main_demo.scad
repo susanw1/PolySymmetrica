@@ -10,12 +10,10 @@ use <../../models/regular_all.scad>
 t = undef;
 IR = 20;
 
-LAYER1 = -100;
-
 //p = (tetrahedron());
-//p = (octahedron());
-p = (dodecahedron());
-//p = poly_truncate(dodecahedron());
+//p = poly_truncate(octahedron());
+//p = (dodecahedron());
+p = poly_truncate(dodecahedron());
 
 EDGE_T = 3;
 FACE_T = 0.8;
@@ -23,20 +21,25 @@ FIN_T = 0.8;
 
 SINGLE_FACE = 0;
 
+PILLOW_MIN_RAD = 5;
+PILLOW_INSET = 2;
+PILLOW_RAMP = 1;
+PILLOW_H = 0.4;
+
 module edge_seg(len, pc, r_poly) {
     translate([0, 0, 0]) {
         // builds the edge bar itself
         hull() {
             translate([len/2, 0, 0]) sphere(d = EDGE_T, $fn = 40);
             translate([-len/2, 0, 0]) sphere(d = EDGE_T, $fn = 40);
-            translate([0, 0, -EDGE_T/4]) cube([len, EDGE_T, EDGE_T/2], center = true);
+//            translate([0, 0, -EDGE_T/4]) cube([len, EDGE_T, EDGE_T/2], center = true);
         }
         
         // creates the support fin under the edge
         hull() {
-            translate([len/2,0,0]) cube(FIN_T, center = true);
-            translate([-len/2,0,0]) cube(FIN_T, center = true);
-            translate(pc) cube(FIN_T, center = true);
+            translate([len/2,0,0]) sphere(d = FIN_T, $fn = 10);
+            translate([-len/2,0,0]) sphere(d = FIN_T, $fn = 10);
+            translate(pc) sphere(d = FIN_T, $fn = 10);
         }
     }    
 } 
@@ -83,9 +86,19 @@ function _offset_pts2d(pts, diheds, ht) =
             _line_intersect_2d(l0[0], l0[1], l1[0], l1[1])
     ];
 
+function _pts_centroid2d(pts) =
+    let(n = len(pts))
+    [sum([for (p = pts) p[0]]) / n, sum([for (p = pts) p[1]]) / n];
+
+function _pts_radius2d(pts, centroid) =
+    let(n = len(pts))
+    sum([for (p = pts) norm([p[0] - centroid[0], p[1] - centroid[1]])]) / n;
+
 // Bevel by constructing an inset bottom polygon and lofting.
 module face_plate(idx, pts, ht, diheds, clear_space) {
     n = len(pts);
+    centroid = _pts_centroid2d(pts);
+    rad = _pts_radius2d(pts, centroid);
     top = [for (p = pts) [p[0], p[1], ht/2]];
     bottom2d = _offset_pts2d(pts, diheds, ht);
     bottom = [for (p = bottom2d) [p[0], p[1], -ht/2]];
@@ -99,7 +112,22 @@ module face_plate(idx, pts, ht, diheds, clear_space) {
 
     echo("points", points, "faces", faces);
     color(len(pts) == 3 ? "white" : "red")
-        polyhedron(points = points, faces = faces);
+        union() {
+            polyhedron(points = points, faces = faces);
+            if (rad > PILLOW_MIN_RAD) {
+                // Cheap convex "pillow" by hulling two inset offsets at different heights.
+                hull() {
+                    translate([0, 0, ht/2])
+                        linear_extrude(height = 0.01)
+                            offset(delta = -PILLOW_INSET)
+                                polygon(points = pts);
+                    translate([0, 0, ht/2 + PILLOW_H])
+                        linear_extrude(height = 0.01)
+                            offset(delta = -(PILLOW_INSET + PILLOW_RAMP))
+                                polygon(points = pts);
+                }
+            }
+        }
 
     if (clear_space) {
         translate([0, 0, ht/2]) linear_extrude(height = EDGE_T) polygon(points = pts);
@@ -115,38 +143,16 @@ difference() {
         }
     }
     
-    place_on_faces(p, IR) {
+    !place_on_faces(p, IR) {
         echo($ps_vertex_count, $ps_facet_radius, $ps_facet_dihedrals, $ps_face_pts2d);
 
-        if (is_undef(SINGLE_FACE) || $ps_facet_idx == SINGLE_FACE) {
+        if (is_undef(SINGLE_FACE) || $ps_facet_idx == SINGLE_FACE || $ps_facet_idx == 1) {
 //            face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, is_undef(SINGLE_FACE));
             face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, false);
         }
     }
 
-    sphere(r = IR * 3/4);
+    sphere(r = IR * 5/6);
 }
-
 
 *edge_seg(10, [0,0,-20], 20);
-
-pts = [[12.9968, 2.22045e-16, 0.4], [4.01623, 12.3607, 0.4], [-10.5146, 7.63932, 0.4], [-10.5146, -7.63932, 0.4], [4.01623, -12.3607, 0.4], [12.6912, 0, -0.4], [3.9218, 12.0701, -0.4], [-10.2674, 7.45971, -0.4], [-10.2674, -7.45971, -0.4], [3.9218, -12.0701, -0.4]];
-faces = [[0, 1, 2, 3, 4], [9, 8, 7, 6, 5], [0, 6, 1], [1, 7, 2], [2, 8, 3], [3, 9, 4], [4, 5, 0], [0, 5, 6], [1, 6, 7], [2, 7, 8], [3, 8, 9], [4, 9, 5]];
-
-*difference() {
-    polyhedron(points = pts, faces = faces);
-    translate([0,0,30]) #sphere(r = IR * 3/4);
-}
-
-*difference() {
-    union() {
-        place_on_faces(p, IR) {
-            echo($ps_vertex_count, $ps_facet_radius, $ps_facet_dihedrals, $ps_face_pts2d);
-
-            if (is_undef(SINGLE_FACE) || $ps_facet_idx == SINGLE_FACE) {
-                face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, false);
-            }
-        }
-    }
-    #sphere(r = IR * 3/4);
-}
