@@ -19,7 +19,7 @@ EDGE_T = 3;
 FACE_T = 0.8;
 FIN_T = 0.8;
 
-SINGLE_FACE = undef;
+SHOW_FACES = undef;
 
 PILLOW_MIN_RAD = 5;
 PILLOW_INSET = 2;
@@ -367,8 +367,8 @@ difference() {
     place_on_faces(p, IR) {
 //        echo($ps_vertex_count, $ps_facet_radius, $ps_facet_dihedrals, $ps_face_pts2d);
 
-        if (is_undef(SINGLE_FACE) || $ps_facet_idx == SINGLE_FACE || $ps_facet_idx == 1) {
-            face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, undef, is_undef(SINGLE_FACE));
+        if (is_undef(SHOW_FACES) || len(search($ps_facet_idx, SHOW_FACES)) > 0) {
+            face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, undef, is_undef(SHOW_FACES));
         }
     }
 
