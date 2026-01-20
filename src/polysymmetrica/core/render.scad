@@ -10,11 +10,14 @@ use <placement.scad>
 module poly_render(poly, inter_radius = 1) {
     let(
         k = (inter_radius * poly_e_over_ir(poly)),
-        pts = poly_verts(poly) * k
+        pts = poly_verts(poly) * k,
+        faces_rhr = orient_all_faces_outward(pts, poly_faces(poly)),
+        // OpenSCAD expects LHR (clockwise from outside), so flip RHR faces.
+        faces_lhr = [for (f = faces_rhr) _ps_reverse(f)]
     )
     polyhedron(
         points = pts,
-        faces  = orient_all_faces_outward(pts, poly_faces(poly))
+        faces  = faces_lhr
     );
 }
 

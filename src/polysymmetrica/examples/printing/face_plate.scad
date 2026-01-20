@@ -1,4 +1,6 @@
 use <../../core/funcs.scad>
+use <../../core/render.scad>
+use <../../core/validate.scad>
 
 // Base in-plane inset applied to each face edge (mm).
 FACE_PLATE_EDGE_INSET = 0.2;
@@ -8,8 +10,11 @@ FACE_PLATE_PILLOW_MIN_RAD = 5;
 FACE_PLATE_PILLOW_INSET = 2;
 // Additional pillow inset at the raised height (mm).
 FACE_PLATE_PILLOW_RAMP = 1;
-// Pillow height above the face (mm).
-FACE_PLATE_PILLOW_H = 0.4;
+// Pillow thickness above the face (mm).
+FACE_PLATE_PILLOW_THK = 0.4;
+
+// Thickness of the top polygon above the ramped edges.
+FACE_PLATE_TOP_THK = 0.3;
 // Clearance height for facet sockets (mm) - make larger if face is far inset into a face.
 FACE_PLATE_CLEAR_HEIGHT = 10;
 
@@ -217,12 +222,14 @@ function _pts_radius2d(pts, centroid) =
 
 
 // Bevel by constructing an inset bottom polygon and lofting.
-module face_plate(idx, pts, ht, diheds, insets_override, clear_space,
+module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     edge_inset = FACE_PLATE_EDGE_INSET,
     pillow_min_rad = FACE_PLATE_PILLOW_MIN_RAD,
     pillow_inset = FACE_PLATE_PILLOW_INSET,
     pillow_ramp = FACE_PLATE_PILLOW_RAMP,
-    pillow_h = FACE_PLATE_PILLOW_H,
+    pillow_thk = FACE_PLATE_PILLOW_THK,
+    top_thk = FACE_PLATE_TOP_THK,
+    base_z = undef,
     clear_height = FACE_PLATE_CLEAR_HEIGHT
 ) {
     n = len(pts);
@@ -232,9 +239,12 @@ module face_plate(idx, pts, ht, diheds, insets_override, clear_space,
     pts_gap = (edge_inset > 0) ? _offset_pts2d_inset_edges(pts, insets) : pts;
     centroid = _pts_centroid2d(pts_gap);
     rad = _pts_radius2d(pts_gap, centroid);
-    top = [for (p = pts_gap) [p[0], p[1], ht/2]];
-    bottom2d = _bottom_pts2d_from_bevel(pts_gap, diheds, ht);
-    bottom = [for (p = bottom2d) [p[0], p[1], -ht/2]];
+
+    base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z; // base Z coord
+    ramped_thk = face_thk - top_thk; // actual thickness of ramped part
+    top = [for (p = pts_gap) [p[0], p[1], base_z_eff + ramped_thk]];
+    bottom2d = _bottom_pts2d_from_bevel(pts_gap, diheds, ramped_thk);
+    bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
     points = concat(top, bottom);
     faces = concat(
         [ [for (i = [0:1:n-1]) i] ],
@@ -242,18 +252,26 @@ module face_plate(idx, pts, ht, diheds, insets_override, clear_space,
         [for (i = [0:1:n-1]) [i, n + (i+1)%n, (i+1)%n]],
         [for (i = [0:1:n-1]) [i, n + i, n + (i+1)%n]]
     );
+    // OpenSCAD uses LHR (clockwise from outside), so flip all faces.
+    faces_lhr = [for (f = faces) _ps_reverse(f)];
 
-    echo("points", points, "faces", faces);
+//    echo("points", points, "faces", faces);
     color(len(pts) == 3 ? "white" : "red") {
-        polyhedron(points = points, faces = faces);
+        // ramped part
+        polyhedron(points = points, faces = faces_lhr, convexity = 2);
+
+        // flat roof part
+        translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk) polygon(points = pts_gap);
+
+        // top pillow part
         if (rad > pillow_min_rad) {
             // Cheap convex "pillow" by hulling two inset offsets at different heights.
             hull() {
-                translate([0, 0, ht/2])
+                translate([0, 0, base_z_eff + face_thk])
                     linear_extrude(height = 0.01)
                         offset(delta = -pillow_inset)
                             polygon(points = pts_gap);
-                translate([0, 0, ht/2 + pillow_h])
+                translate([0, 0, base_z_eff + face_thk + pillow_thk])
                     linear_extrude(height = 0.01)
                         offset(delta = -(pillow_inset + pillow_ramp))
                             polygon(points = pts_gap);
@@ -261,8 +279,15 @@ module face_plate(idx, pts, ht, diheds, insets_override, clear_space,
         }
     }
 
+    // Conditionally clears the airspace above the facet, to remove material from the face-mount above the face
     if (clear_space) {
-        translate([0, 0, ht/2]) linear_extrude(height = clear_height) polygon(points = pts_gap);
+        color("magenta") translate([0, 0, base_z_eff + face_thk]) linear_extrude(height = clear_height) polygon(points = pts_gap);
     }
 }
 
+
+
+difference() {
+    translate([0,0,-5]) cube(20);
+    face_plate(0, [[10,0],[0,10],[-10,0],[0,-10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
+}

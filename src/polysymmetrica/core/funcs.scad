@@ -43,6 +43,15 @@ function make_poly(verts, faces, e_over_ir=undef) =
     )
     [verts, faces, computed_e_over_ir];
 
+// Fix face winding so each undirected edge appears in opposite directions.
+function poly_fix_winding(poly) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        fixed = _ps_fix_winding_all(faces)
+    )
+    [verts, fixed, poly_e_over_ir(poly)];
+
 // Helper validation
 function all_faces_valid(verts, faces) =
     len([
@@ -53,6 +62,89 @@ function all_faces_valid(verts, faces) =
 
 function all_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
+
+// ---- winding helpers ----
+
+function _ps_face_edges_dir(f) =
+    let(n = len(f))
+    [ for (i = [0:1:n-1]) [f[i], f[(i+1)%n]] ];
+
+function _ps_face_edge_dir(f, a, b) =
+    let(
+        n = len(f),
+        vals = [
+            for (i = [0:1:n-1])
+                let(u = f[i], v = f[(i+1)%n])
+                (u == a && v == b) ? 1 : (u == b && v == a) ? -1 : 0
+        ]
+    )
+    (max(vals) == 1) ? 1 : (min(vals) == -1) ? -1 : 0;
+
+function _ps_adjacent_faces_for_edge(faces, a, b, fi) =
+    [
+        for (fj = [0:1:len(faces)-1])
+            if (fj != fi && _ps_face_edge_dir(faces[fj], a, b) != 0) fj
+    ];
+
+function _ps_list_set(list, idx, val) =
+    [ for (i = [0:1:len(list)-1]) (i == idx) ? val : list[i] ];
+
+function _ps_index_of_undef(list) =
+    let(idx = [for (i = [0:1:len(list)-1]) if (is_undef(list[i])) i])
+    (len(idx) == 0) ? -1 : idx[0];
+
+function _ps_reverse(list) =
+    [ for (i = [len(list)-1 : -1 : 0]) list[i] ];
+
+function _ps_neighbor_face(neighbors, idx) =
+    let(hit = [for (p = neighbors) if (p[0] == idx) p[1]])
+    (len(hit) == 0) ? undef : hit[0];
+
+function _ps_apply_neighbors(fixed, neighbors) =
+    [
+        for (i = [0:1:len(fixed)-1])
+            is_undef(fixed[i]) ? _ps_neighbor_face(neighbors, i) : fixed[i]
+    ];
+
+function _ps_new_neighbor_indices(fixed, neighbors) =
+    [ for (p = neighbors) if (is_undef(fixed[p[0]])) p[0] ];
+
+function _ps_fix_winding_queue(faces, fixed, queue) =
+    (len(queue) == 0) ? fixed :
+    let(
+        fi = queue[0],
+        fcur = fixed[fi],
+        edges = _ps_face_edges_dir(fcur),
+        neighbors = [
+            for (e = edges)
+                let(
+                    a = e[0],
+                    b = e[1],
+                    nbrs = _ps_adjacent_faces_for_edge(faces, a, b, fi)
+                )
+                for (nj = nbrs)
+                    let(
+                        dir_cur = _ps_face_edge_dir(fcur, a, b),
+                        dir_n = _ps_face_edge_dir(faces[nj], a, b),
+                        desired = (dir_n == dir_cur) ? _ps_reverse(faces[nj]) : faces[nj]
+                    )
+                    [nj, desired]
+        ],
+        updated = _ps_apply_neighbors(fixed, neighbors),
+        new_queue = concat([for (i = [1:1:len(queue)-1]) queue[i]], _ps_new_neighbor_indices(fixed, neighbors))
+    )
+    _ps_fix_winding_queue(faces, updated, new_queue);
+
+function _ps_fix_winding_all(faces, fixed=undef) =
+    let(
+        init = is_undef(fixed) ? [for (i = [0:1:len(faces)-1]) undef] : fixed,
+        seed = _ps_index_of_undef(init)
+    )
+    (seed < 0) ? init :
+    _ps_fix_winding_all(
+        faces,
+        _ps_fix_winding_queue(faces, _ps_list_set(init, seed, faces[seed]), [seed])
+    );
 
 // Basic list helpers (numeric)
 function _ps_list_contains(list, v) =
@@ -83,12 +175,11 @@ function edge_equal(e1, e2) = (e1[0] == e2[0] && e1[1] == e2[1]);
 function sum(a, i = 0) =
     i >= len(a) ? 0 : a[i] + sum(a, i + 1);
 
-/** Sum of vector list (3D) */
-function v_sum(list) = [
-    sum([for (v = list) v[0]]),
-    sum([for (v = list) v[1]]),
-    sum([for (v = list) v[2]])
-];
+/** Sum of vector list (2D/3D/ND) */
+function v_sum(list) =
+    (len(list) == 0) ? [] :
+    let(n = len(list[0]))
+    [ for (i = [0:1:n-1]) sum([for (v = list) v[i]]) ];
 
 
 function find_edge_index(edges, a, b) =
@@ -132,10 +223,7 @@ function _ps_replace_col(m, col, b) =
 
 // Solve 3x3 linear system M*x = b via Cramer's rule; returns [x0,x1,x2] or undef.
 function _ps_solve3(m, b, eps=1e-12) =
-    let(
-        det = _ps_det3(m),
-        _0 = det == 0 ? 0 : 0
-    )
+    let(det = _ps_det3(m))
     (abs(det) < eps) ? undef
   : [
         _ps_det3(_ps_replace_col(m, 0, b)) / det,
@@ -290,7 +378,7 @@ function orient_face_outward(verts, f) =
     )
     (v_dot(c, n) >= 0)
         ? f
-        : [ for (i = [len(f)-1 : -1 : 0]) f[i] ];  // reversed
+        : _ps_reverse(f);  // reversed
 
 function orient_all_faces_outward(verts, faces) =
     [ for (f = faces) orient_face_outward(verts, f) ];

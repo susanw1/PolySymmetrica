@@ -34,6 +34,37 @@ function _ps_faces_edges_nonzero(verts, faces, eps) =
             min([ for (e=_ps_face_edges(f)) _ps_edge_len_ok(verts, e, eps) ? 1 : 0 ])
     ]) == 1;
 
+// ---- winding consistency ----
+
+function _ps_edges_winding_ok(faces, strict=true) =
+    let(
+        dir_edges = [
+            for (f = faces)
+                for (k = [0:1:len(f)-1])
+                    let(
+                        a = f[k],
+                        b = f[(k+1)%len(f)],
+                        u = (a < b) ? a : b,
+                        v = (a < b) ? b : a,
+                        dir = (a < b) ? 1 : -1
+                    )
+                    [u, v, dir]
+        ],
+        edges = _ps_edges_from_faces(faces)
+    )
+    (len(edges) == 0) ? false :
+    min([
+        for (e = edges)
+            let(
+                u = e[0],
+                v = e[1],
+                fwd = sum([for (de = dir_edges) if (de[0]==u && de[1]==v && de[2]==1) 1]),
+                back = sum([for (de = dir_edges) if (de[0]==u && de[1]==v && de[2]==-1) 1])
+            )
+            strict ? ((fwd == 1 && back == 1) ? 1 : 0)
+                   : ((fwd == back && fwd > 0) ? 1 : 0)
+    ]) == 1;
+
 // ---- planarity & intersections ----
 
 function _ps_face_planar(verts, f, eps) =
@@ -141,15 +172,22 @@ function poly_valid(poly, mode="closed", eps=1e-9) =
             _ps_faces_edges_nonzero(verts, faces, eps) &&
             _ps_faces_planar(verts, faces, eps),
         manifold_ok = _ps_edges_manifold(verts, faces),
+        winding_ok = _ps_edges_winding_ok(faces, true),
         outward_ok = _ps_faces_outward(verts, faces, eps),
         convex_ok = _ps_poly_convex(verts, faces, eps),
-        no_self_intersect = _ps_faces_no_self_intersections(verts, faces, eps)
+        no_self_intersect = _ps_faces_no_self_intersections(verts, faces, eps),
+        winding_required = (mode != "struct" && mode != "star_ok")
     )
     (mode == "struct") ? base_ok :
     base_ok &&
     manifold_ok &&
+    (winding_required ? winding_ok : true) &&
     (mode == "convex" ? (outward_ok && convex_ok && no_self_intersect) :
      mode == "closed" ? no_self_intersect : true);
+
+// Returns true if every undirected edge appears exactly twice with opposing directions.
+function poly_validate_winding(poly, strict=true) =
+    _ps_edges_winding_ok(poly_faces(poly), strict);
 
 module assert_poly_valid_mode(poly, mode="closed", eps=1e-9) {
     assert(poly_valid(poly, mode, eps), str("poly invalid (mode=", mode, ")"));
