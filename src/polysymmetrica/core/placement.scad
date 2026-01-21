@@ -13,10 +13,10 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
 
     verts = poly_verts(poly);
     faces = poly_faces(poly);
-    faces0 = orient_all_faces_outward(verts, faces);
+    faces0 = ps_orient_all_faces_outward(verts, faces);
     edges = _ps_edges_from_faces(faces0);
-    edge_faces = edge_faces_table(faces0, edges);
-    face_n = [ for (f = faces0) face_normal(verts, f) ];
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [ for (f = faces0) ps_face_normal(verts, f) ];
 
     for (fi = [0 : 1 : len(faces)-1]) {
         f      = faces[fi];
@@ -64,7 +64,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
                 let(
                     v0 = f[k],
                     v1 = f[(k+1)%len(f)],
-                    ei = find_edge_index(edges, v0, v1),
+                    ei = ps_find_edge_index(edges, v0, v1),
                     adj = edge_faces[ei]
                 )
                 (len(adj) < 2) ? undef : ((adj[0] == fi) ? adj[1] : adj[0])
@@ -75,7 +75,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
                 let(
                     v0 = f[k],
                     v1 = f[(k+1)%len(f)],
-                    ei = find_edge_index(edges, v0, v1),
+                    ei = ps_find_edge_index(edges, v0, v1),
                     adj = edge_faces[ei],
                     n0 = face_n[fi],
                     n1 = (len(adj) < 2) ? n0 : face_n[(adj[0] == fi) ? adj[1] : adj[0]],
@@ -85,7 +85,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
                 180 - acos(c)
         ];
 
-        multmatrix(frame_matrix(center, ex, ey, ez))
+        multmatrix(ps_frame_matrix(center, ex, ey, ez))
             children();
     }
 }
@@ -143,7 +143,7 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef) {
         $ps_vert_radius             = vert_radius;
         $ps_poly_center_local       = [0, 0, -vert_radius];  // by construction
 
-        multmatrix(frame_matrix(center, ex, ey, ez))
+        multmatrix(ps_frame_matrix(center, ex, ey, ez))
             children();
     }
 }
@@ -183,7 +183,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
         // Adjacent faces (indices)
         adj_faces_idx = [
             for (fi = [0 :  1 : len(faces)-1])
-                if (face_has_edge(faces[fi], e[0], e[1])) fi
+                if (ps_face_has_edge(faces[fi], e[0], e[1])) fi
         ];
 
         // Metadata for children (edge-local)
@@ -196,7 +196,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
         $ps_edge_verts_idx      = e;
         $ps_edge_adj_faces_idx  = adj_faces_idx;
 
-        multmatrix(frame_matrix(center, ex, ey, ez))
+        multmatrix(ps_frame_matrix(center, ex, ey, ez))
             children();
     }
 }

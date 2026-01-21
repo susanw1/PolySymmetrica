@@ -20,7 +20,7 @@ module apply_polygon_sym(n_vertex, polygon_rad) {
 
 
 module regular_polygon_2d(n_vertex, edge_len) {
-    polygon_rad = calc_radius(n_vertex, edge_len);
+    polygon_rad = ps_calc_radius(n_vertex, edge_len);
     hull() {
         apply_polygon_sym(n_vertex, polygon_rad) {
             square(0.001);

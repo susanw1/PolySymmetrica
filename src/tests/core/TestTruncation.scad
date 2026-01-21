@@ -35,7 +35,7 @@ module test__ps_edge_point_near__picks_correct_end() {
 
     // pick edge (0,1) near 0 should equal first point of that edge entry
     P0 = _ps_edge_point_near(edges, edge_pts, 0, 1, 0);
-    ei = find_edge_index(edges, 0, 1);
+    ei = ps_find_edge_index(edges, 0, 1);
     assert(norm(P0 - edge_pts[ei][0]) < 1e-12, "near 0 uses [0]");
 }
 

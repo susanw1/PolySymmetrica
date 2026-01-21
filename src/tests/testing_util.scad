@@ -133,7 +133,7 @@ function _ps_face_has_distinct_indices(f) =
     n == len([ for (i=[0:n-1]) if (len([for (j=[0:n-1]) if (f[j]==f[i]) 1]) == 1) 1 ]);
 
 function _ps_faces_in_range(verts, faces) =
-    all_faces_valid(verts, faces);
+    ps_faces_valid(verts, faces);
 
 function _ps_faces_min_arity(faces, min_k=3) =
     min([ for (f=faces) len(f) ]) >= min_k;
@@ -143,8 +143,8 @@ function _ps_faces_min_arity(faces, min_k=3) =
 function _ps_faces_outward(verts, faces, eps=1e-9) =
     min([
         for (f = faces)
-            let(c = face_centroid(verts, f),
-                n = face_normal(verts, f))
+            let(c = ps_face_centroid(verts, f),
+                n = ps_face_normal(verts, f))
             (v_dot(c,n) >= -eps) ? 1 : 0
     ]) == 1;
 

@@ -23,7 +23,7 @@ module edge_mount(len, edge_diam = EDGE_DIAM) {
 
 // replicates the edge-mount around a polygon
 module regular_polygon_frame(n_vertex, edge_len) {
-    polygon_rad = calc_radius(n_vertex, edge_len);
+    polygon_rad = ps_calc_radius(n_vertex, edge_len);
     apply_polygon_sym(n_vertex, polygon_rad) {
         edge_mount(edge_len);
     }
@@ -32,14 +32,14 @@ module regular_polygon_frame(n_vertex, edge_len) {
 
 // simple 2d circle
 //module regular_polygon_2d(n_vertex, edge_len) {
-//    polygon_rad = calc_radius(n_vertex, edge_len);
+//    polygon_rad = ps_calc_radius(n_vertex, edge_len);
 //    circle(r = polygon_rad, $fn = n_vertex);
 //}
 
 
 // facet with an appealing cushion appearance
 module facet_cushion(n_vertex, edge_len, top_h = 2.5, ledge_h = 1.2, ledge_w = 4) {
-    polygon_rad = calc_radius(n_vertex, edge_len);
+    polygon_rad = ps_calc_radius(n_vertex, edge_len);
     hull() {
         apply_polygon_sym(n_vertex, polygon_rad) {
             cube([0.01, 0.01, ledge_h]);

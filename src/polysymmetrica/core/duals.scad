@@ -37,8 +37,8 @@ function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
         v_next = f[k_next],
 
         // edges (v -> v_next) and (v_prev -> v)
-        ei1 = find_edge_index(edges, v,      v_next),
-        ei2 = find_edge_index(edges, v_prev, v     ),
+        ei1 = ps_find_edge_index(edges, v,      v_next),
+        ei2 = ps_find_edge_index(edges, v_prev, v     ),
 
         ef1 = edge_faces[ei1],
         ef2 = edge_faces[ei2],
@@ -80,7 +80,7 @@ function dual_faces(poly, centers) =
     let(
         faces      = poly_faces(poly),
         edges      = _ps_edges_from_faces(faces),
-        edge_faces = edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces, edges),
         verts      = poly_verts(poly)
     )
     [
@@ -111,7 +111,7 @@ function ps_face_polar_verts(verts, faces) =
         for (fi = [0 : len(faces)-1])
             let(
                 f = faces[fi],
-                n = face_normal(verts, f),        // unit outward normal
+                n = ps_face_normal(verts, f),        // unit outward normal
                 d = v_dot(n, verts[f[0]])         // plane offset along n
             )
             assert(d > 0, str("ps_face_polar_verts: d<=0 at face ", fi))
@@ -126,7 +126,7 @@ function poly_dual_polar_vf(verts, faces) =
     let(
         dual_verts  = ps_face_polar_verts(verts, faces),
         faces_raw   = dual_faces([verts, faces, 1, 1], dual_verts),
-        faces_orient = orient_all_faces_outward(dual_verts, faces_raw)
+        faces_orient = ps_orient_all_faces_outward(dual_verts, faces_raw)
     )
     [dual_verts, faces_orient];
 
@@ -165,7 +165,7 @@ function ps_face_facet_radius_list(poly) =
     [
         for (f = faces)
             let(
-                c = face_centroid(verts, f),
+                c = ps_face_centroid(verts, f),
                 rs = [ for (vid = f) norm(verts[vid] - c) ]
             )
             sum(rs) / len(rs)
@@ -249,7 +249,7 @@ function ps_edge_from_face(poly, face_idx, edge_pos) =
         b = f[(edge_pos + 1) % n],
         edges = _ps_edges_from_faces(faces)
     )
-    find_edge_index(edges, a, b);
+    ps_find_edge_index(edges, a, b);
 
 // Compute a scale that makes dual edges intersect the selected edge family.
 // face_idx selects a face; edge_pos selects the reference edge within that face.
@@ -259,7 +259,7 @@ function scale_dual_edge_cross(poly, dual, face_idx, edge_pos=0, eps=1e-12, len_
         verts = poly_verts(poly),
         faces = poly_faces(poly),
         edges = _ps_edges_from_faces(faces),
-        edge_faces = edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces, edges),
         valences = _ps_vertex_valence_list(verts, edges),
 
         ref_ei = ps_edge_from_face(poly, face_idx, edge_pos),
@@ -354,7 +354,7 @@ function poly_dual(poly) =
     let(
         // Ensure input faces are outward for correct polar normals
         verts0 = poly_verts(poly),
-        faces0 = orient_all_faces_outward(verts0, poly_faces(poly)),
+        faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
 
         // Build raw polar dual in same coordinate system as verts0
         dual_vf_raw = poly_dual_polar_vf(verts0, faces0),

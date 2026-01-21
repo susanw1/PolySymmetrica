@@ -26,18 +26,18 @@ module test_poly_accessors__basic() {
 }
 
 
-// --- all_indices_in_range / all_faces_valid ---
+// --- ps_indices_in_range / ps_faces_valid ---
 module test_all_indices_in_range__true_false() {
-    assert(all_indices_in_range([0,1,2], 3), "in range");
-    assert(!all_indices_in_range([0,1,3], 3), "out of range");
+    assert(ps_indices_in_range([0,1,2], 3), "in range");
+    assert(!ps_indices_in_range([0,1,3], 3), "out of range");
 }
 
 module test_all_faces_valid__true_false() {
     verts = [[0,0,0],[1,0,0],[0,1,0],[0,0,1]];
     faces_ok  = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
     faces_bad = [[0,1,2],[0,1,3],[0,2,3],[1,2,9]];
-    assert(all_faces_valid(verts, faces_ok), "faces valid");
-    assert(!all_faces_valid(verts, faces_bad), "faces invalid");
+    assert(ps_faces_valid(verts, faces_ok), "faces valid");
+    assert(!ps_faces_valid(verts, faces_bad), "faces invalid");
 }
 
 
@@ -88,7 +88,7 @@ module test_v_sum__vec3_list() {
 module test_find_edge_index__finds() {
     faces = poly_faces(_tetra_poly());
     edges = _ps_edges_from_faces(faces);
-    i = find_edge_index(edges, 0, 1);
+    i = ps_find_edge_index(edges, 0, 1);
     assert(i >= 0, "edge exists");
     assert(edges[i] == [0,1], "stored sorted");
 }
@@ -97,29 +97,29 @@ module test_find_edge_index__finds() {
 module test_calc_edge_radius_roundtrip() {
     for (n=[3,4,5,6]) {
         R=2.5;
-        e = calc_edge(n, R);
-        R2 = calc_radius(n, e);
+        e = ps_calc_edge(n, R);
+        R2 = ps_calc_radius(n, e);
         assert_near(R2, R, 1e-9, str("roundtrip n=", n));
     }
 }
 
 module test_calc_edge__known_values() {
-    assert_near(calc_edge(3,1), sqrt(3), 1e-9, "triangle R=1");
-    assert_near(calc_edge(4,1), sqrt(2), 1e-9, "square R=1");
+    assert_near(ps_calc_edge(3,1), sqrt(3), 1e-9, "triangle R=1");
+    assert_near(ps_calc_edge(4,1), sqrt(2), 1e-9, "square R=1");
 }
 
 
-// --- face_centroid / face_normal ---
+// --- ps_face_centroid / ps_face_normal ---
 module test_face_centroid__triangle() {
     verts = [[0,0,0],[2,0,0],[0,2,0]];
-    c = face_centroid(verts, [0,1,2]);
+    c = ps_face_centroid(verts, [0,1,2]);
     assert_vec3_near(c, [2/3, 2/3, 0], 1e-12, "centroid");
 }
 
 module test_face_normal__orientation() {
     verts = [[0,0,0],[1,0,0],[0,1,0]];
-    n1 = face_normal(verts, [0,1,2]);
-    n2 = face_normal(verts, [0,2,1]);
+    n1 = ps_face_normal(verts, [0,1,2]);
+    n2 = ps_face_normal(verts, [0,2,1]);
     assert_vec3_near(n1, [0,0,1], 1e-12, "normal ccw");
     assert_vec3_near(n2, [0,0,-1], 1e-12, "normal cw");
 }
@@ -135,7 +135,7 @@ module test_poly_vertex_neighbor__returns_incident_vertex() {
 }
 
 
-// --- _ps_edges_from_faces / face_has_edge / edge_faces_table ---
+// --- _ps_edges_from_faces / ps_face_has_edge / ps_edge_faces_table ---
 module test_edges_from_faces__tetra_counts() {
     faces = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
     edges = _ps_edges_from_faces(faces);
@@ -144,15 +144,15 @@ module test_edges_from_faces__tetra_counts() {
 
 module test_face_has_edge__undirected_adjacent_only() {
     f = [0,1,2,3];
-    assert(face_has_edge(f, 1,2), "has (1,2)");
-    assert(face_has_edge(f, 2,1), "has (2,1)");
-    assert(!face_has_edge(f, 0,2), "no diagonal (0,2)");
+    assert(ps_face_has_edge(f, 1,2), "has (1,2)");
+    assert(ps_face_has_edge(f, 2,1), "has (2,1)");
+    assert(!ps_face_has_edge(f, 0,2), "no diagonal (0,2)");
 }
 
 module test_edge_faces_table__tetra_each_edge_two_faces() {
     faces = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
     edges = _ps_edges_from_faces(faces);
-    t = edge_faces_table(faces, edges);
+    t = ps_edge_faces_table(faces, edges);
     for (ei=[0:len(edges)-1]) assert_int_eq(len(t[ei]), 2, str("edge ", ei, " has 2 faces"));
 }
 
@@ -183,29 +183,29 @@ module test_poly_face_axes__orthonormalish() {
 }
 
 
-// --- orient_face_outward / orient_all_faces_outward ---
+// --- ps_orient_face_outward / ps_orient_all_faces_outward ---
 module test_orient_face_outward__makes_centroid_dot_normal_nonnegative() {
     verts = [[1,0,1],[0,1,1],[-1,0,1]];
     f_ccw = [0,1,2];
     f_cw  = [0,2,1];
 
-    g1 = orient_face_outward(verts, f_ccw);
-    g2 = orient_face_outward(verts, f_cw);
+    g1 = ps_orient_face_outward(verts, f_ccw);
+    g2 = ps_orient_face_outward(verts, f_cw);
 
     // invariant we actually care about:
-    c1 = face_centroid(verts, g1);
-    n1 = face_normal(verts, g1);
+    c1 = ps_face_centroid(verts, g1);
+    n1 = ps_face_normal(verts, g1);
     assert(v_dot(c1, n1) >= -1e-12, "oriented face has centroid·normal >= 0");
 
-    c2 = face_centroid(verts, g2);
-    n2 = face_normal(verts, g2);
+    c2 = ps_face_centroid(verts, g2);
+    n2 = ps_face_normal(verts, g2);
     assert(v_dot(c2, n2) >= -1e-12, "flipped face has centroid·normal >= 0");
 }
 
 module test_orient_all_faces_outward__length_preserved() {
     verts = [[0,0,0],[1,0,0],[0,1,0],[0,0,1]];
     faces = [[0,2,1],[0,1,3],[0,3,2],[1,2,3]];
-    out = orient_all_faces_outward(verts, faces);
+    out = ps_orient_all_faces_outward(verts, faces);
     assert_int_eq(len(out), len(faces), "face count preserved");
 }
 

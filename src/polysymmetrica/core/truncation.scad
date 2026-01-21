@@ -12,7 +12,7 @@ use <duals.scad>  // for faces_around_vertex helpers
 // For edge ei=[a,b], edge_pts[ei]=[P_a,P_b] (near a and near b)
 function _ps_edge_point_near(edges, edge_pts, a, b, near_v) =
     let(
-        ei = find_edge_index(edges, a, b),
+        ei = ps_find_edge_index(edges, a, b),
         e  = edges[ei]
     )
     (near_v == e[0]) ? edge_pts[ei][0] : edge_pts[ei][1];
@@ -21,7 +21,7 @@ function _ps_edge_point_near(edges, edge_pts, a, b, near_v) =
 // index of point p in list (or -1)
 function _ps_find_point(list, p, eps, i=0) =
     (i >= len(list)) ? -1 :
-    (point_eq(list[i], p, eps) ? i : _ps_find_point(list, p, eps, i+1));
+    (ps_point_eq(list[i], p, eps) ? i : _ps_find_point(list, p, eps, i+1));
 
 // Build unique vertex list from a flat list of points
 function _ps_unique_points(points, eps, acc=[], i=0) =
@@ -85,7 +85,7 @@ function poly_truncate(poly, t, eps = 1e-8) =
         // We use faces_around_vertex to get cyclic face order, then derive neighbor vertices
         // by intersecting consecutive faces at v; simplest is to use edges_incident_to_vertex + angular order later.
         // For now: derive from incident edges and the same "walk" logic we already have.
-        edge_faces = edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces, edges),
 
         vert_faces_pts = [
             for (vi = [0:len(verts)-1])
@@ -127,7 +127,7 @@ function poly_truncate(poly, t, eps = 1e-8) =
         faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, eps) ],
 
         // orient outward on the constructed geometry
-        faces_out = orient_all_faces_outward(uniq_verts, faces_idx),
+        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
 
         // compute unit_edge and e_over_ir from first edge
         edges_new = _ps_edges_from_faces(faces_out),
@@ -162,14 +162,14 @@ function poly_rectify(poly) =
                         let(
                             a = f[k],
                             b = f[(k+1)%n],
-                            ei = find_edge_index(edges, a, b)
+                            ei = ps_find_edge_index(edges, a, b)
                         )
                         ei
                 ]
         ],
 
         // Faces corresponding to original vertices: cycle around the vertex.
-        edge_faces = edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces, edges),
         vert_faces = [
             for (vi = [0:len(verts)-1])
                 let(
@@ -187,13 +187,13 @@ function poly_rectify(poly) =
                 )
                 [
                     for (vn = neigh)
-                        let(ei = find_edge_index(edges, vi, vn))
+                        let(ei = ps_find_edge_index(edges, vi, vn))
                         ei
                 ]
         ],
 
         faces_idx = concat(face_faces, vert_faces),
-        faces_out = orient_all_faces_outward(edge_mid, faces_idx),
+        faces_out = ps_orient_all_faces_outward(edge_mid, faces_idx),
 
         edges_new = _ps_edges_from_faces(faces_out),
         e0 = edges_new[0],
@@ -214,11 +214,11 @@ function poly_rectify(poly) =
 function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     let(
         verts0 = poly_verts(poly),
-        faces0 = orient_all_faces_outward(verts0, poly_faces(poly)),
+        faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
         edges = _ps_edges_from_faces(faces0),
-        edge_faces = edge_faces_table(faces0, edges),
+        edge_faces = ps_edge_faces_table(faces0, edges),
 
-        face_n = [ for (f = faces0) face_normal(verts0, f) ],
+        face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
         // offset face corners: one point per (face, vertex) incidence
         face_pts = [
             for (fi = [0:1:len(faces0)-1])
@@ -282,7 +282,7 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
         all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
         uniq_verts = _ps_unique_points(all_pts, len_eps),
         faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps) ],
-        faces_out = orient_all_faces_outward(uniq_verts, faces_idx),
+        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
 
         edges_new = _ps_edges_from_faces(faces_out),
         e0 = edges_new[0],
@@ -306,9 +306,9 @@ function _ps_face_edge_spread(verts, face) =
 // Solve df so that the chosen edge-face family is as square as possible.
 function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0, eps=1e-9) =
     let(
-        faces0 = orient_all_faces_outward(poly_verts(poly), poly_faces(poly)),
+        faces0 = ps_orient_all_faces_outward(poly_verts(poly), poly_faces(poly)),
         edges0 = _ps_edges_from_faces(faces0),
-        edge_faces0 = edge_faces_table(faces0, edges0),
+        edge_faces0 = ps_edge_faces_table(faces0, edges0),
         fpair = edge_faces0[family_edge_idx],
         key = (len(fpair) == 2) ? ((len(faces0[fpair[0]]) <= len(faces0[fpair[1]]))
             ? [len(faces0[fpair[0]]), len(faces0[fpair[1]])]

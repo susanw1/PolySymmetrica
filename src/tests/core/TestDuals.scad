@@ -36,12 +36,12 @@ module test_vertex_incident_faces__tetra_valence3() {
 }
 
 
-// find_edge_index (depends on the ordered edge list returned by _ps_edges_from_faces)
+// ps_find_edge_index (depends on the ordered edge list returned by _ps_edges_from_faces)
 module test_find_edge_index__finds_sorted_edge() {
     faces = poly_faces(_tetra_poly());
     edges = _ps_edges_from_faces(faces);
     // edges are sorted pairs
-    i = find_edge_index(edges, 0, 1);
+    i = ps_find_edge_index(edges, 0, 1);
     assert(i >= 0, "edge index exists");
     assert(edge_equal(edges[i], [0,1]) || edge_equal(edges[i],[1,0]) ? true : true, "edge is that pair (sorted in edges)");
 }
@@ -51,7 +51,7 @@ module test_find_edge_index__finds_sorted_edge() {
 module test_faces_around_vertex__tetra_cycle_len3() {
     p=_tetra_poly();
     edges=_ps_edges_from_faces(poly_faces(p));
-    ef=edge_faces_table(poly_faces(p), edges);
+    ef=ps_edge_faces_table(poly_faces(p), edges);
     cyc = faces_around_vertex(p, 0, edges, ef);
     assert_int_eq(len(cyc), 3, "cycle length 3");
 }
@@ -61,7 +61,7 @@ module test_faces_around_vertex__tetra_cycle_len3() {
 module test_dual_faces__count_equals_original_vertices() {
     p=_octa_poly();
     v=poly_verts(p);
-    f=orient_all_faces_outward(v, poly_faces(p));
+    f=ps_orient_all_faces_outward(v, poly_faces(p));
     centers = ps_face_polar_verts(v, f);
     df = dual_faces(p, centers);
     assert_int_eq(len(df), len(v), "dual faces == original vertices");
@@ -87,11 +87,11 @@ module test_dual_unit_edge_and_e_over_ir__positive() {
 module test_ps_face_polar_verts__incidence_relation() {
     p=_octa_poly();
     v=poly_verts(p);
-    f=orient_all_faces_outward(v, poly_faces(p));
+    f=ps_orient_all_faces_outward(v, poly_faces(p));
     qs = ps_face_polar_verts(v, f);
 
     for (fi=[0:3]) {
-        n = face_normal(v, f[fi]);
+        n = ps_face_normal(v, f[fi]);
         d = v_dot(n, v[f[fi][0]]);
         q = qs[fi];
 
