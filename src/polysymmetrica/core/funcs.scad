@@ -6,7 +6,7 @@
 
 
 ///////////////////////////////////////
-// ---- Poly descriptor accessors ----
+// ---- Poly descriptor API ----
 function poly_verts(poly)      = poly[0];
 function poly_faces(poly)      = poly[1];
 function poly_e_over_ir(poly)  = poly[2];
@@ -52,7 +52,8 @@ function poly_fix_winding(poly) =
     )
     [verts, fixed, poly_e_over_ir(poly)];
 
-// Helper validation
+///////////////////////////////////////
+// ---- Basic validation helpers ----
 function ps_faces_valid(verts, faces) =
     len([
         for (f = faces)
@@ -63,8 +64,8 @@ function ps_faces_valid(verts, faces) =
 function ps_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
 
-// ---- winding helpers ----
-
+///////////////////////////////////////
+// ---- Winding/orientation helpers (private) ----
 function _ps_face_edges_dir(f) =
     let(n = len(f))
     [ for (i = [0:1:n-1]) [f[i], f[(i+1)%n]] ];
@@ -146,7 +147,8 @@ function _ps_fix_winding_all(faces, fixed=undef) =
         _ps_fix_winding_queue(faces, _ps_list_set(init, seed, faces[seed]), [seed])
     );
 
-// Basic list helpers (numeric)
+///////////////////////////////////////
+// ---- List helpers (private) ----
 function _ps_list_contains(list, v) =
     len([for (x = list) if (x == v) 1]) > 0;
 
@@ -155,8 +157,7 @@ function _ps_index_of(list, v) =
     (len(idx) == 0) ? -1 : idx[0];
 
 ///////////////////////////////////////
-// Handy vector functions (and aliases)
-
+// ---- Vector math ----
 function v_add(a, b)   = a + b;
 function v_sub(a, b)   = a - b;
 function v_scale(a, k) = a * k;             // scalar multiplication
@@ -168,7 +169,8 @@ function v_norm(a)     = let(L = norm(a)) (L == 0 ? [0,0,0] : a / L);
 function _ps_ordered_pair(a, b) = (a < b) ? [a,b] : [b,a];
 
 
-// Edge equality
+///////////////////////////////////////
+// ---- Edge/list primitives ----
 function edge_equal(e1, e2) = (e1[0] == e2[0] && e1[1] == e2[1]);
 
 /** Sum of vector */
@@ -192,7 +194,6 @@ function ps_find_edge_index(edges, a, b) =
 // point equality within eps
 function ps_point_eq(p,q,eps) = norm(p-q) <= eps;
 
-// ---- List helpers ----
 function _ps_list_min(list, i=0, cur=undef) =
     (i >= len(list)) ? cur :
     let(v = list[i])
@@ -208,6 +209,7 @@ function _ps_sort(list, acc=[]) =
     let(mn = _ps_list_min(list))
     _ps_sort(_ps_remove_first(list, mn), concat(acc, [mn]));
 
+///////////////////////////////////////
 // ---- Linear algebra helpers ----
 function _ps_det3(m) =
     m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) -
@@ -233,9 +235,7 @@ function _ps_solve3(m, b, eps=1e-12) =
 
 
 ///////////////////////////////////////
-// Polygon helpers
-
-/** Calculate polygon edge, given N and radius */
+// ---- Polygon helpers ----
 function ps_calc_edge(n_vertex, rad) = 2 * rad * sin(180 / n_vertex);
 
 /** Calculate polygon radius, given N and edge length */
@@ -243,9 +243,7 @@ function ps_calc_radius(n_vertex, edge_len) = edge_len / (2 * sin(180 / n_vertex
 
 
 ///////////////////////////////////////
-// Geometry helpers
-
-/** Face centroid from verts + index list */
+// ---- Geometry helpers ----
 function ps_face_centroid(verts, f) =
     len(f) == 0
         ? [0,0,0]
@@ -273,6 +271,8 @@ function poly_vertex_neighbor(poly, vi) =
 
 
 // Internal: build unique undirected edges from a face list
+///////////////////////////////////////
+// ---- Topology helpers ----
 function _ps_edges_from_faces(faces) =
     let(
         raw_edges = [
@@ -322,7 +322,8 @@ function ps_face_has_edge(f, a, b) =
     ]) > 0;
 
 
-// ---- Generic face-frame helpers ----
+///////////////////////////////////////
+// ---- Frame/placement helpers ----
 function poly_face_center(poly, fi, scale) =
     let(
         f   = poly_faces(poly)[fi],
