@@ -33,8 +33,7 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: Run tests
         run: |
-          openscad --version
           openscad-nightly --version
-          openscad -o passed.stl  src/tests/run_all.scad
-          # openscad -o main_trunc.png src/polysymmetrica/examples/truncation/main_trunc.scad
+          openscad-nightly -o passed.stl  src/tests/run_all.scad
+          openscad-nightly -o main_trunc.png src/polysymmetrica/examples/truncation/main_trunc.scad
           
