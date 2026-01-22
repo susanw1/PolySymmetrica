@@ -18,7 +18,7 @@ IR = 20 * SC;
 p = (poly_truncate(dodecahedron()));
 
 EDGE_T = 3.5 * SC;
-FACE_T = 1.5 * SC;
+FACE_T = 1.6 * SC;
 FIN_T = 1 * SC;
 INSET = 1.1 * SC;
 
@@ -34,7 +34,8 @@ INSET = 1.1 * SC;
     show_faces = [0, 9, 23];
     and place '!'
 */
-module model(show_faces = undef) {
+module model(show_faces = undef, clear_airspace = true) {
+    let (inter_radius = IR)
     difference() {
         // Constructs the edge-based frame
         color("gray")
@@ -45,14 +46,14 @@ module model(show_faces = undef) {
         // Constructs facets, removes them from frame to create facet-fitting sockets.
         place_on_faces(p, IR) {
             // add '!' here to force facets-only:
-            if (is_undef(SHOW_FACES) || len(search($ps_facet_idx, [for (i=SHOW_FACES) i])) > 0) {
-                face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, undef, is_undef(show_faces), 
-                    edge_inset = INSET, base_z = -FACE_T/3);
+            !if (is_undef(show_faces) || len(search($ps_facet_idx, [for (i=show_faces) i])) > 0) {
+                face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, undef, clear_airspace, 
+                    edge_inset = INSET, base_z = 0);
             }
         }
     }
 }
 
-model();
+model(undef);
 
 
