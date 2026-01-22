@@ -1,4 +1,5 @@
 use <../../polysymmetrica/core/funcs.scad>
+use <../../polysymmetrica/core/validate.scad>
 use <../testing_util.scad>
 
 EPS = 1e-9;
@@ -51,6 +52,16 @@ module test_make_poly__valid_tetra_computes_e_over_ir() {
     assert(poly_e_over_ir(p) > 0, "e_over_ir > 0");
 }
 
+// --- poly_fix_winding ---
+module test_poly_fix_winding__repairs_edge_dirs() {
+    verts = [[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]];
+    // Two faces share edge (0,3) in the same direction -> winding mismatch.
+    faces = [[0,2,1],[0,3,1],[0,3,2],[1,2,3]];
+    p = [verts, faces, 1];
+    assert(!poly_validate_winding(p), "winding mismatch");
+    fixed = poly_fix_winding(p);
+    assert(poly_validate_winding(fixed), "winding repaired");
+}
 
 // --- vector helpers ---
 module test_v_ops__dot_cross_norm() {
@@ -82,6 +93,33 @@ module test_sum__numbers() {
 
 module test_v_sum__vec3_list() {
     assert_vec3_near(v_sum([[1,2,3],[4,5,6]]), [5,7,9], EPS, "v_sum");
+}
+
+// --- _ps_ordered_pair ---
+module test_ps_ordered_pair__basic() {
+    assert(_ps_ordered_pair(1,2) == [1,2], "ordered 1,2");
+    assert(_ps_ordered_pair(2,1) == [1,2], "ordered 2,1");
+}
+
+// --- _ps_reverse ---
+module test_ps_reverse__edge_cases() {
+    assert(_ps_reverse([]) == [], "reverse empty");
+    assert(_ps_reverse([1]) == [1], "reverse singleton");
+    assert(_ps_reverse([1,2,3]) == [3,2,1], "reverse list");
+}
+
+// --- _ps_list_contains / _ps_index_of ---
+module test_ps_list_contains_index__basic() {
+    assert(_ps_list_contains([1,2,3], 2), "contains 2");
+    assert(!_ps_list_contains([1,2,3], 4), "not contains 4");
+    assert_int_eq(_ps_index_of([1,2,3], 3), 2, "index of 3");
+    assert_int_eq(_ps_index_of([1,2,3], 4), -1, "index missing");
+}
+
+// --- ps_point_eq ---
+module test_ps_point_eq__eps() {
+    assert(ps_point_eq([0,0,0], [0,0,1e-6], 1e-5), "point eq within eps");
+    assert(!ps_point_eq([0,0,0], [0,0,1e-3], 1e-5), "point eq outside eps");
 }
 
 
@@ -140,6 +178,12 @@ module test_edges_from_faces__tetra_counts() {
     faces = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
     edges = _ps_edges_from_faces(faces);
     assert_int_eq(len(edges), 6, "tetra edges=6");
+}
+
+module test_edges_from_faces__quad_edges() {
+    faces = [[0,1,2,3]];
+    edges = _ps_edges_from_faces(faces);
+    assert_int_eq(len(edges), 4, "quad edges=4");
 }
 
 module test_face_has_edge__undirected_adjacent_only() {
@@ -228,6 +272,30 @@ module test_ps_sort__empty() {
     assert_int_eq(len(s), 0, "sort empty");
 }
 
+// --- _ps_solve3 ---
+module test_ps_solve3__identity_and_scale() {
+    m1 = [[1,0,0],[0,1,0],[0,0,1]];
+    b1 = [1,2,3];
+    x1 = _ps_solve3(m1, b1);
+    assert_vec3_near(x1, b1, EPS, "solve identity");
+
+    m2 = [[2,0,0],[0,3,0],[0,0,4]];
+    b2 = [4,9,8];
+    x2 = _ps_solve3(m2, b2);
+    assert_vec3_near(x2, [2,3,2], EPS, "solve scale");
+}
+
+// --- ps_frame_matrix ---
+module test_ps_frame_matrix__basic_layout() {
+    m = ps_frame_matrix([1,2,3], [1,0,0], [0,1,0], [0,0,1]);
+    assert_vec3_near([m[0][0], m[0][1], m[0][2]], [1,0,0], EPS, "row0 xyz");
+    assert_near(m[0][3], 1, EPS, "row0 w");
+    assert_vec3_near([m[1][0], m[1][1], m[1][2]], [0,1,0], EPS, "row1 xyz");
+    assert_near(m[1][3], 2, EPS, "row1 w");
+    assert_vec3_near([m[2][0], m[2][1], m[2][2]], [0,0,1], EPS, "row2 xyz");
+    assert_near(m[2][3], 3, EPS, "row2 w");
+}
+
 
 // ---- suite ----
 module run_TestFuncs() {
@@ -236,12 +304,17 @@ module run_TestFuncs() {
     test_all_indices_in_range__true_false();
     test_all_faces_valid__true_false();
     test_make_poly__valid_tetra_computes_e_over_ir();
+    test_poly_fix_winding__repairs_edge_dirs();
 
     test_v_ops__dot_cross_norm();
 //    test_v_ordered();
     test_edge_equal__ordered();
     test_sum__numbers();
     test_v_sum__vec3_list();
+    test_ps_ordered_pair__basic();
+    test_ps_reverse__edge_cases();
+    test_ps_list_contains_index__basic();
+    test_ps_point_eq__eps();
     test_find_edge_index__finds();
 
     test_calc_edge_radius_roundtrip();
@@ -253,6 +326,7 @@ module run_TestFuncs() {
     test_poly_vertex_neighbor__returns_incident_vertex();
 
     test_edges_from_faces__tetra_counts();
+    test_edges_from_faces__quad_edges();
     test_face_has_edge__undirected_adjacent_only();
     test_edge_faces_table__tetra_each_edge_two_faces();
 
@@ -264,6 +338,8 @@ module run_TestFuncs() {
     test_ps_sort__numbers();
     test_ps_sort__floats();
     test_ps_sort__empty();
+    test_ps_solve3__identity_and_scale();
+    test_ps_frame_matrix__basic_layout();
 }
 
 run_TestFuncs();
