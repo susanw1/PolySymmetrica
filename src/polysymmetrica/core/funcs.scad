@@ -251,9 +251,10 @@ function ps_face_centroid(verts, f) =
 
 // Face normal (not scaled, just direction)
 function ps_face_normal(verts, f) =
+    // OpenSCAD expects LHR (clockwise from outside), so flip cross product.
     v_norm(v_cross(
-        verts[f[1]] - verts[f[0]],
-        verts[f[2]] - verts[f[0]]
+        verts[f[2]] - verts[f[0]],
+        verts[f[1]] - verts[f[0]]
     ));
 
 
@@ -360,7 +361,8 @@ function poly_face_ez(poly, fi, scale) =
         v0 = vs[f[0]] * scale,
         v1 = vs[f[1]] * scale,
         v2 = vs[f[2]] * scale)
-    v_norm(v_cross(v1 - v0, v2 - v0));   // outward normal
+    // LHR outward normal (clockwise from outside).
+    v_norm(v_cross(v2 - v0, v1 - v0));
 
 
 function ps_frame_matrix(center, ex, ey, ez) = [

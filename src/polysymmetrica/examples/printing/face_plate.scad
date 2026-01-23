@@ -154,7 +154,8 @@ function _bottom_pts2d_from_bevel(top_pts, diheds, ht) =
                     p1 = top_pts[(k+1)%n],
                     e = v_norm([p1[0]-p0[0], p1[1]-p0[1], 0]),
                     n0 = [0,0,1],
-                    n1 = _rot_axis(n0, e, -diheds[k]),
+                    // LHR: rotate outward normal toward adjacent face by +dihedral.
+                    n1 = _rot_axis(n0, e, diheds[k]),
                     n_side = v_norm(n0 + n1),
                     n_xy = [n_side[0], n_side[1]],
                     d2_raw = v_dot(n_xy, p0) + n_side[2] * ht,
@@ -222,6 +223,7 @@ function _pts_radius2d(pts, centroid) =
 
 
 // Bevel by constructing an inset bottom polygon and lofting.
+// Expects LHR/CW polygon order for pts and aligned dihedrals.
 module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     edge_inset = FACE_PLATE_EDGE_INSET,
     pillow_min_rad = FACE_PLATE_PILLOW_MIN_RAD,
@@ -247,18 +249,18 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
     points = concat(top, bottom);
     faces = concat(
+        // top face: already LHR (clockwise from outside, +Z)
         [ [for (i = [0:1:n-1]) i] ],
+        // bottom face: reverse to keep LHR (clockwise from outside, -Z)
         [ [for (i = [0:1:n-1]) (2*n-1-i)] ],
-        [for (i = [0:1:n-1]) [i, n + (i+1)%n, (i+1)%n]],
-        [for (i = [0:1:n-1]) [i, n + i, n + (i+1)%n]]
+        // side faces: use opposite edge direction to the top/bottom faces
+        [for (i = [0:1:n-1]) [ (i+1)%n, i, n + i ]],
+        [for (i = [0:1:n-1]) [ (i+1)%n, n + i, n + (i+1)%n ]]
     );
-    // OpenSCAD uses LHR (clockwise from outside), so flip all faces.
-    faces_lhr = [for (f = faces) _ps_reverse(f)];
-
 //    echo("points", points, "faces", faces);
     color(len(pts) == 3 ? "white" : "red") {
         // ramped part
-        polyhedron(points = points, faces = faces_lhr, convexity = 2);
+        polyhedron(points = points, faces = faces, convexity = 2);
 
         // flat roof part
         translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk) polygon(points = pts_gap);
@@ -289,5 +291,5 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 
 difference() {
     translate([0,0,-5]) cube(20);
-    face_plate(0, [[10,0],[0,10],[-10,0],[0,-10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
+    face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
 }

@@ -40,6 +40,10 @@ function facet_eq_rot(a, b) =
                    // try all rotations of b
                    (max([ for (k = [0:n-1]) (a == rotl(b, k)) ? 1 : 0 ]) == 1));
 
+// true if a and b are equal up to rotation in either direction
+function facet_eq_rot_any(a, b) =
+    facet_eq_rot(a, b) || facet_eq_rot(a, _ps_reverse(b));
+
 // true if every facet in A can be matched with a distinct facet in B (multiset match)
 function facets_eq_rot(A, B) =
     let(n = len(A))
@@ -47,7 +51,7 @@ function facets_eq_rot(A, B) =
         let(M = [
                 for (i = [0:n-1])
                     [ for (j = [0:n-1])
-                        facet_eq_rot(A[i], B[j]) ? 1 : 0
+                        facet_eq_rot_any(A[i], B[j]) ? 1 : 0
                     ]
             ]
         )

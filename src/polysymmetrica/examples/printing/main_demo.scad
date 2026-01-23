@@ -46,7 +46,7 @@ module model(show_faces = undef, clear_airspace = true) {
         // Constructs facets, removes them from frame to create facet-fitting sockets.
         place_on_faces(p, IR) {
             // add '!' here to force facets-only:
-            !if (is_undef(show_faces) || len(search($ps_facet_idx, [for (i=show_faces) i])) > 0) {
+            if (is_undef(show_faces) || len(search($ps_facet_idx, [for (i=show_faces) i])) > 0) {
                 face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, undef, clear_airspace, 
                     edge_inset = INSET, base_z = 0);
             }
@@ -54,6 +54,5 @@ module model(show_faces = undef, clear_airspace = true) {
     }
 }
 
-model(undef);
-
+model();
 

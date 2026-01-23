@@ -158,8 +158,8 @@ module test_face_normal__orientation() {
     verts = [[0,0,0],[1,0,0],[0,1,0]];
     n1 = ps_face_normal(verts, [0,1,2]);
     n2 = ps_face_normal(verts, [0,2,1]);
-    assert_vec3_near(n1, [0,0,1], 1e-12, "normal ccw");
-    assert_vec3_near(n2, [0,0,-1], 1e-12, "normal cw");
+    assert_vec3_near(n1, [0,0,-1], 1e-12, "normal ccw");
+    assert_vec3_near(n2, [0,0,1], 1e-12, "normal cw");
 }
 
 

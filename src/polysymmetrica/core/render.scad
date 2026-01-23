@@ -11,9 +11,8 @@ module poly_render(poly, inter_radius = 1) {
     let(
         k = (inter_radius * poly_e_over_ir(poly)),
         pts = poly_verts(poly) * k,
-        faces_rhr = ps_orient_all_faces_outward(pts, poly_faces(poly)),
-        // OpenSCAD expects LHR (clockwise from outside), so flip RHR faces.
-        faces_lhr = [for (f = faces_rhr) _ps_reverse(f)]
+        // Faces are expected to be LHR (clockwise from outside).
+        faces_lhr = poly_faces(poly)
     )
     polyhedron(
         points = pts,
@@ -73,3 +72,9 @@ poly_describe(octahedron(), "Octahedron");
 //poly_describe(poly_dual(poly_truncate(octahedron())), "Dual of Trunc Octa");
 
 poly_render(octahedron(), 30);
+
+translate([100,0,0])
+difference() {
+    cube(60);
+    translate([10,10,0])poly_render(octahedron(), 30);
+}
