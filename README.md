@@ -100,9 +100,6 @@ for a full explanation of:
 
 ## 🔶 Roadmap
 
-* Truncation engine
-* Archimedean solids
-* Catalan solids (via duals)
 * Stellation framework
 * Compound construction
 * More examples and printable models
@@ -114,5 +111,4 @@ for a full explanation of:
 MIT — permissive and open for community use.
 
 ---
-
 

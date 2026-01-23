@@ -36,7 +36,7 @@ This enables a wide range of applications:
 
 * 3D-printed **polyhedral frames**, edge mounts, and decorative solids
 * Dual solids (e.g., cube from octahedron, dodecahedron from icosahedron)
-* Future: **Archimedean and Catalan solids**, truncations, rectifications
+* **Archimedean and Catalan solids** via truncation/duals are now supported; stellations are next
 * Custom geometric elements attached to any symmetry site
 * Explorations of symmetry, stellation, and polyhedral combinatorics
 
@@ -63,11 +63,10 @@ PolySymmetrica/
 │   │   │   └─ icosahedron.scad
 │   │   │
 │   │   └─ examples/
-│   │       ├─ poly-frame/
-│   │       │   ├─ main.scad
-│   │       │   ├─ polygon-sym.scad
-│   │       │   └─ edge-mount.scad
-│   │       └─ (future) demos for duals, placements, truncations
+│   │       ├─ basics/                 # core placement demos
+│   │       ├─ truncation/             # trunc/rectify/cantellate demos
+│   │       ├─ poly-frame/             # frame + mount experiments
+│   │       └─ printing/               # printable facet/frame experiments
 │   └─ tests/...
 │
 └─ docs/
@@ -93,7 +92,7 @@ Where:
 
 | Field       | Meaning                                                                  |
 | ----------- | ---------------------------------------------------------                |
-| `verts`     | List of 3D vertex coordinates, with edge length normalized to 1          |
+| `verts`     | List of 3D vertex coordinates (unit-edge by convention; not required)     |
 | `faces`     | List of faces, each face = ordered list of vertex indices                |
 | `e_over_ir` | Ratio of edge length to **inter-radius**                                 |
 
@@ -194,7 +193,7 @@ The following conventions are used consistently to make their meaning predictabl
 
   * Examples: `$ps_poly_center_local`, `$ps_edge_pts_local`, `$ps_vertex_neighbor_pts_local`
 * `*_pts2d`
-  2D points in the local XY plane, suitable for `polygon(points=...)`.
+  2D points in the local XY plane, suitable for `polygon(points=...)` and **ordered LHR (CW from outside)**.
 
   * Example: `$ps_face_pts2d`
 
@@ -240,10 +239,10 @@ dual_poly = poly_dual(poly);
 
 Algorithm:
 
-1. **Dual vertices** = centroids of original faces
+1. **Dual vertices** = polar face normals (plane normals divided by offset)
 2. **Dual faces** = cyclic lists of faces around original vertices
    (computed combinatorially)
-3. **Face orientation** corrected via normals
+3. **Face orientation** corrected via normals (LHR; clockwise when viewed from outside)
 4. **e_over_ir** computed automatically
 5. Scaling helper function to match dual size to original for overlay
 
@@ -355,12 +354,15 @@ Any convex polyhedron may be added by supplying:
 
 The descriptor is then compatible with all placement operators.
 
-### **6.2 Derived Families (future modules)**
+### **6.2 Derived Families**
 
-Planned:
+Implemented:
 
 * **Rectification**
 * **Cantellation / expansion**
+
+Planned:
+
 * **Stellation frameworks**
 
 ### **6.3 Custom placement modes**
@@ -409,8 +411,8 @@ Confirm:
 * ✔ Primitive Platonic descriptors
 * ✔ Dual-generated cube and dodecahedron
 * ✔ Convex dual operator
-* ✔ General truncation operator
-* ✔ Archimedean generation via truncation
+* ✔ General truncation/rectification/cantellation operators (`core/truncation.scad`)
+* ✔ Archimedean generation via truncation/cantellation
 * ✔ Catalan generation via duals
 * ✔ Catalan scaling to ensure dual overlay
 
