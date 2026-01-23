@@ -19,10 +19,10 @@ function octahedron() = let(unit_edge = sqrt(2)) make_poly(
         [ 0, 0,-1]   // 5 (bottom)
     ] / unit_edge,
 
-    // faces (index 1) – triangles by vertex index
+    // faces (index 1) – triangles by vertex index, oriented for LHR (OpenSCAD)
     [
-        [0,2,4], [2,1,4], [1,3,4], [3,0,4],
-        [2,0,5], [1,2,5], [3,1,5], [0,3,5]
+        [0,4,2], [2,4,1], [1,4,3], [3,4,0],
+        [2,5,0], [1,5,2], [3,5,1], [0,5,3]
     ],
 
     // e_over_ir (index 3): edge_len / inter_radius
