@@ -232,7 +232,8 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     pillow_thk = FACE_PLATE_PILLOW_THK,
     top_thk = FACE_PLATE_TOP_THK,
     base_z = undef,
-    clear_height = FACE_PLATE_CLEAR_HEIGHT
+    clear_height = FACE_PLATE_CLEAR_HEIGHT,
+    eps = 1e-4
 ) {
     n = len(pts);
     insets = (is_undef(insets_override) || len(insets_override) != n)
@@ -283,7 +284,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 
     // Conditionally clears the airspace above the facet, to remove material from the face-mount above the face
     if (clear_space) {
-        color("magenta") translate([0, 0, base_z_eff + face_thk]) linear_extrude(height = clear_height) polygon(points = pts_gap);
+        color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height) polygon(points = pts_gap);
     }
 }
 
@@ -291,5 +292,5 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 
 difference() {
     translate([0,0,-5]) cube(20);
-    face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
+    face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=true);
 }
