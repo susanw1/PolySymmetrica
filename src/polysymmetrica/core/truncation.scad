@@ -35,6 +35,25 @@ function _ps_unique_points(points, eps, acc=[], i=0) =
 function _ps_face_points_to_indices(uniq, face_pts, eps) =
     [ for (p = face_pts) _ps_find_point(uniq, p, eps) ];
 
+// Build a poly descriptor from face point lists (dedup + orient + unit-edge scale).
+function _ps_poly_from_face_points(faces_pts_all, eps, len_eps=undef) =
+    let(
+        len_eps_eff = is_undef(len_eps) ? eps : len_eps,
+        all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
+        uniq_verts = _ps_unique_points(all_pts, len_eps_eff),
+        faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps_eff) ],
+        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
+        edges_new = _ps_edges_from_faces(faces_out),
+        e0 = edges_new[0],
+        vA = uniq_verts[e0[0]],
+        vB = uniq_verts[e0[1]],
+        unit_e = norm(vB - vA),
+        mid = (vA + vB) / 2,
+        ir  = norm(mid),
+        e_over_ir = unit_e / ir
+    )
+    make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+
 // --- main truncation ---
 
 function poly_truncate(poly, t, eps = 1e-8) =
@@ -117,29 +136,9 @@ function poly_truncate(poly, t, eps = 1e-8) =
         ],
 
         // collect all face point lists
-        faces_pts_all = concat(trunc_faces_pts, vert_faces_pts),
-
-        // flatten all points for uniq build
-        all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
-        uniq_verts = _ps_unique_points(all_pts, eps),
-
-        // remap faces
-        faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, eps) ],
-
-        // orient outward on the constructed geometry
-        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
-
-        // compute unit_edge and e_over_ir from first edge
-        edges_new = _ps_edges_from_faces(faces_out),
-        e0 = edges_new[0],
-        vA = uniq_verts[e0[0]],
-        vB = uniq_verts[e0[1]],
-        unit_e = norm(vB - vA),
-        mid = (vA + vB) / 2,
-        ir  = norm(mid),
-        e_over_ir = unit_e / ir
+        faces_pts_all = concat(trunc_faces_pts, vert_faces_pts)
     )
-    make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+    _ps_poly_from_face_points(faces_pts_all, eps);
 
 // Rectification: replace each vertex with the midpoint of each incident edge.
 function poly_rectify(poly) =
@@ -284,22 +283,9 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
         // Faces from original vertices (valence-gons)
         vert_faces_pts = _ps_vert_faces_from_offsets(verts0, faces0, face_pts, edges, edge_faces),
 
-        faces_pts_all = concat(face_faces_pts, edge_faces_pts, vert_faces_pts),
-        all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
-        uniq_verts = _ps_unique_points(all_pts, len_eps),
-        faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps) ],
-        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
-
-        edges_new = _ps_edges_from_faces(faces_out),
-        e0 = edges_new[0],
-        vA = uniq_verts[e0[0]],
-        vB = uniq_verts[e0[1]],
-        unit_e = norm(vB - vA),
-        mid = (vA + vB) / 2,
-        ir  = norm(mid),
-        e_over_ir = unit_e / ir
+        faces_pts_all = concat(face_faces_pts, edge_faces_pts, vert_faces_pts)
     )
-    make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+    _ps_poly_from_face_points(faces_pts_all, eps, len_eps);
 
 // Chamfer: face faces + edge faces (no vertex faces).
 function poly_chamfer(poly, df, eps = 1e-8, len_eps = 1e-6) =
@@ -314,22 +300,9 @@ function poly_chamfer(poly, df, eps = 1e-8, len_eps = 1e-6) =
         face_faces_pts = face_pts,
         edge_faces_pts = _ps_edge_faces_from_offsets(faces0, face_pts, edges, edge_faces),
 
-        faces_pts_all = concat(face_faces_pts, edge_faces_pts),
-        all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
-        uniq_verts = _ps_unique_points(all_pts, len_eps),
-        faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps) ],
-        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
-
-        edges_new = _ps_edges_from_faces(faces_out),
-        e0 = edges_new[0],
-        vA = uniq_verts[e0[0]],
-        vB = uniq_verts[e0[1]],
-        unit_e = norm(vB - vA),
-        mid = (vA + vB) / 2,
-        ir  = norm(mid),
-        e_over_ir = unit_e / ir
+        faces_pts_all = concat(face_faces_pts, edge_faces_pts)
     )
-    make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+    _ps_poly_from_face_points(faces_pts_all, eps, len_eps);
 
 // Measure how square an edge face is (edge length spread).
 function _ps_face_edge_spread(verts, face) =
