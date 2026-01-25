@@ -20,8 +20,4 @@ Demonstrates chamfering.
             demo(poly_chamfer(p[1], t[1]));
 }        
 
-p1 = poly_dual(poly_rectify(dodecahedron()));
-p = poly_chamfer(p1, 0.05);
-demo(p);
-//poly_describe(p1);
-//poly_render(p, 20);
+demo(poly_chamfer(tetrahedron(), 0.2));

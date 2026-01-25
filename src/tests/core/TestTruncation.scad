@@ -72,6 +72,14 @@ module test_poly_truncate__t_zero_counts_preserved() {
     assert_facet_matches(p, q);
 }
 
+// chamfer: cube should have 6 original faces + 12 edge faces (hexes)
+module test_poly_chamfer__cube_face_counts() {
+    p = hexahedron();
+    q = poly_chamfer(p, 0.1);
+    assert_int_eq(len(poly_faces(q)), 18, "chamfer cube faces=18");
+    assert_int_eq(_count_faces_of_size(q, 6), 12, "chamfer cube: 12 hex edge faces");
+}
+
 
 // truncation + dual: size relations
 module test_poly_truncate_then_dual__counts_relations() {
@@ -216,6 +224,7 @@ module run_TestTruncation() {
 
     test_poly_truncate__tetra_counts_at_one_third();
     test_poly_truncate__t_zero_counts_preserved();
+    test_poly_chamfer__cube_face_counts();
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
     test_poly_cantellate__tetra_counts();
