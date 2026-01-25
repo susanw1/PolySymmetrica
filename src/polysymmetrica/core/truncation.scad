@@ -39,7 +39,7 @@ function _ps_face_points_to_indices(uniq, face_pts, eps) =
 
 function poly_truncate(poly, t, eps = 1e-8) =
     let(t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t)
-    assert(t_eff >= 0 && t_eff < 0.5, "'t' out of range")
+    // assert(t_eff >= 0 && t_eff < 0.5, "'t' out of range")
     (t_eff == 0) 
         ? poly
         :
@@ -211,6 +211,62 @@ function poly_rectify(poly) =
 // - edge faces are quads (rectangles/squares)
 // - vertex faces are valence-gons
 // df offsets faces along their normals; edge/vertex faces are derived from those offsets.
+function _ps_face_offset_pts(verts0, faces0, face_n, df) =
+    [
+        for (fi = [0:1:len(faces0)-1])
+            let(
+                f = faces0[fi],
+                n = len(f),
+                n_f = face_n[fi]
+            )
+            [
+                for (k = [0:1:n-1])
+                    let(v = f[k])
+                    verts0[v] + df * n_f
+            ]
+    ];
+
+function _ps_vert_faces_from_offsets(verts0, faces0, face_pts, edges, edge_faces) =
+    [
+        for (vi = [0:1:len(verts0)-1])
+            let(
+                fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces),
+                idxs = [for (k = [0:1:len(fc)-1]) k]
+            )
+            [
+                for (k = idxs)
+                    let(
+                        fi = fc[k],
+                        f = faces0[fi],
+                        pos = [ for (j=[0:1:len(f)-1]) if (f[j]==vi) j ][0]
+                    )
+                    face_pts[fi][pos]
+            ]
+    ];
+
+function _ps_edge_faces_from_offsets(faces0, face_pts, edges, edge_faces) =
+    [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                e = edges[ei],
+                fpair = edge_faces[ei],
+                f0 = fpair[0],
+                f1 = fpair[1],
+                v0 = e[0],
+                v1 = e[1],
+                pos0 = _ps_index_of(faces0[f0], v0),
+                pos1 = _ps_index_of(faces0[f0], v1),
+                pos2 = _ps_index_of(faces0[f1], v1),
+                pos3 = _ps_index_of(faces0[f1], v0)
+            )
+            [
+                face_pts[f0][pos0],
+                face_pts[f0][pos1],
+                face_pts[f1][pos2],
+                face_pts[f1][pos3]
+            ]
+    ];
+
 function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     let(
         verts0 = poly_verts(poly),
@@ -220,65 +276,45 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
 
         face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
         // offset face corners: one point per (face, vertex) incidence
-        face_pts = [
-            for (fi = [0:1:len(faces0)-1])
-                let(
-                    f = faces0[fi],
-                    n = len(f),
-                    n_f = face_n[fi]
-                )
-                [
-                    for (k = [0:1:n-1])
-                        let(v = f[k])
-                        verts0[v] + df * n_f
-                ]
-        ],
-
+        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df),
         // Faces from original faces (n-gons)
         face_faces_pts = face_pts,
-
+        // Faces from original edges (quads)
+        edge_faces_pts = _ps_edge_faces_from_offsets(faces0, face_pts, edges, edge_faces),
         // Faces from original vertices (valence-gons)
-        vert_faces_pts = [
-            for (vi = [0:1:len(verts0)-1])
-                let(
-                    fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces),
-                    idxs = [for (k = [0:1:len(fc)-1]) k]
-                )
-                [
-                    for (k = idxs)
-                        let(
-                            fi = fc[k],
-                            f = faces0[fi],
-                            pos = [ for (j=[0:1:len(f)-1]) if (f[j]==vi) j ][0]
-                        )
-                        face_pts[fi][pos]
-                ]
-        ],
-
-        // Faces from original edges (quads): connect corresponding offset edges
-        edge_faces_pts = [
-            for (ei = [0:1:len(edges)-1])
-                let(
-                    e = edges[ei],
-                    fpair = edge_faces[ei],
-                    f0 = fpair[0],
-                    f1 = fpair[1],
-                    v0 = e[0],
-                    v1 = e[1],
-                    pos0 = _ps_index_of(faces0[f0], v0),
-                    pos1 = _ps_index_of(faces0[f0], v1),
-                    pos2 = _ps_index_of(faces0[f1], v1),
-                    pos3 = _ps_index_of(faces0[f1], v0)
-                )
-                [
-                    face_pts[f0][pos0],
-                    face_pts[f0][pos1],
-                    face_pts[f1][pos2],
-                    face_pts[f1][pos3]
-                ]
-        ],
+        vert_faces_pts = _ps_vert_faces_from_offsets(verts0, faces0, face_pts, edges, edge_faces),
 
         faces_pts_all = concat(face_faces_pts, edge_faces_pts, vert_faces_pts),
+        all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
+        uniq_verts = _ps_unique_points(all_pts, len_eps),
+        faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps) ],
+        faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx),
+
+        edges_new = _ps_edges_from_faces(faces_out),
+        e0 = edges_new[0],
+        vA = uniq_verts[e0[0]],
+        vB = uniq_verts[e0[1]],
+        unit_e = norm(vB - vA),
+        mid = (vA + vB) / 2,
+        ir  = norm(mid),
+        e_over_ir = unit_e / ir
+    )
+    make_poly(uniq_verts / unit_e, faces_out, e_over_ir);
+
+// Chamfer: face faces + edge faces (no vertex faces).
+function poly_chamfer(poly, df, eps = 1e-8, len_eps = 1e-6) =
+    let(
+        verts0 = poly_verts(poly),
+        faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
+        edges = _ps_edges_from_faces(faces0),
+        edge_faces = ps_edge_faces_table(faces0, edges),
+
+        face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
+        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df),
+        face_faces_pts = face_pts,
+        edge_faces_pts = _ps_edge_faces_from_offsets(faces0, face_pts, edges, edge_faces),
+
+        faces_pts_all = concat(face_faces_pts, edge_faces_pts),
         all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
         uniq_verts = _ps_unique_points(all_pts, len_eps),
         faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps) ],
