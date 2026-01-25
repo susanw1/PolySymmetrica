@@ -69,5 +69,5 @@ module model(show_faces = undef, clear_airspace = true) {
     }
 }
 
-model(undef, true);
+model();
 

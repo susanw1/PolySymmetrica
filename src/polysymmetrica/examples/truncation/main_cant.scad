@@ -1,8 +1,4 @@
-use <../../core/funcs.scad>
-use <../../core/placement.scad>
-use <../../core/duals.scad>
 use <../../core/truncation.scad>
-use <../../core/render.scad>
 
 use <../../models/regular_all.scad>
 
@@ -11,20 +7,15 @@ use <util_demo.scad>
 
 /**
 Demonstrates extended cantellations with extreme values of 't'.
-
-But values outside the range 0 < t < 0.5 cause the new vertex faces to over-extend.
-* t < 0: anti-truncation
-* 0.5 < t <= 1: hyper-truncation
-* t > 1: quasi-truncation
 */
 for (   p = [ [-1, undef],
-            [0, tetrahedron()] , [1, hexahedron()], [2, octahedron()], [3, dodecahedron()], [4, icosahedron()]], 
+            [0, tetrahedron()] , [1, hexahedron()], [2, octahedron()], [3, dodecahedron()], [4, icosahedron()]],
         t = [[-3, -1],[ -2, -0.7], [-1, -0.2], [0, 0.001], [1, 0.2], [2, 0.4], [3, 0.6], [4, 1], [5, 2.5]]) {
-            
-    translate([100 * t[0], 100 * p[0], 0]) 
-        if (is_undef(p[1])) 
+
+    translate([100 * t[0], 100 * p[0], 0])
+        if (is_undef(p[1]))
             text(str("t=", t[1]));
         else
             demo(poly_cantellate(p[1], t[1]));
-}        
+}
 

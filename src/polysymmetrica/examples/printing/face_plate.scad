@@ -292,5 +292,5 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 
 difference() {
     translate([0,0,-5]) cube(20);
-    face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=true);
+    face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
 }
