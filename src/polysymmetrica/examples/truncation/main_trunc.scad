@@ -1,8 +1,5 @@
-use <../../core/funcs.scad>
-use <../../core/placement.scad>
-use <../../core/duals.scad>
 use <../../core/truncation.scad>
-use <../../core/render.scad>
+use <../../core/duals.scad>
 
 use <../../models/regular_all.scad>
 

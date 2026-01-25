@@ -58,7 +58,8 @@ function _ps_poly_from_face_points(faces_pts_all, eps, len_eps=undef) =
 
 function poly_truncate(poly, t, eps = 1e-8) =
     let(t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t)
-    // assert(t_eff >= 0 && t_eff < 0.5, "'t' out of range")
+    // should this assert? Or should we allow, or silently call rectify?
+    assert(t_eff != 0.5, "'t' cannot be 0.5 as this produces degenerate vertices - use poly_rectify() instead")
     (t_eff == 0) 
         ? poly
         :
