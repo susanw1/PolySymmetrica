@@ -45,7 +45,7 @@ module model(show_faces = undef, clear_airspace = true) {
             // Constructs the edge-based frame
             color("gray")
             place_on_edges(p, IR) {
-                edge_seg($ps_edge_len, $ps_poly_center_local, edge_t = EDGE_T);
+                edge_seg($ps_edge_pts_local, $ps_poly_center_local, edge_t = EDGE_T);
             }
 
             // mounting plate - the edge frame isn't quite substantial enough
