@@ -164,8 +164,9 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
 
         center = (v0 + v1) / 2;          // edge midpoint (world)
         ex     = v_norm(v1 - v0);        // along edge
-        ez     = v_norm(center);         // radial, outward from origin
-        ey     = v_cross(ez, ex);        // completes basis
+        ez0    = v_norm(center);         // radial reference
+        ey     = v_norm(v_cross(ez0, ex)); // orthonormal
+        ez     = v_norm(v_cross(ex, ey));  // orthonormal
 
         edge_midradius   = norm(center);
         edge_len_actual  = norm(v1 - v0);
@@ -176,7 +177,6 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
             v_dot(-center, ey),
             v_dot(-center, ez)
         ];
-
         // Edge endpoints in LOCAL coords
         edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]];
 
@@ -215,5 +215,3 @@ module face_debug() {
     // Radial line to centre
     color("yellow") cylinder(h = -$ps_poly_center_local[2], r = 0.5, center=false);
 }
-
-
