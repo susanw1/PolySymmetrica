@@ -314,22 +314,67 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     let(
         verts0 = poly_verts(poly),
         faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
+        poly0 = make_poly(verts0, faces0, poly_e_over_ir(poly)),
         edges = _ps_edges_from_faces(faces0),
         edge_faces = ps_edge_faces_table(faces0, edges),
 
         face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
         // offset face corners: one point per (face, vertex) incidence
         face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df),
-        // Faces from original faces (n-gons)
-        face_faces_pts = face_pts,
-        // Faces from original edges (quads)
-        edge_faces_pts = _ps_edge_faces_from_offsets(faces0, face_pts, edges, edge_faces),
-        // Faces from original vertices (valence-gons)
-        vert_faces_pts = _ps_vert_faces_from_offsets(verts0, faces0, face_pts, edges, edge_faces),
-
-        faces_pts_all = concat(face_faces_pts, edge_faces_pts, vert_faces_pts)
+        face_offsets = [
+            for (fi = [0:1:len(faces0)-1])
+                sum([for (j = [0:1:fi-1]) len(faces0[j])])
+        ],
+        sites = [
+            for (fi = [0:1:len(faces0)-1])
+                for (v = faces0[fi])
+                    [fi, v]
+        ],
+        site_points = [
+            for (fi = [0:1:len(faces0)-1])
+                for (p = face_pts[fi])
+                    p
+        ],
+        face_cycles = [
+            for (fi = [0:1:len(faces0)-1])
+                let(n = len(faces0[fi]))
+                [ for (k = [0:1:n-1]) [1, face_offsets[fi] + k] ]
+        ],
+        edge_cycles = [
+            for (ei = [0:1:len(edges)-1])
+                let(
+                    e = edges[ei],
+                    fpair = edge_faces[ei],
+                    f0 = fpair[0],
+                    f1 = fpair[1],
+                    v0 = e[0],
+                    v1 = e[1],
+                    pos0 = _ps_index_of(faces0[f0], v0),
+                    pos1 = _ps_index_of(faces0[f0], v1),
+                    pos2 = _ps_index_of(faces0[f1], v1),
+                    pos3 = _ps_index_of(faces0[f1], v0)
+                )
+                [
+                    [1, face_offsets[f0] + pos0],
+                    [1, face_offsets[f0] + pos1],
+                    [1, face_offsets[f1] + pos2],
+                    [1, face_offsets[f1] + pos3]
+                ]
+        ],
+        vert_cycles = [
+            for (vi = [0:1:len(verts0)-1])
+                let(
+                    fc = faces_around_vertex(poly0, vi, edges, edge_faces)
+                )
+                [
+                    for (fi = fc)
+                        let(pos = _ps_index_of(faces0[fi], vi))
+                            [1, face_offsets[fi] + pos]
+                ]
+        ],
+        cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
     )
-    _ps_poly_from_face_points(faces_pts_all, eps, len_eps);
+    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
 // Chamfer: face faces + edge faces (no vertex faces).
 // t is a signed face-plane offset, expressed as a fraction of mean face edge length.
