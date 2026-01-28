@@ -365,6 +365,13 @@ Planned:
 
 * **Stellation frameworks**
 
+### **6.4 Transform parameter sign conventions**
+
+Operator parameters follow their construction, so the sign may differ by operator.
+
+* **Chamfer**: positive `t` offsets face planes **inward** (toward the poly center); negative `t` produces an anti‑chamfer.
+* **Cantellate/expand**: positive offsets typically push new edge/vertex features **outward** from the original poly.
+
 ### **6.3 Custom placement modes**
 
 Just follow the structure of `place_on_faces`:

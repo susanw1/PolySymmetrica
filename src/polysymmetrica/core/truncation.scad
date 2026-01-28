@@ -332,7 +332,8 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     _ps_poly_from_face_points(faces_pts_all, eps, len_eps);
 
 // Chamfer: face faces + edge faces (no vertex faces).
-// t is interpreted as an inset fraction of mean edge length per face.
+// t is a signed face-plane offset, expressed as a fraction of mean face edge length.
+// Positive t = inward chamfer; negative t = anti-chamfer.
 function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
     let(
         t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
@@ -367,14 +368,9 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                             let(p0 = pts2d[k], p1 = pts2d[(k+1)%n])
                                 norm([p1[0]-p0[0], p1[1]-p0[1]])
                     ],
-                    d_f0 = t_eff * (sum(edge_lens) / n),
-                    inset2d_a = _ps_face_inset_bisector_2d(f, fi, d_f0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
-                    r0 = sum([for (p = pts2d) norm(p)]) / n,
-                    r1 = sum([for (p = inset2d_a) norm(p)]) / n,
-                    d_f = (r1 > r0) ? -d_f0 : d_f0,
-                    inset2d = (r1 > r0)
-                        ? _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
-                        : inset2d_a,
+                    d_f0 = -t_eff * (sum(edge_lens) / n),
+                    d_f = d_f0,
+                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
                     p0 = center - n_f * d_f
                 )
                 [
