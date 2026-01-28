@@ -150,10 +150,10 @@ function _ps_fix_winding_all(faces, fixed=undef) =
 ///////////////////////////////////////
 // ---- List helpers (private) ----
 function _ps_list_contains(list, v) =
-    len([for (x = list) if (x == v) 1]) > 0;
+    len(search(v, list)) > 0;
 
 function _ps_index_of(list, v) =
-    let(idx = [for (i = [0:1:len(list)-1]) if (list[i] == v) i])
+    let(idx = search(v, list))
     (len(idx) == 0) ? -1 : idx[0];
 
 ///////////////////////////////////////

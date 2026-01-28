@@ -28,7 +28,7 @@ module poly_describe(poly, name = undef, detail = 1) {
 
     echo ("#vertices: ", len(verts));
     echo ("#faces: ", len(faces));
-    echo ("#edges: to be implemented");
+    echo ("#edges: ", len(_ps_edges_from_faces(faces)));
     echo ("e_over_ir: ", poly_e_over_ir(poly));
     
     if (detail > 0) {
