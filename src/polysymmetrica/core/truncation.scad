@@ -20,6 +20,14 @@ function _ps_edge_point_near(edges, edge_pts, a, b, near_v) =
     )
     (near_v == e[0]) ? edge_pts[ei][0] : edge_pts[ei][1];
 
+// Site index for edge-point near a vertex.
+function _ps_edge_site_index(edges, a, b, near_v) =
+    let(
+        ei = ps_find_edge_index(edges, a, b),
+        e  = edges[ei]
+    )
+    2 * ei + ((near_v == e[0]) ? 0 : 1);
+
 // True if face f contains directed edge v0->v1.
 function _ps_face_has_dir(f, v0, v1) =
     let(pos = _ps_index_of(f, v0))
@@ -125,8 +133,20 @@ function poly_truncate(poly, t, eps = 1e-8) =
                 [P_a, P_b]
         ],
 
+        edge_faces = ps_edge_faces_table(faces, edges),
+
+        // sites: two per edge (near each endpoint)
+        sites = [
+            for (ei = [0:1:len(edges)-1])
+                each [[ei, edges[ei][0]], [ei, edges[ei][1]]]
+        ],
+        site_points = [
+            for (ei = [0:1:len(edges)-1])
+                each [edge_pts[ei][0], edge_pts[ei][1]]
+        ],
+
         // truncated original faces -> 2n-gons
-        trunc_faces_pts = [
+        face_cycles = [
             for (f = faces)
                 let(n = len(f))
                 [
@@ -135,54 +155,38 @@ function poly_truncate(poly, t, eps = 1e-8) =
                             v      = f[k],
                             v_next = f[(k+1)%n],
                             v_prev = f[(k-1+n)%n],
-                            P_prev = _ps_edge_point_near(edges, edge_pts, v_prev, v, v),
-                            P_next = _ps_edge_point_near(edges, edge_pts, v, v_next, v)
+                            idx_prev = _ps_edge_site_index(edges, v_prev, v, v),
+                            idx_next = _ps_edge_site_index(edges, v, v_next, v)
                         )
-                        // append the two points at corner v
-                        // (ordering yields a consistent 2n winding when f is consistent)
-                        each [P_prev, P_next]
+                        each [[1, idx_prev], [1, idx_next]]
                 ]
         ],
 
         // vertex faces: one per original vertex
-        // We use faces_around_vertex to get cyclic face order, then derive neighbor vertices
-        // by intersecting consecutive faces at v; simplest is to use edges_incident_to_vertex + angular order later.
-        // For now: derive from incident edges and the same "walk" logic we already have.
-        edge_faces = ps_edge_faces_table(faces, edges),
-
-        vert_faces_pts = [
+        vert_cycles = [
             for (vi = [0:1:len(verts)-1])
                 let(
-                    // get faces around vertex in cyclic order
                     fc = faces_around_vertex(poly, vi, edges, edge_faces),
-
-                    // turn that into an ordered list of neighbor vertices around vi:
-                    // take each face in the cycle, find the two neighbors of vi in that face,
-                    // and pick the "next" neighbor consistently. Bit fiddly.
                     neigh = [
                         for (idx = [0:1:len(fc)-1])
                             let(
                                 f = faces[ fc[idx] ],
                                 m = len(f),
                                 pos = _ps_index_of(f, vi),
-                                v_next = f[(pos+1)%m]   // neighbor after vi in that face winding
+                                v_next = f[(pos+1)%m]
                             )
                             v_next
-                    ],
-
-                    // now map each neighbor to the trunc point on edge (vi, neighbor) near vi
-                    pts = [
-                        for (vn = neigh)
-                            _ps_edge_point_near(edges, edge_pts, vi, vn, vi)
                     ]
                 )
-                pts
+                [
+                    for (vn = neigh)
+                        [1, _ps_edge_site_index(edges, vi, vn, vi)]
+                ]
         ],
 
-        // collect all face point lists
-        faces_pts_all = concat(trunc_faces_pts, vert_faces_pts)
+        cycles_all = concat(face_cycles, vert_cycles)
     )
-    _ps_poly_from_face_points(faces_pts_all, eps);
+    ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
 
 // Rectification: replace each vertex with the midpoint of each incident edge.
 function poly_rectify(poly) =
