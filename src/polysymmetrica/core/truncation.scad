@@ -12,14 +12,6 @@ CHAMFER_DEBUG = true;
 
 // --- internal helpers ---
 
-// For edge ei=[a,b], edge_pts[ei]=[P_a,P_b] (near a and near b)
-function _ps_edge_point_near(edges, edge_pts, a, b, near_v) =
-    let(
-        ei = ps_find_edge_index(edges, a, b),
-        e  = edges[ei]
-    )
-    (near_v == e[0]) ? edge_pts[ei][0] : edge_pts[ei][1];
-
 // Site index for edge-point near a vertex.
 function _ps_edge_site_index(edges, a, b, near_v) =
     let(
@@ -266,47 +258,6 @@ function _ps_face_offset_pts(verts0, faces0, face_n, df) =
                 for (k = [0:1:n-1])
                     let(v = f[k])
                     verts0[v] + df * n_f
-            ]
-    ];
-
-function _ps_vert_faces_from_offsets(verts0, faces0, face_pts, edges, edge_faces) =
-    [
-        for (vi = [0:1:len(verts0)-1])
-            let(
-                fc = faces_around_vertex([verts0, faces0, 1], vi, edges, edge_faces),
-                idxs = [for (k = [0:1:len(fc)-1]) k]
-            )
-            [
-                for (k = idxs)
-                    let(
-                        fi = fc[k],
-                        f = faces0[fi],
-                        pos = _ps_index_of(f, vi)
-                    )
-                    face_pts[fi][pos]
-            ]
-    ];
-
-function _ps_edge_faces_from_offsets(faces0, face_pts, edges, edge_faces) =
-    [
-        for (ei = [0:1:len(edges)-1])
-            let(
-                e = edges[ei],
-                fpair = edge_faces[ei],
-                f0 = fpair[0],
-                f1 = fpair[1],
-                v0 = e[0],
-                v1 = e[1],
-                pos0 = _ps_index_of(faces0[f0], v0),
-                pos1 = _ps_index_of(faces0[f0], v1),
-                pos2 = _ps_index_of(faces0[f1], v1),
-                pos3 = _ps_index_of(faces0[f1], v0)
-            )
-            [
-                face_pts[f0][pos0],
-                face_pts[f0][pos1],
-                face_pts[f1][pos2],
-                face_pts[f1][pos3]
             ]
     ];
 

@@ -19,27 +19,6 @@ function _count_faces_of_size(poly, k) =
     sum([ for (f = poly_faces(poly)) (len(f)==k) ? 1 : 0 ]);
 
 
-// internal helpers: _ps_edge_point_near, equality/find/unique/remap
-
-module test__ps_edge_point_near__picks_correct_end() {
-    p=_tetra_poly();
-    verts=poly_verts(p);
-    faces=poly_faces(p);
-    edges=_ps_edges_from_faces(faces);
-
-    t=0.2;
-    edge_pts = [
-        for (ei=[0:len(edges)-1])
-            let(a=edges[ei][0], b=edges[ei][1], A=verts[a], B=verts[b])
-            [A + t*(B-A), B + t*(A-B)]
-    ];
-
-    // pick edge (0,1) near 0 should equal first point of that edge entry
-    P0 = _ps_edge_point_near(edges, edge_pts, 0, 1, 0);
-    ei = ps_find_edge_index(edges, 0, 1);
-    assert(norm(P0 - edge_pts[ei][0]) < 1e-12, "near 0 uses [0]");
-}
-
 // point eq / find / unique
 module test__ps_unique_points__dedups_with_eps() {
     pts = [[0,0,0],[0,0,0.0],[1,0,0],[1,0,0.0000000001]];
@@ -208,7 +187,6 @@ module test_truncate__dodeca_archimedean_counts() {
 
 // suite
 module run_TestTruncation() {
-    test__ps_edge_point_near__picks_correct_end();
     test__ps_unique_points__dedups_with_eps();
     test__ps_face_points_to_indices__maps();
 
