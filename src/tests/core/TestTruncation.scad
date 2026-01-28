@@ -183,6 +183,27 @@ module test_truncate__dodeca_archimedean_counts() {
     assert(_count_faces_of_size(p,10) == 12, "trunc dodeca: 12 decagons");
 }
 
+// chamfer: positive t should move face planes inward (closer to origin)
+module test_poly_chamfer__positive_t_inward() {
+    p = _tetra_poly();
+    q = poly_chamfer(p, 0.1);
+
+    verts_p = poly_verts(p);
+    faces_p = poly_faces(p);
+    verts_q = poly_verts(q);
+    faces_q = poly_faces(q);
+
+    for (fi = [0 : 1 : len(faces_p)-1]) {
+        fp = faces_p[fi];
+        fq = faces_q[fi];
+        np = ps_face_normal(verts_p, fp);
+        nq = ps_face_normal(verts_q, fq);
+        dp = v_dot(np, verts_p[fp[0]]);
+        dq = v_dot(nq, verts_q[fq[0]]);
+        assert(dq < dp, str("chamfer t>0 inward face ", fi, " dp=", dp, " dq=", dq));
+    }
+}
+
 
 
 // suite
@@ -206,6 +227,7 @@ module run_TestTruncation() {
     test_truncate__icosa_archimedean_counts();
     test_truncate__hexa_archimedean_counts();
     test_truncate__dodeca_archimedean_counts();
+    test_poly_chamfer__positive_t_inward();
 }
 
 run_TestTruncation();
