@@ -39,7 +39,7 @@ function _ps_face_inset_pts2d(pts2d, inset) =
     let(
         n = len(pts2d),
         edges = [
-            for (i = [0:n-1])
+            for (i = [0:1:n-1])
                 let(
                     p0 = pts2d[i],
                     p1 = pts2d[(i+1)%n],
@@ -50,7 +50,7 @@ function _ps_face_inset_pts2d(pts2d, inset) =
         ]
     )
     [
-        for (i = [0:n-1])
+        for (i = [0:1:n-1])
             let(
                 e_prev = edges[(i-1+n)%n],
                 e_cur  = edges[i],
@@ -65,7 +65,7 @@ function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edge
         n = len(f),
         p0 = center - n_f * d_f,
         lines = [
-            for (k = [0:n-1])
+            for (k = [0:1:n-1])
                 let(
                     v0 = f[k],
                     v1 = f[(k+1)%n],
@@ -87,7 +87,7 @@ function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edge
                 [n2d_use, d2_use]
         ],
         inset2d = [
-            for (k = [0:n-1])
+            for (k = [0:1:n-1])
                 _ps_line2_intersect(
                     lines[(k-1+n)%n][0], lines[(k-1+n)%n][1],
                     lines[k][0], lines[k][1]
@@ -113,7 +113,7 @@ function poly_truncate(poly, t, eps = 1e-8) =
 
         // edge points: aligned with edges[ei]=[a,b]
         edge_pts = [
-            for (ei = [0:len(edges)-1])
+            for (ei = [0:1:len(edges)-1])
                 let(
                     a = edges[ei][0],
                     b = edges[ei][1],
@@ -130,7 +130,7 @@ function poly_truncate(poly, t, eps = 1e-8) =
             for (f = faces)
                 let(n = len(f))
                 [
-                    for (k = [0:n-1])
+                    for (k = [0:1:n-1])
                         let(
                             v      = f[k],
                             v_next = f[(k+1)%n],
@@ -151,7 +151,7 @@ function poly_truncate(poly, t, eps = 1e-8) =
         edge_faces = ps_edge_faces_table(faces, edges),
 
         vert_faces_pts = [
-            for (vi = [0:len(verts)-1])
+            for (vi = [0:1:len(verts)-1])
                 let(
                     // get faces around vertex in cyclic order
                     fc = faces_around_vertex(poly, vi, edges, edge_faces),
@@ -160,11 +160,11 @@ function poly_truncate(poly, t, eps = 1e-8) =
                     // take each face in the cycle, find the two neighbors of vi in that face,
                     // and pick the "next" neighbor consistently. Bit fiddly.
                     neigh = [
-                        for (idx = [0:len(fc)-1])
+                        for (idx = [0:1:len(fc)-1])
                             let(
                                 f = faces[ fc[idx] ],
                                 m = len(f),
-                                pos = [ for (k=[0:m-1]) if (f[k]==vi) k ][0],
+                                pos = _ps_index_of(f, vi),
                                 v_next = f[(pos+1)%m]   // neighbor after vi in that face winding
                             )
                             v_next
@@ -201,7 +201,7 @@ function poly_rectify(poly) =
             for (f = faces)
                 let(n = len(f))
                 [
-                    for (k = [0:n-1])
+                    for (k = [0:1:n-1])
                         let(
                             a = f[k],
                             b = f[(k+1)%n],
@@ -214,15 +214,15 @@ function poly_rectify(poly) =
         // Faces corresponding to original vertices: cycle around the vertex.
         edge_faces = ps_edge_faces_table(faces, edges),
         vert_faces = [
-            for (vi = [0:len(verts)-1])
+            for (vi = [0:1:len(verts)-1])
                 let(
                     fc = faces_around_vertex(poly, vi, edges, edge_faces),
                     neigh = [
-                        for (idx = [0:len(fc)-1])
+                        for (idx = [0:1:len(fc)-1])
                             let(
                                 f = faces[fc[idx]],
                                 m = len(f),
-                                pos = [ for (k = [0:m-1]) if (f[k]==vi) k ][0],
+                                pos = _ps_index_of(f, vi),
                                 v_next = f[(pos+1)%m]
                             )
                             v_next
@@ -281,7 +281,7 @@ function _ps_vert_faces_from_offsets(verts0, faces0, face_pts, edges, edge_faces
                     let(
                         fi = fc[k],
                         f = faces0[fi],
-                        pos = [ for (j=[0:1:len(f)-1]) if (f[j]==vi) j ][0]
+                        pos = _ps_index_of(f, vi)
                     )
                     face_pts[fi][pos]
             ]
@@ -358,12 +358,12 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                     ex = poly_face_ex(poly, fi, 1),
                     ey = poly_face_ey(poly, fi, 1),
                     pts2d = [
-                        for (k = [0:n-1])
+                        for (k = [0:1:n-1])
                             let(p = verts0[f[k]] - center)
                                 [v_dot(p, ex), v_dot(p, ey)]
                     ],
                     edge_lens = [
-                        for (k = [0:n-1])
+                        for (k = [0:1:n-1])
                             let(p0 = pts2d[k], p1 = pts2d[(k+1)%n])
                                 norm([p1[0]-p0[0], p1[1]-p0[1]])
                     ],
@@ -378,7 +378,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                     p0 = center - n_f * d_f
                 )
                 [
-                    for (k = [0:n-1])
+                    for (k = [0:1:n-1])
                         p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
                 ]
         ],
@@ -386,7 +386,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
         sites = [
             for (fi = [0:1:len(faces0)-1])
                 let(f = faces0[fi], n = len(f))
-                for (k = [0:n-1])
+                for (k = [0:1:n-1])
                     [fi, f[k]]
         ],
 
@@ -398,7 +398,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
         face_cycles = [
             for (fi = [0:1:len(faces0)-1])
                 let(f = faces0[fi], n = len(f))
-                [ for (k = [0:n-1]) [1, face_offsets[fi] + k] ]
+                [ for (k = [0:1:n-1]) [1, face_offsets[fi] + k] ]
         ],
 
         edge_cycles = [
