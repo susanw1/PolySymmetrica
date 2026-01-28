@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // PolySymmetrica - Polyhedral transform helpers
 // Version: 0.1.0
-// Copyright 2025 Susan Witts
+// Copyright 2026 Susan Witts
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>

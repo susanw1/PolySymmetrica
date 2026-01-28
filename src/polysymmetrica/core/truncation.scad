@@ -59,6 +59,43 @@ function _ps_face_inset_pts2d(pts2d, inset) =
             p
     ];
 
+// Inset polygon vertices using bisector-plane intersection lines per edge.
+function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
+    let(
+        n = len(f),
+        p0 = center - n_f * d_f,
+        lines = [
+            for (k = [0:n-1])
+                let(
+                    v0 = f[k],
+                    v1 = f[(k+1)%n],
+                    ei = ps_find_edge_index(edges, v0, v1),
+                    adj = edge_faces[ei],
+                    f_adj = (len(adj) < 2) ? fi : ((adj[0] == fi) ? adj[1] : adj[0]),
+                    n_adj = face_n[f_adj],
+                    n_edge_raw = n_f + n_adj,
+                    n_edge = (v_len(n_edge_raw) < 1e-8) ? n_f : v_norm(n_edge_raw),
+                    n2d = [v_dot(n_edge, ex), v_dot(n_edge, ey)],
+                    n2d_len = v_len(n2d),
+                    p1_2d = pts2d[(k+1)%n],
+                    e2d = [p1_2d[0]-pts2d[k][0], p1_2d[1]-pts2d[k][1]],
+                    n2d_fb = v_norm([e2d[1], -e2d[0]]),
+                    n2d_use = (n2d_len < 1e-8) ? n2d_fb : (n2d / n2d_len),
+                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0),
+                    d2_use = (n2d_len < 1e-8) ? (v_dot(n2d_use, pts2d[k]) + d_f) : (d2 / n2d_len)
+                )
+                [n2d_use, d2_use]
+        ],
+        inset2d = [
+            for (k = [0:n-1])
+                _ps_line2_intersect(
+                    lines[(k-1+n)%n][0], lines[(k-1+n)%n][1],
+                    lines[k][0], lines[k][1]
+                )
+        ]
+    )
+    inset2d;
+
 
 // --- main truncation ---
 
@@ -303,6 +340,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
         faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
         edges = _ps_edges_from_faces(faces0),
         edge_faces = ps_edge_faces_table(faces0, edges),
+        face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
         debug = (!is_undef(CHAMFER_DEBUG) && CHAMFER_DEBUG),
 
         face_offsets = [
@@ -315,6 +353,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                 let(
                     f = faces0[fi],
                     n = len(f),
+                    n_f = face_n[fi],
                     center = poly_face_center(poly, fi, 1),
                     ex = poly_face_ex(poly, fi, 1),
                     ey = poly_face_ey(poly, fi, 1),
@@ -328,12 +367,19 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                             let(p0 = pts2d[k], p1 = pts2d[(k+1)%n])
                                 norm([p1[0]-p0[0], p1[1]-p0[1]])
                     ],
-                    inset = t_eff * (sum(edge_lens) / n),
-                    inset2d = _ps_face_inset_pts2d(pts2d, inset)
+                    d_f0 = t_eff * (sum(edge_lens) / n),
+                    inset2d_a = _ps_face_inset_bisector_2d(f, fi, d_f0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+                    r0 = sum([for (p = pts2d) norm(p)]) / n,
+                    r1 = sum([for (p = inset2d_a) norm(p)]) / n,
+                    d_f = (r1 > r0) ? -d_f0 : d_f0,
+                    inset2d = (r1 > r0)
+                        ? _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
+                        : inset2d_a,
+                    p0 = center - n_f * d_f
                 )
                 [
                     for (k = [0:n-1])
-                        center + ex * inset2d[k][0] + ey * inset2d[k][1]
+                        p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
                 ]
         ],
 
@@ -349,7 +395,6 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                 for (p = face_pts3d[fi])
                     p
         ],
-
         face_cycles = [
             for (fi = [0:1:len(faces0)-1])
                 let(f = faces0[fi], n = len(f))
@@ -388,7 +433,10 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
 
         cycles_all = concat(face_cycles, edge_cycles),
         _dbg = debug ? echo("chamfer_debug edge0", edge_cycles[0]) : 0,
-        _dbg2 = debug ? echo("chamfer_debug face0", face_cycles[0]) : 0
+        _dbg2 = debug ? echo("chamfer_debug face0", face_cycles[0]) : 0,
+        _dbg3 = debug ? echo("chamfer_debug face0_verts", faces0[0]) : 0,
+        _dbg4 = debug ? echo("chamfer_debug face0_pts3d", face_pts3d[0]) : 0,
+        _dbg5 = debug ? echo("chamfer_debug edge0_e", edges[0], "edge0_faces", edge_faces[0]) : 0
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
