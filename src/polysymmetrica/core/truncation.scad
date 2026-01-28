@@ -193,7 +193,9 @@ function poly_rectify(poly) =
     let(
         verts = poly_verts(poly),
         faces = poly_faces(poly),
-        edges = _ps_edges_from_faces(faces),
+        faces0 = ps_orient_all_faces_outward(verts, faces),
+        poly0 = make_poly(verts, faces0, poly_e_over_ir(poly)),
+        edges = _ps_edges_from_faces(faces0),
 
         edge_mid = [
             for (e = edges)
@@ -202,7 +204,7 @@ function poly_rectify(poly) =
 
         // Faces corresponding to original faces: walk edges in face order.
         face_faces = [
-            for (f = faces)
+            for (f = faces0)
                 let(n = len(f))
                 [
                     for (k = [0:1:n-1])
@@ -216,15 +218,15 @@ function poly_rectify(poly) =
         ],
 
         // Faces corresponding to original vertices: cycle around the vertex.
-        edge_faces = ps_edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces0, edges),
         vert_faces = [
             for (vi = [0:1:len(verts)-1])
                 let(
-                    fc = faces_around_vertex(poly, vi, edges, edge_faces),
+                    fc = faces_around_vertex(poly0, vi, edges, edge_faces),
                     neigh = [
                         for (idx = [0:1:len(fc)-1])
                             let(
-                                f = faces[fc[idx]],
+                                f = faces0[fc[idx]],
                                 m = len(f),
                                 pos = _ps_index_of(f, vi),
                                 v_next = f[(pos+1)%m]
@@ -240,18 +242,12 @@ function poly_rectify(poly) =
         ],
 
         faces_idx = concat(face_faces, vert_faces),
-        faces_out = ps_orient_all_faces_outward(edge_mid, faces_idx),
-
-        edges_new = _ps_edges_from_faces(faces_out),
-        e0 = edges_new[0],
-        vA = edge_mid[e0[0]],
-        vB = edge_mid[e0[1]],
-        unit_e = norm(vB - vA),
-        mid = (vA + vB) / 2,
-        ir  = norm(mid),
-        e_over_ir = unit_e / ir
+        cycles_all = [
+            for (f = faces_idx)
+                [ for (ei = f) [1, ei] ]
+        ]
     )
-    make_poly(edge_mid / unit_e, faces_out, e_over_ir);
+    ps_poly_transform_from_sites(verts, [for (i = [0:1:len(edge_mid)-1]) [i]], edge_mid, cycles_all);
 
 // Cantellation/expansion:
 // - face faces remain n-gons (one point per original vertex)
