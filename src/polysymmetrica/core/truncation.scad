@@ -8,8 +8,6 @@ use <funcs.scad>
 use <duals.scad>  // for faces_around_vertex helpers
 use <transform.scad>
 
-CHAMFER_DEBUG = true;
-
 // --- internal helpers ---
 
 // Site index for edge-point near a vertex.
@@ -338,7 +336,6 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
         edges = _ps_edges_from_faces(faces0),
         edge_faces = ps_edge_faces_table(faces0, edges),
         face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
-        debug = (!is_undef(CHAMFER_DEBUG) && CHAMFER_DEBUG),
 
         face_offsets = [
             for (fi = [0:1:len(faces0)-1])
@@ -423,12 +420,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                 ]
         ],
 
-        cycles_all = concat(face_cycles, edge_cycles),
-        _dbg = debug ? echo("chamfer_debug edge0", edge_cycles[0]) : 0,
-        _dbg2 = debug ? echo("chamfer_debug face0", face_cycles[0]) : 0,
-        _dbg3 = debug ? echo("chamfer_debug face0_verts", faces0[0]) : 0,
-        _dbg4 = debug ? echo("chamfer_debug face0_pts3d", face_pts3d[0]) : 0,
-        _dbg5 = debug ? echo("chamfer_debug edge0_e", edges[0], "edge0_faces", edge_faces[0]) : 0
+        cycles_all = concat(face_cycles, edge_cycles)
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
