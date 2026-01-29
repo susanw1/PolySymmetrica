@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // PolySymmetrica - Polyhedral Geometry Engine
 // Version: 0.1.0
-// Copyright 2025 Susan Witts
+// Copyright 2026 Susan Witts
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>
@@ -34,8 +34,10 @@ module poly_describe(poly, name = undef, detail = 1) {
     if (detail > 0) {
         place_on_faces(poly, 1) {
             let(
-                basic1 = str("facet#", $ps_facet_idx, ": (", $ps_vertex_count, " verts) vert_idx: ", faces[$ps_facet_idx]),
-                more2 = str(" poly_rad: ", $ps_face_midradius, " verts: ", [for (f = faces[$ps_facet_idx]) verts[f]])
+                face_verts = faces[$ps_facet_idx],
+                basic1 = str("facet#", $ps_facet_idx, ": (", $ps_vertex_count, " verts) vert_idx: ", face_verts),
+                more2 = str(" poly_rad: ", $ps_face_midradius, " verts: ", [for (f = face_verts) verts[f]],
+                    " lens: ", [for (fi = [0:1:len(face_verts)-1]) norm(verts[face_verts[fi]]-verts[face_verts[(fi+1)%len(face_verts)]]) ])
             )
             echo (str("  ", basic1, detail > 1? more2 : ""));
         }
