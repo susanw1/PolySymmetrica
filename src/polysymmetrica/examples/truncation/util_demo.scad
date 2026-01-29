@@ -45,3 +45,6 @@ module combo(p, scale_f = function(p,d) scale_dual_edge_cross(p,d, 0)) {
         translate([0,0,-T]) linear_extrude(height=T) polygon(points = $ps_face_pts2d);
     }
 }
+
+// Turns a list into a list of [i+start, a[i]] tuples.
+function with_index(a, start=0) = [ for (i = [0:1:len(a)-1]) [ i + start, a[i] ] ];

@@ -9,15 +9,15 @@ use <util_demo.scad>
 /**
 Demonstrates chamfering.
 */
-*for (   p = [ [-1, undef],
-            [0, tetrahedron()]], 
-        t = [[-1, -0.3], [0, 0.01], [1, 0.2], [2, 0.45], [3, 0.55], 
-            [4, 0.7], [5, 0.9], [6, 1.0], [7, 1.5], [8, 2.5]]) {
+for (   p = with_index([
+            undef, // adds text to show 't' value
+            tetrahedron(), hexahedron(), octahedron(), dodecahedron(), icosahedron(),
+            poly_truncate(tetrahedron()), poly_dual(poly_rectify(icosahedron()))
+            ]),
+        t = with_index([ -0.4, -0.1, 0, 0.1, 0.2, 0.4, 1.01, 1.5, 2 ], -1)) {
     translate([100 * t[0], 100 * p[0], 0]) 
         if (is_undef(p[1])) 
             text(str("t=", t[1]));
         else
             demo(poly_chamfer(p[1], t[1]));
 }        
-
-demo(poly_chamfer(tetrahedron(), 0.2));

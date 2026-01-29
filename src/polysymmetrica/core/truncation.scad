@@ -94,6 +94,61 @@ function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edge
     )
     inset2d;
 
+// 2D polygon area (absolute), pts may be undef.
+function _ps_poly_area_abs_2d(pts2d) =
+    (is_undef(pts2d) || len(pts2d) < 3) ? 0
+  : let(
+        n = len(pts2d),
+        a = sum([
+            for (i = [0:1:n-1])
+                let(
+                    p0 = pts2d[i],
+                    p1 = pts2d[(i+1)%n]
+                )
+                (is_undef(p0) || is_undef(p1)) ? 0 : (p0[0]*p1[1] - p1[0]*p0[1])
+        ])
+    )
+    abs(a) / 2;
+
+// Inradius of 2D polygon (CW), measured from origin to nearest edge line.
+function _ps_face_inradius_2d(pts2d) =
+    let(
+        n = len(pts2d),
+        ds = [
+            for (i = [0:1:n-1])
+                let(
+                    p0 = pts2d[i],
+                    p1 = pts2d[(i+1)%n],
+                    e = [p1[0]-p0[0], p1[1]-p0[1]],
+                    n_in = v_norm([e[1], -e[0]])
+                )
+                v_dot(n_in, p0)
+        ]
+    )
+    min(ds);
+
+// Find d_f at which bisector-based inset polygon collapses (min area).
+function _ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0, steps=40) =
+    let(
+        inr = _ps_face_inradius_2d(pts2d),
+        ds = [ for (i = [0:1:steps]) inr * i / steps ],
+        areas = [
+            for (d = ds)
+                let(poly2d = _ps_face_inset_bisector_2d(f, fi, d, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0))
+                    _ps_poly_area_abs_2d(poly2d)
+        ],
+        min_i = _ps_index_of_min(areas)
+    )
+    ds[min_i];
+
+function _ps_index_of_min(list) =
+    let(
+        n = len(list),
+        vals = [ for (i = [0:1:n-1]) [list[i], i] ],
+        min_val = min([for (v = vals) v[0]]),
+        idxs = [for (v = vals) if (v[0] == min_val) v[1]]
+    )
+    (len(idxs) == 0) ? 0 : idxs[0];
 
 // --- main truncation ---
 
@@ -326,11 +381,12 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
 // Chamfer: face faces + edge faces (no vertex faces).
-// t is a signed face-plane offset, expressed as a fraction of mean face edge length.
+// t is a signed face-plane offset as a fraction of each face's collapse distance.
 // Positive t = inward chamfer; negative t = anti-chamfer.
 function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
     let(
         t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
+        _t_ok = assert(abs(t_eff) != 1, "poly_chamfer: |t| must not be 1 (t=±1 collapses faces; use cleanup/hyper mode)"),
         verts0 = poly_verts(poly),
         faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
         edges = _ps_edges_from_faces(faces0),
@@ -361,7 +417,8 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                             let(p0 = pts2d[k], p1 = pts2d[(k+1)%n])
                                 norm([p1[0]-p0[0], p1[1]-p0[1]])
                     ],
-                    d_f0 = -t_eff * (sum(edge_lens) / n),
+                    face_collapse = abs(_ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)),
+                    d_f0 = -t_eff * face_collapse,
                     d_f = d_f0,
                     inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
                     p0 = center - n_f * d_f
