@@ -18,6 +18,23 @@ module assert_int_eq(a, b, msg="") {
 function _count_faces_of_size(poly, k) =
     sum([ for (f = poly_faces(poly)) (len(f)==k) ? 1 : 0 ]);
 
+function _skew_quad_prism() =
+    let(
+        v = [
+            [0,0,0],[2,0,0],[2,1,0],[0,1,0],
+            [0.3,0.2,1],[2.2,0.1,1],[2.1,1.2,1],[0.1,1.1,1]
+        ],
+        f = [
+            [0,1,2,3],
+            [4,5,6,7],
+            [0,1,5,4],
+            [1,2,6,5],
+            [2,3,7,6],
+            [3,0,4,7]
+        ]
+    )
+    make_poly(v, f);
+
 
 // point eq / find / unique
 module test__ps_unique_points__dedups_with_eps() {
@@ -70,6 +87,14 @@ module test_poly_truncate__t_zero_counts_preserved() {
     assert_int_eq(len(poly_verts(q)), len(poly_verts(p)), "t=0 verts");
     assert_int_eq(len(poly_faces(q)), len(poly_faces(p)), "t=0 faces");
     assert_facet_matches(p, q);
+}
+
+// chamfer: cube should have 6 original faces + 12 edge faces (hexes)
+module test_poly_chamfer__cube_face_counts() {
+    p = hexahedron();
+    q = poly_chamfer(p, 0.1);
+    assert_int_eq(len(poly_faces(q)), 18, "chamfer cube faces=18");
+    assert_int_eq(_count_faces_of_size(q, 6), 12, "chamfer cube: 12 hex edge faces");
 }
 
 
@@ -204,6 +229,44 @@ module test_poly_chamfer__positive_t_inward() {
     }
 }
 
+module test_poly_chamfer__tetra_changes_geom() {
+    p = _tetra_poly();
+    q = poly_chamfer(p, 0.2);
+    assert(len(poly_verts(q)) != len(poly_verts(p)), "chamfer tetra should add vertices");
+    assert(len(poly_faces(q)) != len(poly_faces(p)), "chamfer tetra should add faces");
+}
+
+module test_poly_chamfer__skew_prism_shrinks_all_faces() {
+    p = _skew_quad_prism();
+    t = 0.9;
+
+    verts0 = poly_verts(p);
+    faces0 = ps_orient_all_faces_outward(verts0, poly_faces(p));
+    edges = _ps_edges_from_faces(faces0);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [ for (f = faces0) ps_face_normal(verts0, f) ];
+
+    fi = 0;
+    f = faces0[fi];
+    n = len(f);
+    center = poly_face_center(p, fi, 1);
+    ex = poly_face_ex(p, fi, 1);
+    ey = poly_face_ey(p, fi, 1);
+    pts2d = [
+        for (k = [0:1:n-1])
+            let(v = verts0[f[k]] - center)
+                [v_dot(v, ex), v_dot(v, ey)]
+    ];
+
+    area0 = _ps_poly_area_abs_2d(pts2d);
+    collapse = _ps_face_bisector_collapse_d(f, fi, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
+    d_f = -t * collapse;
+    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
+    area1 = _ps_poly_area_abs_2d(inset2d);
+
+    assert(area1 < area0, str("chamfer t=0.9 should shrink face area: area0=", area0, " area1=", area1));
+}
+
 
 
 // suite
@@ -216,6 +279,7 @@ module run_TestTruncation() {
 
     test_poly_truncate__tetra_counts_at_one_third();
     test_poly_truncate__t_zero_counts_preserved();
+    test_poly_chamfer__cube_face_counts();
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
     test_poly_cantellate__tetra_counts();
@@ -228,6 +292,8 @@ module run_TestTruncation() {
     test_truncate__hexa_archimedean_counts();
     test_truncate__dodeca_archimedean_counts();
     test_poly_chamfer__positive_t_inward();
+    test_poly_chamfer__tetra_changes_geom();
+    test_poly_chamfer__skew_prism_shrinks_all_faces();
 }
 
 run_TestTruncation();

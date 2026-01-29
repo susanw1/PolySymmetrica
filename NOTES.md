@@ -38,3 +38,16 @@ dihedral geometry and edge families. A small numeric search is the most robust
 general solution. Closed-form solutions are possible for specific shapes (e.g., cube)
 but do not generalize; a search keeps the API uniform across convex polyhedra and
 Johnson solids.
+
+## Orientation Convention (OpenSCAD LHR)
+- The library now uses OpenSCAD’s LHR winding (CW when viewed from outside).
+- `ps_face_normal` and `poly_face_ez` are LHR; `poly_render` assumes faces are already LHR.
+- `face_plate` expects LHR/CW 2D point order and dihedrals aligned to that order.
+
+## Mesh Build Helper
+- `_ps_poly_from_face_points(...)` centralizes: dedup, face index remap, outward orientation,
+  unit-edge scaling, and `e_over_ir` recompute. Used by truncation/cantellation/chamfer.
+
+## Chamfer Notes
+- True chamfer keeps original vertices and builds hex edge faces from face-edge points.
+- Distinct from cantellation (which inserts vertex faces).
