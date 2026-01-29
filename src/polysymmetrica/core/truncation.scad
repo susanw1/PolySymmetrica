@@ -85,36 +85,51 @@ function _ps_poly_area_abs_2d(pts2d) =
     )
     abs(a) / 2;
 
-// Inradius of 2D polygon (CW), measured from origin to nearest edge line.
-function _ps_face_inradius_2d(pts2d) =
+function _ps_poly_area_abs_2d_valid(pts2d) =
     let(
-        n = len(pts2d),
-        ds = [
-            for (i = [0:1:n-1])
-                let(
-                    p0 = pts2d[i],
-                    p1 = pts2d[(i+1)%n],
-                    e = [p1[0]-p0[0], p1[1]-p0[1]],
-                    n_in = v_norm([e[1], -e[0]])
-                )
-                v_dot(n_in, p0)
-        ]
+        n = is_undef(pts2d) ? 0 : len(pts2d),
+        ok = (n >= 3) && (sum([for (p = pts2d) is_undef(p) ? 1 : 0]) == 0)
     )
-    min(ds);
+    ok ? _ps_poly_area_abs_2d(pts2d) : undef;
+
+function _ps_face_inset_area_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
+    let(poly2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0))
+    _ps_poly_area_abs_2d_valid(poly2d);
+
+function _ps_expand_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0, prev_d, prev_area, d, iter, max_iter) =
+    let(area = _ps_face_inset_area_2d(f, fi, d, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0))
+    (iter >= max_iter) ? [d, area] :
+    (is_undef(area) || area <= 0) ? [d, area] :
+    (area > prev_area) ? [prev_d, prev_area] :
+    _ps_expand_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0, d, area, d * 2, iter + 1, max_iter);
 
 // Find d_f at which bisector-based inset polygon collapses (min area).
 function _ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0, steps=40) =
     let(
-        inr = _ps_face_inradius_2d(pts2d),
-        ds = [ for (i = [0:1:steps]) inr * i / steps ],
-        areas = [
-            for (d = ds)
-                let(poly2d = _ps_face_inset_bisector_2d(f, fi, d, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0))
-                    _ps_poly_area_abs_2d(poly2d)
+        area0 = _ps_poly_area_abs_2d(pts2d),
+        r_max = max([for (p = pts2d) norm(p)]),
+        d0 = (r_max > 0) ? r_max : 1,
+        area_p0 = _ps_face_inset_area_2d(f, fi, d0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+        area_n0 = _ps_face_inset_area_2d(f, fi, -d0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+        a_p0 = is_undef(area_p0) ? 1e30 : area_p0,
+        a_n0 = is_undef(area_n0) ? 1e30 : area_n0,
+        any_decrease = (a_n0 < area0) || (a_p0 < area0),
+        dir = (a_n0 < area0) ? -1 : (a_p0 < area0) ? 1 : -1,
+        d_start = dir * d0,
+        dmax_pair = (area0 <= 0) ? [0, area0]
+                  : !any_decrease ? [d0, area0]
+                  : _ps_expand_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0, 0, area0, d_start, 0, 20),
+        d_max = abs(dmax_pair[0]),
+        ds_dir = [ for (i = [0:1:steps]) dir * d_max * i / steps ],
+        areas_raw = [
+            for (i = [0:1:len(ds_dir)-1])
+                (ds_dir[i] == 0) ? area0 : _ps_face_inset_area_2d(f, fi, ds_dir[i], center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
         ],
-        min_i = _ps_index_of_min(areas)
+        areas = [ for (a = areas_raw) is_undef(a) ? 1e30 : a ],
+        min_i = _ps_index_of_min(areas),
+        all_bad = (min(areas) >= 1e29)
     )
-    ds[min_i];
+    all_bad ? d0 : abs(ds_dir[min_i]);
 
 function _ps_index_of_min(list) =
     let(
