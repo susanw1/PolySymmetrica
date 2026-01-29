@@ -145,6 +145,17 @@ module test_poly_cantellate__cube_counts() {
     assert_int_eq(_count_faces_of_size(q, 4), 18, "cantellate cube: 18 quads");
 }
 
+module test_poly_cantitruncate__tetra_counts() {
+    p = _tetra_poly();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantitruncate(p, 0.2, 0.1);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate faces count");
+    assert_int_eq(_count_faces_of_size(q, 3), 8, "cantitruncate tetra: 8 triangles");
+    assert_int_eq(_count_faces_of_size(q, 4), 6, "cantitruncate tetra: 6 quads");
+}
 module test_truncate__validity() {
     p = poly_truncate(tetrahedron(), 1/3);
     assert_poly_valid_mode(p, "closed");
@@ -261,7 +272,7 @@ module test_poly_chamfer__skew_prism_shrinks_all_faces() {
     area0 = _ps_poly_area_abs_2d(pts2d);
     collapse = _ps_face_bisector_collapse_d(f, fi, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
     d_f = -t * collapse;
-    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
+    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
     area1 = _ps_poly_area_abs_2d(inset2d);
 
     assert(area1 < area0, str("chamfer t=0.9 should shrink face area: area0=", area0, " area1=", area1));
@@ -284,6 +295,7 @@ module run_TestTruncation() {
     test_poly_rectify__tetra_counts();
     test_poly_cantellate__tetra_counts();
     test_poly_cantellate__cube_counts();
+    test_poly_cantitruncate__tetra_counts();
     test_truncate__validity();
     
     test_truncate__tetra_archimedean_counts();

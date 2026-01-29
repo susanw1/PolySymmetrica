@@ -33,7 +33,8 @@ function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
     ];
 
 // Inset polygon vertices using bisector-plane intersection lines per edge.
-function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
+// d_f shifts the face plane; d_e shifts the edge-bisector planes along their normals.
+function _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
     let(
         n = len(f),
         p0 = center - n_f * d_f,
@@ -54,7 +55,7 @@ function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edge
                     e2d = [p1_2d[0]-pts2d[k][0], p1_2d[1]-pts2d[k][1]],
                     n2d_fb = v_norm([e2d[1], -e2d[0]]),
                     n2d_use = (n2d_len < 1e-8) ? n2d_fb : (n2d / n2d_len),
-                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0),
+                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0) + d_e,
                     d2_use = (n2d_len < 1e-8) ? (v_dot(n2d_use, pts2d[k]) + d_f) : (d2 / n2d_len)
                 )
                 [n2d_use, d2_use]
@@ -93,7 +94,7 @@ function _ps_poly_area_abs_2d_valid(pts2d) =
     ok ? _ps_poly_area_abs_2d(pts2d) : undef;
 
 function _ps_face_inset_area_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
-    let(poly2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0))
+    let(poly2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0))
     _ps_poly_area_abs_2d_valid(poly2d);
 
 function _ps_expand_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0, prev_d, prev_area, d, iter, max_iter) =
@@ -410,7 +411,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
                     face_collapse = abs(_ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)),
                     d_f0 = -t_eff * face_collapse,
                     d_f = d_f0,
-                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
                     p0 = center - n_f * d_f
                 )
                 [
@@ -468,6 +469,98 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
         ],
 
         cycles_all = concat(face_cycles, edge_cycles)
+    )
+    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+
+// Cantitruncation: truncation + cantellation (two parameters).
+// t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
+function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
+    let(
+        t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
+        c_eff = is_undef(c) ? 0 : c,
+        verts0 = poly_verts(poly),
+        faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
+        poly0 = make_poly(verts0, faces0, poly_e_over_ir(poly)),
+        edges = _ps_edges_from_faces(faces0),
+        edge_faces = ps_edge_faces_table(faces0, edges),
+        face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
+        // scale by inter-radius for consistent parameterization
+        ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
+        d_f = -t_eff * ir,
+        d_e = c_eff * ir,
+        face_offsets = [
+            for (fi = [0:1:len(faces0)-1])
+                sum([for (j = [0:1:fi-1]) len(faces0[j])])
+        ],
+        // sites: one per (face, vertex)
+        sites = [
+            for (fi = [0:1:len(faces0)-1])
+                for (v = faces0[fi])
+                    [fi, v]
+        ],
+        face_pts3d = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    f = faces0[fi],
+                    n = len(f),
+                    n_f = face_n[fi],
+                    center = poly_face_center(poly, fi, 1),
+                    ex = poly_face_ex(poly, fi, 1),
+                    ey = poly_face_ey(poly, fi, 1),
+                    pts2d = [
+                        for (k = [0:1:n-1])
+                            let(p = verts0[f[k]] - center)
+                                [v_dot(p, ex), v_dot(p, ey)]
+                    ],
+                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+                    p0 = center - n_f * d_f
+                )
+                [
+                    for (k = [0:1:n-1])
+                        p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
+                ]
+        ],
+        site_points = [
+            for (fi = [0:1:len(faces0)-1])
+                for (p = face_pts3d[fi])
+                    p
+        ],
+        face_cycles = [
+            for (fi = [0:1:len(faces0)-1])
+                let(n = len(faces0[fi]))
+                [ for (k = [0:1:n-1]) [1, face_offsets[fi] + k] ]
+        ],
+        edge_cycles = [
+            for (ei = [0:1:len(edges)-1])
+                let(
+                    e = edges[ei],
+                    fpair = edge_faces[ei],
+                    f0 = fpair[0],
+                    f1 = fpair[1],
+                    v0 = e[0],
+                    v1 = e[1],
+                    pos0 = _ps_index_of(faces0[f0], v0),
+                    pos1 = _ps_index_of(faces0[f0], v1),
+                    pos2 = _ps_index_of(faces0[f1], v1),
+                    pos3 = _ps_index_of(faces0[f1], v0)
+                )
+                [
+                    [1, face_offsets[f0] + pos0],
+                    [1, face_offsets[f0] + pos1],
+                    [1, face_offsets[f1] + pos2],
+                    [1, face_offsets[f1] + pos3]
+                ]
+        ],
+        vert_cycles = [
+            for (vi = [0:1:len(verts0)-1])
+                let(fc = faces_around_vertex(poly0, vi, edges, edge_faces))
+                [
+                    for (fi = fc)
+                        let(pos = _ps_index_of(faces0[fi], vi))
+                            [1, face_offsets[fi] + pos]
+                ]
+        ],
+        cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
