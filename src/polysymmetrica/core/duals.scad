@@ -154,10 +154,10 @@ function ps_edge_midradius_stat(poly) =
     let(rs = ps_edge_midradius_list(poly))
         min(rs);
 
-// ---- Face facet-radius helpers ----
+// ---- Face radius helpers ----
 
 // Mean vertex distance from face centroid for each face (unit-edge coords).
-function ps_face_facet_radius_list(poly) =
+function ps_face_radius_list(poly) =
     let(
         verts = poly_verts(poly),
         faces = poly_faces(poly)
@@ -171,14 +171,14 @@ function ps_face_facet_radius_list(poly) =
             sum(rs) / len(rs)
     ];
 
-function ps_face_facet_radius_stat(poly, face_k=undef) =
+function ps_face_radius_stat(poly, face_k=undef) =
     let(
         faces = poly_faces(poly),
-        rs_all = ps_face_facet_radius_list(poly),
+        rs_all = ps_face_radius_list(poly),
         rs = is_undef(face_k)
             ? rs_all
             : [ for (i = [0:len(faces)-1]) if (len(faces[i]) == face_k) rs_all[i] ],
-        _0 = assert(len(rs) > 0, "ps_face_facet_radius_stat: no faces of that size")
+        _0 = assert(len(rs) > 0, "ps_face_radius_stat: no faces of that size")
     )
     min(rs);
 
@@ -335,13 +335,13 @@ function scale_dual(poly, dual) =
     (sp * rp) / (sd * rd);
 
 // ---- Face-radius scaling to align face overlays ----
-// Returns multiplier 'm' so that the unit-edge facet radius of poly matches the dual's.
+// Returns multiplier 'm' so that the unit-edge face radius of poly matches the dual's.
 // Use face_k (vertex count) to select a face family on the poly (e.g., 4 for squares).
 // For world-space overlays, multiply this by scale_dual(poly, dual).
 function scale_dual_face_radius(poly, dual, face_k=undef, dual_face_k=undef) =
     let(
-        rp = ps_face_facet_radius_stat(poly, face_k),
-        rd = ps_face_facet_radius_stat(dual, dual_face_k),
+        rp = ps_face_radius_stat(poly, face_k),
+        rd = ps_face_radius_stat(dual, dual_face_k),
         _0 = assert(abs(rd) > 1e-12, "scale_dual_face_radius: dual face radius ~ 0")
     )
     rp / rd * scale_dual(poly, dual);

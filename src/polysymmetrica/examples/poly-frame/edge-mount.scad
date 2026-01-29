@@ -1,7 +1,7 @@
 use <../../core/funcs.scad>
 use <polygon-sym.scad>
 
-// Tools and examples for building various facet styles
+// Tools and examples for building various face styles
 
 
 EDGE_DIAM = 5;
@@ -11,7 +11,7 @@ EDGE_KEEL_T = 2;
 
 $fn = 20;
 
-// edge-component of a polygon to be placed on polygonal facets
+// edge-component of a polygon to be placed on polygonal faces
 module edge_mount(len, edge_diam = EDGE_DIAM) {
     hull() {
         sphere(d = edge_diam);
@@ -37,8 +37,8 @@ module regular_polygon_frame(n_vertex, edge_len) {
 //}
 
 
-// facet with an appealing cushion appearance
-module facet_cushion(n_vertex, edge_len, top_h = 2.5, ledge_h = 1.2, ledge_w = 4) {
+// face with an appealing cushion appearance
+module face_cushion(n_vertex, edge_len, top_h = 2.5, ledge_h = 1.2, ledge_w = 4) {
     polygon_rad = ps_calc_radius(n_vertex, edge_len);
     hull() {
         apply_polygon_sym(n_vertex, polygon_rad) {
@@ -60,4 +60,4 @@ regular_polygon_frame(5, 40);
 
 translate([100,0,0]) edge_mount(40);
 
-translate([200,0,0]) facet_cushion(6, 40);
+translate([200,0,0]) face_cushion(6, 40);

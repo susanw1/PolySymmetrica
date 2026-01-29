@@ -70,10 +70,10 @@ function icosahedron() = let(unit_edge = 2) make_poly(
 //////
 
 place_on_faces(icosahedron(), 40) {
-    cylinder($fn = 3, r = $ps_facet_radius );
+    cylinder($fn = 3, r = $ps_face_radius );
 
     color("white") translate([0,0,1])
-        text(str($ps_facet_idx), size = 5, halign="center", valign="center");
+        text(str($ps_face_idx), size = 5, halign="center", valign="center");
 
     // starts at face centre, points to poly centre
     color("green")
@@ -88,7 +88,7 @@ place_on_vertices(icosahedron(), 40) {
 }
 
 place_on_faces(icosahedron(), 40) {
-    cylinder($fn = 3, r = $ps_facet_radius);
+    cylinder($fn = 3, r = $ps_face_radius);
 }
 
 place_on_vertices(icosahedron(), 40) {

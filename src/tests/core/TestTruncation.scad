@@ -86,7 +86,7 @@ module test_poly_truncate__t_zero_counts_preserved() {
     q=poly_truncate(p, 0);
     assert_int_eq(len(poly_verts(q)), len(poly_verts(p)), "t=0 verts");
     assert_int_eq(len(poly_faces(q)), len(poly_faces(p)), "t=0 faces");
-    assert_facet_matches(p, q);
+    assert_face_matches(p, q);
 }
 
 // chamfer: cube should have 6 original faces + 12 edge faces (hexes)

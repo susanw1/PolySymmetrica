@@ -27,7 +27,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
 
         face_midradius = norm(center);  // distance from origin to face centre
         rad_vec = [ for (vid = f) norm(verts[vid] * scale - center) ];
-        facet_radius = sum(rad_vec) / len(rad_vec);
+        face_radius = sum(rad_vec) / len(rad_vec);
 
         // Vector from face centre to polyhedral centre (which is at world [0,0,0]), expressed in LOCAL coords.
         // World-space vector is -center.
@@ -49,17 +49,17 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
                 [ p[0], p[1] ]
         ];
 
-        // Per-facet metadata (local-space friendly) - mean average values where faces are irregular
-        $ps_facet_idx         = fi;                 // index of this facet, 0..N-1
+        // Per-face metadata (local-space friendly) - mean average values where faces are irregular
+        $ps_face_idx          = fi;                // index of this face, 0..N-1
         $ps_edge_len          = exp_edge_len;       // (mean) length of edge
-        $ps_vertex_count      = len(face_pts2d);    // vertex count for this facet (length of the $ps_face_pts2d list)
+        $ps_vertex_count      = len(face_pts2d);    // vertex count for this face (length of the $ps_face_pts2d list)
         $ps_face_midradius    = face_midradius;     // (mean) distance of the face polygon centre from polyhedral centre
-        $ps_facet_radius      = facet_radius;       // (mean) distance from facet centre to vertices
+        $ps_face_radius       = face_radius;        // (mean) distance from face centre to vertices
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
         
         // Adjacent faces per edge (aligned with face vertex order)
-        $ps_facet_neighbors_idx = [
+        $ps_face_neighbors_idx = [
             for (k = [0:1:len(f)-1])
                 let(
                     v0 = f[k],
@@ -70,7 +70,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
                 (len(adj) < 2) ? undef : ((adj[0] == fi) ? adj[1] : adj[0])
         ];
         // Dihedral angles per edge (degrees, aligned with face vertex order)
-        $ps_facet_dihedrals = [
+        $ps_face_dihedrals = [
             for (k = [0:1:len(f)-1])
                 let(
                     v0 = f[k],
@@ -205,7 +205,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
 module face_debug() {
     // Face index
     color("white") translate([0,0,2])
-        text(str($ps_facet_idx), size=5, halign="center", valign="center");
+        text(str($ps_face_idx), size=5, halign="center", valign="center");
 
     // Local axes
     color("red")   cube([8,1,1], center=false);

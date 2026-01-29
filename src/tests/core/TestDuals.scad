@@ -164,11 +164,11 @@ module test_scale_dual_edge_cross__octa_consistent() {
 
 
 // dual(dual()) combinatorics match (faces match up to rotation)
-module test_poly_dual__dual_dual_facet_match_octa() {
+module test_poly_dual__dual_dual_face_match_octa() {
     p=_octa_poly();
     q=poly_dual(poly_dual(p));
-    // Use rotation-invariant facet multiset matcher:
-    assert_facet_matches(p, q);
+    // Use rotation-invariant face multiset matcher:
+    assert_face_matches(p, q);
 }
 
 
@@ -187,5 +187,5 @@ module run_TestDuals() {
     test_face_family_helpers__rectified_octa();
     test_face_family_helpers__truncated_octa();
     test_scale_dual_edge_cross__octa_consistent();
-    test_poly_dual__dual_dual_facet_match_octa();
+    test_poly_dual__dual_dual_face_match_octa();
 }
