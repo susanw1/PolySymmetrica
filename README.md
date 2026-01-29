@@ -48,7 +48,7 @@ use <polysymmetrica/core/placement.scad>
 use <polysymmetrica/models/octahedron.scad>
 
 place_on_faces(octahedron(), 30)
-    circle(r = $ps_facet_radius, $fn = 3);
+    circle(r = $ps_face_radius, $fn = 3);
 ```
 
 Attach geometry to edges:

@@ -35,7 +35,7 @@ function tetrahedron() = let(unit_edge = 2 * sqrt(2)) make_poly(
 //////
 
 place_on_faces(tetrahedron(), 40) {
-    cylinder($fn = 3, r = $ps_facet_radius);
+    cylinder($fn = 3, r = $ps_face_radius);
 }
 
 place_on_vertices(tetrahedron(), 40) {

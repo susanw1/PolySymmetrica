@@ -15,7 +15,7 @@ IR = 20 * SC;
 //p = (tetrahedron());
 //p = poly_truncate(octahedron());
 //p = (dodecahedron());
-p = (poly_truncate(dodecahedron()));
+p = (poly_truncate(icosahedron()));
 
 EDGE_T = 3.5 * SC;
 FACE_T = 1.6 * SC;
@@ -30,11 +30,11 @@ BASE_Z = -FACE_T / 4;
 * Generate skeletal frame:
     show_faces = undef;
 
-* Generate single facet, eg facet#8:
+* Generate single face, eg face#8:
     show_faces = [8];
     and place '!'
 
-* Generate multiple facets, eg facet#0,#9, and #23:
+* Generate multiple faces, eg face#0,#9, and #23:
     show_faces = [0, 9, 23];
     and place '!'
 */
@@ -58,11 +58,11 @@ module model(show_faces = undef, clear_airspace = true) {
                     }
             }
         }
-        // Constructs facets, removes them from frame to create facet-fitting sockets.
+        // Constructs faces, removes them from frame to create face-fitting sockets.
         place_on_faces(p, IR) {
-            // add '!' here to force facets-only:
-            if (is_undef(show_faces) || len(search($ps_facet_idx, [for (i=show_faces) i])) > 0) {
-                face_plate($ps_facet_idx, $ps_face_pts2d, FACE_T, $ps_facet_dihedrals, undef, clear_airspace, 
+            // add '!' here to force faces-only:
+            if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
+                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace, 
                     edge_inset = INSET, base_z = BASE_Z);
             }
         }
@@ -70,4 +70,3 @@ module model(show_faces = undef, clear_airspace = true) {
 }
 
 model();
-

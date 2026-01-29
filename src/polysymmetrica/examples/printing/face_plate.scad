@@ -15,7 +15,7 @@ FACE_PLATE_PILLOW_THK = 0.4;
 
 // Thickness of the top polygon above the ramped edges.
 FACE_PLATE_TOP_THK = 0.3;
-// Clearance height for facet sockets (mm) - make larger if face is far inset into a face.
+// Clearance height for face sockets (mm) - make larger if face is far inset into a face.
 FACE_PLATE_CLEAR_HEIGHT = 10;
 
 function _line_intersect_2d(n1, d1, n2, d2) =
@@ -282,7 +282,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
         }
     }
 
-    // Conditionally clears the airspace above the facet, to remove material from the face-mount above the face
+    // Conditionally clears the airspace above the face, to remove material from the face-mount above the face
     if (clear_space) {
         color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height) polygon(points = pts_gap);
     }

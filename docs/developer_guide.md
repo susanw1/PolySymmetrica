@@ -66,7 +66,7 @@ PolySymmetrica/
 │   │       ├─ basics/                 # core placement demos
 │   │       ├─ truncation/             # trunc/rectify/cantellate demos
 │   │       ├─ poly-frame/             # frame + mount experiments
-│   │       └─ printing/               # printable facet/frame experiments
+│   │       └─ printing/               # printable face/frame experiments
 │   └─ tests/...
 │
 └─ docs/
@@ -149,13 +149,13 @@ PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 
 | Variable                        | Faces | Verts  | Edges | Meaning                                                                                                                                                        |
 | ------------------------------- | :---: | :---:  | :---: | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `$ps_facet_idx`                 |   ✅  |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
+| `$ps_face_idx`                 |   ✅  |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
 | `$ps_vertex_count`              |   ✅  |   ☐   |   ☐   | Number of vertices of this face (length of `$ps_face_pts2d`)                                                                                                   |
 | `$ps_face_midradius`            |   ✅  |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
-| `$ps_facet_radius`              |   ✅  |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
+| `$ps_face_radius`              |   ✅  |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
 | `$ps_face_pts2d`                |   ✅  |   ☐   |   ☐   | Face polygon vertices in **face-local 2D coords** `[[x,y]...]` suitable for `polygon(points=...)`                                                              |
-| `$ps_facet_neighbors_idx`       |   ✅  |   ☐   |   ☐   | Adjacent face indices per face edge (aligned with `$ps_face_pts2d` order; `undef` for boundary edges)                                                         |
-| `$ps_facet_dihedrals`            |   ✅  |   ☐   |   ☐   | Dihedral angles per face edge, degrees (aligned with `$ps_face_pts2d` order; internal dihedral for closed manifolds)                                           |
+| `$ps_face_neighbors_idx`       |   ✅  |   ☐   |   ☐   | Adjacent face indices per face edge (aligned with `$ps_face_pts2d` order; `undef` for boundary edges)                                                         |
+| `$ps_face_dihedrals`            |   ✅  |   ☐   |   ☐   | Dihedral angles per face edge, degrees (aligned with `$ps_face_pts2d` order; internal dihedral for closed manifolds)                                           |
 | `$ps_vertex_valence`            |   ☐   |   ✅   |   ☐   | Number of incident edges at this vertex                                                                                                                       |
 | `$ps_vertex_neighbors_idx`      |   ☐   |   ✅   |   ☐   | Neighbor vertex indices incident to this vertex (order currently unspecified)                                                                                 |
 | `$ps_vertex_neighbor_pts_local` |   ☐   |   ✅   |   ☐   | Vectors from vertex to each neighbor in **vertex-local coords** `[[x,y,z]...]`                                                                                |
@@ -180,7 +180,7 @@ The following conventions are used consistently to make their meaning predictabl
 * `*_idx`
   An **index** into the polyhedral descriptor (e.g. face index, edge index, vertex index).
 
-  * Examples: `$ps_facet_idx`, `$ps_edge_idx`, `$ps_vertex_idx`
+  * Examples: `$ps_face_idx`, `$ps_edge_idx`, `$ps_vertex_idx`
 * `*_idx` (plural values)
   A list of indices.
 
@@ -285,7 +285,7 @@ Tetrahedron is self-dual.
 
 ```scad
 place_on_faces(octahedron(), 30)
-    circle(r = $ps_facet_radius, $fn = $ps_vertex_count);
+    circle(r = $ps_face_radius, $fn = $ps_vertex_count);
 ```
 <img src="images/5.1 octa.png" alt="Simple octahedron" width="200px"/>
 
@@ -304,7 +304,7 @@ d = poly_dual(icosahedron());
 
 place_on_faces(d, 40)
     translate([0,0, -$ps_face_midradius + 20])
-        cylinder(r1 = 0, r2 = $ps_facet_radius, h = $ps_face_midradius, $fn = $ps_vertex_count);
+        cylinder(r1 = 0, r2 = $ps_face_radius, h = $ps_face_midradius, $fn = $ps_vertex_count);
 ```
 <img src="images/5.3 dodeca-exploded.png" alt="Exploded dodecahedron" width="200px"/>
 
@@ -313,7 +313,7 @@ place_on_faces(d, 40)
 ```scad
 !place_on_faces(poly_truncate(icosahedron()), 40)
     color($ps_vertex_count == 5? "blue" : "orange")
-        cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
+        cylinder(r = $ps_face_radius, $fn = $ps_vertex_count, h = 0.2);
 ```
 <img src="images/5.4 trunc-icosa.png" alt="Truncated icosahedron" width="200px"/>
 
@@ -332,11 +332,11 @@ place_on_faces(d, 40)
 ```scad
 color("red", alpha = 0.5)
 place_on_faces(octahedron(), 30)
-    cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
+    cylinder(r = $ps_face_radius, $fn = $ps_vertex_count, h = 0.2);
 
 color("gold", alpha = 0.3)
 place_on_faces(poly_dual(octahedron()), 30)    // note scaling for vertex/face alignment
-    cylinder(r = $ps_facet_radius, $fn = $ps_vertex_count, h = 0.2);
+    cylinder(r = $ps_face_radius, $fn = $ps_vertex_count, h = 0.2);
 ```
 <img src="images/5.6 cube-octa.png" alt="Overlayed cube on octahedron" width="200px"/>
 

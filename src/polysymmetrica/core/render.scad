@@ -34,8 +34,8 @@ module poly_describe(poly, name = undef, detail = 1) {
     if (detail > 0) {
         place_on_faces(poly, 1) {
             let(
-                face_verts = faces[$ps_facet_idx],
-                basic1 = str("facet#", $ps_facet_idx, ": (", $ps_vertex_count, " verts) vert_idx: ", face_verts),
+                face_verts = faces[$ps_face_idx],
+                basic1 = str("face#", $ps_face_idx, ": (", $ps_vertex_count, " verts) vert_idx: ", face_verts),
                 more2 = str(" poly_rad: ", $ps_face_midradius, " verts: ", [for (f = face_verts) verts[f]],
                     " lens: ", [for (fi = [0:1:len(face_verts)-1]) norm(verts[face_verts[fi]]-verts[face_verts[(fi+1)%len(face_verts)]]) ])
             )

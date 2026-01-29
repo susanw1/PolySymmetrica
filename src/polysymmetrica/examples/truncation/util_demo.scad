@@ -13,7 +13,7 @@ module demo(p, ir = IR) {
         let (col = COLORS[$ps_vertex_count]) {
             color(col) {
                 linear_extrude(height=T) polygon(points = $ps_face_pts2d);
-//                translate([0,0,3]) text(str($ps_facet_idx), halign="center",valign="center", size=4);
+//                translate([0,0,3]) text(str($ps_face_idx), halign="center",valign="center", size=4);
             }
         }
     }

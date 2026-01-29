@@ -6,7 +6,7 @@ RAD = 40;
 module placement_tester(poly, rad=RAD) {
     color("yellow")
     place_on_faces(poly, rad)
-        cylinder(r = $ps_facet_radius, h = 2, $fn = $ps_vertex_count);
+        cylinder(r = $ps_face_radius, h = 2, $fn = $ps_vertex_count);
 
     color("red")
     place_on_vertices(poly, rad)
@@ -25,7 +25,7 @@ function _tetra_poly() =
         [[0,1,2],[0,3,1],[0,2,3],[1,3,2]]
     );
 
-// --- facet equivalence helpers ---
+// --- face equivalence helpers ---
 
 // rotate list left by k (k can be >= len)
 function rotl(v, k) =
@@ -33,7 +33,7 @@ function rotl(v, k) =
     [ for (i = [0:n-1]) v[(i+s) % n] ];
 
 // true if a and b are equal up to rotation (same direction), false otherwise
-function facet_eq_rot(a, b) =
+function face_eq_rot(a, b) =
     (len(a) == len(b)) &&
     (len(a) == 0 ? true
                  : let(n = len(a))
@@ -41,17 +41,17 @@ function facet_eq_rot(a, b) =
                    (max([ for (k = [0:n-1]) (a == rotl(b, k)) ? 1 : 0 ]) == 1));
 
 // true if a and b are equal up to rotation in either direction
-function facet_eq_rot_any(a, b) =
-    facet_eq_rot(a, b) || facet_eq_rot(a, _ps_reverse(b));
+function face_eq_rot_any(a, b) =
+    face_eq_rot(a, b) || face_eq_rot(a, _ps_reverse(b));
 
-// true if every facet in A can be matched with a distinct facet in B (multiset match)
-function facets_eq_rot(A, B) =
+// true if every face in A can be matched with a distinct face in B (multiset match)
+function faces_eq_rot(A, B) =
     let(n = len(A))
     (n == len(B)) ?
         let(M = [
                 for (i = [0:n-1])
                     [ for (j = [0:n-1])
-                        facet_eq_rot_any(A[i], B[j]) ? 1 : 0
+                        face_eq_rot_any(A[i], B[j]) ? 1 : 0
                     ]
             ]
         )
@@ -106,13 +106,13 @@ function _ta_j(M, i, j, matchR, seen) =
  B = [[3,4,1,2], [6,7,5]];
  B1 = [[6,7,5], [3,4,1,2]];
  C = [[3,4,1,2], [6,5,7]];
- echo(facets_eq_rot(A,B));  // true
- echo(facets_eq_rot(A,B1)); // true
- echo(facets_eq_rot(A,C));  // false
+ echo(faces_eq_rot(A,B));  // true
+ echo(faces_eq_rot(A,B1)); // true
+ echo(faces_eq_rot(A,C));  // false
 
 
-module assert_facet_matches(p1, p2) {
-    assert(facets_eq_rot(poly_faces(p1), poly_faces(p2)));
+module assert_face_matches(p1, p2) {
+    assert(faces_eq_rot(poly_faces(p1), poly_faces(p2)));
 }
 
 module assert_verts_matches(A, B, eps=1e-9) {
