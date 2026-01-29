@@ -32,31 +32,6 @@ function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
         (n0[0]*d1 - d0*n1[0]) / det
     ];
 
-// Inset a 2D polygon (CW) by distance inset, using edge-offset intersections.
-function _ps_face_inset_pts2d(pts2d, inset) =
-    let(
-        n = len(pts2d),
-        edges = [
-            for (i = [0:1:n-1])
-                let(
-                    p0 = pts2d[i],
-                    p1 = pts2d[(i+1)%n],
-                    e = [p1[0]-p0[0], p1[1]-p0[1]],
-                    n_in = v_norm([e[1], -e[0]])
-                )
-                [n_in, v_dot(n_in, p0) + inset]
-        ]
-    )
-    [
-        for (i = [0:1:n-1])
-            let(
-                e_prev = edges[(i-1+n)%n],
-                e_cur  = edges[i],
-                p = _ps_line2_intersect(e_prev[0], e_prev[1], e_cur[0], e_cur[1])
-            )
-            p
-    ];
-
 // Inset polygon vertices using bisector-plane intersection lines per edge.
 function _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
     let(

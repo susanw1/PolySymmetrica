@@ -6,6 +6,9 @@
 
 use <funcs.scad>
 
+// Generic site/cycle poly transform kernel.
+// Keep this file minimal and reusable across future operators (snub, cantitruncate, etc.).
+
 // index of point p in list (or -1)
 function _ps_find_point(list, p, eps, i=0) =
     (i >= len(list)) ? -1 :
