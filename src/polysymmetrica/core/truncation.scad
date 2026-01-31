@@ -653,30 +653,6 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
                 ]
         ],
         // Debug: echo one decagon face cycle points and their angles (first face with n>=5*2)
-        _dbg_face = let(
-            cands = [for (i = [0:1:len(faces0)-1]) if (len(faces0[i]) >= 5) i],
-            fi = (len(cands) > 0) ? cands[0] : undef
-        )
-        (is_undef(fi)) ? undef :
-        let(
-            n = len(faces0[fi]),
-            base = edge_site_offset + face_edge_offsets[fi],
-            cy = [
-                for (k = [0:1:n-1])
-                    let(
-                        k_prev = (k - 1 + n) % n,
-                        s_prev = base + 2*k_prev + 1,
-                        s_next = base + 2*k
-                    )
-                    each [[1, s_prev], [1, s_next]]
-            ],
-            center = poly_face_center(poly, fi, 1),
-            ex = poly_face_ex(poly, fi, 1),
-            ey = poly_face_ey(poly, fi, 1),
-            pts = [for (c = cy) face_edge_pts_flat[c[1]]],
-            angs = [for (p = pts) atan2(v_dot(p-center, ey), v_dot(p-center, ex))]
-        )
-        echo("cantitrunc_dbg face", fi, "n", n, "angs", angs),
         cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);

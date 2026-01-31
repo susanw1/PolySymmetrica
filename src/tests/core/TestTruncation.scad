@@ -154,14 +154,14 @@ module test_poly_cantitruncate__tetra_counts() {
 
     expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
     assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate faces count");
-    assert_int_eq(_count_faces_of_size(q, 3), 4, "cantitruncate tetra: 4 triangles");
+    assert_int_eq(_count_faces_of_size(q, 3), 0, "cantitruncate tetra: 0 triangles");
     assert_int_eq(_count_faces_of_size(q, 4), 6, "cantitruncate tetra: 6 quads");
-    assert_int_eq(_count_faces_of_size(q, 6), 4, "cantitruncate tetra: 4 hexagons");
+    assert_int_eq(_count_faces_of_size(q, 6), 8, "cantitruncate tetra: 8 hexagons (4 face + 4 vertex)");
 }
 
 module test_poly_cantitruncate_uniform__tetra_sanity() {
     p = _tetra_poly();
-    sol = solve_cantitruncate_uniform(p, 0, 0.6, 0, 0.6, 6, 6);
+    sol = solve_cantitruncate_uniform_fast_refine(p, 0.05, 0.5, 0.05, 0.5, 4, 2);
     assert(len(sol) == 3, "cantitruncate uniform solver returns [t,c,score]");
     q = poly_cantitruncate(p, sol[0], sol[1]);
     assert_poly_valid(q);
