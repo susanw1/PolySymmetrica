@@ -8,7 +8,7 @@ Great rhombi* via cantitruncate uniform solver.
 */
 
 translate([0, 0, 0])
-    demo(great_rhombicuboctahedron(4, 2));
+    demo(great_rhombicuboctahedron());
 
 translate([80, 0, 0])
-    demo(great_rhombicosidodecahedron(4, 2));
+    demo(great_rhombicosidodecahedron());

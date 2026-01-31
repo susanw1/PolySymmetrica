@@ -219,7 +219,7 @@ module test_poly_cantitruncate_uniform__cube_bounds() {
 }
 
 module test_great_rhombi__cube_square_faces() {
-    p = great_rhombicuboctahedron(8, 8);
+    p = great_rhombicuboctahedron();
     assert_poly_valid(p);
 }
 module test_truncate__validity() {

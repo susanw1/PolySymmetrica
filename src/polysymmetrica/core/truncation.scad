@@ -31,22 +31,7 @@ function _ps_face_edge_index(f, v0, v1) =
     )
     (len(hits) == 0) ? -1 : hits[0];
 
-// Prefix offsets for a list of counts: [0, c0, c0+c1, ...]
-function _ps_prefix_offsets(counts, acc=[]) =
-    (len(counts) == 0) ? acc :
-    let(last = (len(acc) == 0) ? 0 : acc[len(acc)-1])
-    _ps_prefix_offsets(
-        [for (i = [1:1:len(counts)-1]) counts[i]],
-        concat(acc, [last + counts[0]])
-    );
-
-function _ps_face_offsets(faces) =
-    let(counts = [for (f = faces) len(f)])
-    _ps_prefix_offsets(counts, [0]);
-
-function _ps_face_edge_offsets(faces) =
-    let(counts = [for (f = faces) 2 * len(f)])
-    _ps_prefix_offsets(counts, [0]);
+function _ps_clamp(x, lo, hi) = (x < lo) ? lo : (x > hi) ? hi : x;
 
 function _ps_face_edge_site(base, k, near_next=false) =
     base + 2*k + (near_next ? 1 : 0);
@@ -919,6 +904,38 @@ function solve_cantitruncate_uniform_fast_refine(poly, t_min=0, t_max=1, c_min=0
             (r <= 1) ? sol : _solve_round(t_lo2, t_hi2, c_lo2, c_hi2, span_t2, span_c2, r - 1)
     )
     _solve_round(t0, t1, c0, c1, t_span, c_span, rounds);
+
+// Trig-based solver for regular bases (one edge type).
+// Uses face interior angle and dihedral to compute t and c directly.
+function solve_cantitruncate_trig(poly, face_idx=0, edge_idx=undef) =
+    let(
+        verts = poly_verts(poly),
+        faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
+        f = faces[face_idx],
+        n = len(f),
+        v0 = f[0],
+        v_prev = f[(n-1)%n],
+        v_next = f[1],
+        a0 = v_norm(verts[v_prev] - verts[v0]),
+        a1 = v_norm(verts[v_next] - verts[v0]),
+        phi = acos(_ps_clamp(v_dot(a0, a1), -1, 1)),
+        t = 1 / (2 * (1 + sin(phi/2))),
+        edges = _ps_edges_from_faces(faces),
+        ei = is_undef(edge_idx) ? ps_find_edge_index(edges, v0, v_next) : edge_idx,
+        fpair = ps_edge_faces_table(faces, edges)[ei],
+        f0 = fpair[0],
+        f1 = fpair[1],
+        n0 = ps_face_normal(verts, faces[f0]),
+        n1 = ps_face_normal(verts, faces[f1]),
+        // alpha is angle between outward normals
+        alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1)),
+        a = norm(verts[v_next] - verts[v0]),
+        ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
+        // across-face distance uses sin(alpha/2); for cube alpha=90 so sin=cos
+        d_f = (1 - 2*t) * a / (2 * sin(alpha/2)),
+        c = abs(d_f) / ir
+    )
+    [t, c];
 
 function poly_cantitruncate_uniform(poly, t_min=0, t_max=1, c_min=0, c_max=1,
                                    steps_t=12, steps_c=12, square_face_k=4,
