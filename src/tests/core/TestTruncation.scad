@@ -159,12 +159,63 @@ module test_poly_cantitruncate__tetra_counts() {
     assert_int_eq(_count_faces_of_size(q, 6), 8, "cantitruncate tetra: 8 hexagons (4 face + 4 vertex)");
 }
 
+module test_poly_cantitruncate__cube_counts() {
+    p = hexahedron();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantitruncate(p, 0.2, 0.2);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate cube faces count");
+    assert_int_eq(_count_faces_of_size(q, 4), 12, "cantitruncate cube: 12 quads (edges)");
+    assert_int_eq(_count_faces_of_size(q, 6), 8, "cantitruncate cube: 8 hexagons (verts)");
+    assert_int_eq(_count_faces_of_size(q, 8), 6, "cantitruncate cube: 6 octagons (faces)");
+}
+
+module test_poly_cantitruncate__dodeca_counts() {
+    p = dodecahedron();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantitruncate(p, 0.2, 0.2);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate dodeca faces count");
+    assert_int_eq(_count_faces_of_size(q, 4), 30, "cantitruncate dodeca: 30 quads (edges)");
+    assert_int_eq(_count_faces_of_size(q, 6), 20, "cantitruncate dodeca: 20 hexagons (verts)");
+    assert_int_eq(_count_faces_of_size(q, 10), 12, "cantitruncate dodeca: 12 decagons (faces)");
+}
+
+module test_poly_cantitruncate__cube_edge_face_adjacency() {
+    p = hexahedron();
+    q = poly_cantitruncate(p, 0.2, 0.2);
+    faces = poly_faces(q);
+    edges = _ps_edges_from_faces(poly_faces(p));
+
+    // pick the first edge-face (quad) after face cycles
+    face_count = len(poly_faces(p));
+    quad = faces[face_count]; // edge 0 quad
+    // adjacent face cycles are expected to share its vertices
+    shared = [
+        for (v = quad)
+            sum([for (f = [0:1:face_count-1]) (search([v], faces[f], 1)[0] >= 0) ? 1 : 0])
+    ];
+    // each quad vertex should belong to at least one original-face cycle
+    assert(min(shared) >= 1, "cantitruncate cube: quad vertices shared with face cycles");
+}
+
 module test_poly_cantitruncate_uniform__tetra_sanity() {
     p = _tetra_poly();
     sol = solve_cantitruncate_uniform_fast_refine(p, 0.05, 0.5, 0.05, 0.5, 4, 2);
     assert(len(sol) == 3, "cantitruncate uniform solver returns [t,c,score]");
     q = poly_cantitruncate(p, sol[0], sol[1]);
     assert_poly_valid(q);
+}
+
+module test_poly_cantitruncate_uniform__cube_bounds() {
+    p = hexahedron();
+    sol = solve_cantitruncate_uniform_fast_refine(p, 0.05, 0.8, 0.05, 0.8, 4, 2);
+    assert(sol[0] > 0 && sol[0] < 1, "cantitruncate uniform cube: 0<t<1");
+    assert(sol[1] > 0 && sol[1] < 1, "cantitruncate uniform cube: 0<c<1");
 }
 
 module test_great_rhombi__cube_square_faces() {

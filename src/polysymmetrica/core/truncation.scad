@@ -31,6 +31,57 @@ function _ps_face_edge_index(f, v0, v1) =
     )
     (len(hits) == 0) ? -1 : hits[0];
 
+// Prefix offsets for a list of counts: [0, c0, c0+c1, ...]
+function _ps_prefix_offsets(counts, acc=[]) =
+    (len(counts) == 0) ? acc :
+    let(last = (len(acc) == 0) ? 0 : acc[len(acc)-1])
+    _ps_prefix_offsets(
+        [for (i = [1:1:len(counts)-1]) counts[i]],
+        concat(acc, [last + counts[0]])
+    );
+
+function _ps_face_offsets(faces) =
+    let(counts = [for (f = faces) len(f)])
+    _ps_prefix_offsets(counts, [0]);
+
+function _ps_face_edge_offsets(faces) =
+    let(counts = [for (f = faces) 2 * len(f)])
+    _ps_prefix_offsets(counts, [0]);
+
+function _ps_face_edge_site(base, k, near_next=false) =
+    base + 2*k + (near_next ? 1 : 0);
+
+// Return [s_near_v0, s_near_v1] for edge (v0,v1) on face fidx.
+function _ps_face_edge_sites_for_face_edge(faces, fidx, v0, v1, base) =
+    let(
+        f = faces[fidx],
+        k_dir = _ps_face_edge_index(f, v0, v1),
+        k = (k_dir >= 0) ? k_dir : _ps_face_edge_index(f, v1, v0),
+        flip = (k_dir < 0)
+    )
+    assert(k >= 0, "cantitruncate: edge not found in face")
+    [
+        flip ? _ps_face_edge_site(base, k, true) : _ps_face_edge_site(base, k, false),
+        flip ? _ps_face_edge_site(base, k, false) : _ps_face_edge_site(base, k, true)
+    ];
+
+// Project edge points to face plane and order along face edge direction.
+function _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1) =
+    let(
+        ei = ps_find_edge_index(edges, v0, v1),
+        e = edges[ei],
+        p_a = edge_pts[ei][0],
+        p_b = edge_pts[ei][1],
+        p_near_v0 = (e[0] == v0) ? p_a : p_b,
+        p_near_v1 = (e[0] == v1) ? p_a : p_b,
+        proj0 = p_near_v0 + n_f * v_dot(n_f, (p0 - p_near_v0)),
+        proj1 = p_near_v1 + n_f * v_dot(n_f, (p0 - p_near_v1)),
+        e_vec = verts0[v1] - verts0[v0],
+        e_dir = v_norm(e_vec - n_f * v_dot(n_f, e_vec)),
+        flip = v_dot((proj1 - proj0), e_dir) < 0
+    )
+    [flip ? proj1 : proj0, flip ? proj0 : proj1];
+
 
 // Intersect 2D lines n0·x=d0 and n1·x=d1.
 function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
@@ -329,10 +380,7 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
         face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
         // offset face corners: one point per (face, vertex) incidence
         face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df),
-        face_offsets = [
-            for (fi = [0:1:len(faces0)-1])
-                sum([for (j = [0:1:fi-1]) len(faces0[j])])
-        ],
+        face_offsets = _ps_face_offsets(faces0),
         sites = [
             for (fi = [0:1:len(faces0)-1])
                 for (v = faces0[fi])
@@ -397,10 +445,7 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
         edge_faces = ps_edge_faces_table(faces0, edges),
         face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
 
-        face_offsets = [
-            for (fi = [0:1:len(faces0)-1])
-                sum([for (j = [0:1:fi-1]) len(faces0[j])])
-        ],
+        face_offsets = _ps_face_offsets(faces0),
 
         face_pts3d = [
             for (fi = [0:1:len(faces0)-1])
@@ -501,10 +546,7 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
         ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
         d_f = -c_eff * ir,
         d_e = c_eff * ir,
-        face_offsets = [
-            for (fi = [0:1:len(faces0)-1])
-                sum([for (j = [0:1:fi-1]) len(faces0[j])])
-        ],
+        face_offsets = _ps_face_offsets(faces0),
         // edge points (truncation-style): two per edge
         edge_pts = [
             for (ei = [0:1:len(edges)-1])
@@ -559,27 +601,14 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
                         let(
                             v0 = f[k],
                             v1 = f[(k+1)%n],
-                            ei = ps_find_edge_index(edges, v0, v1),
-                            e = edges[ei],
-                            p_a = edge_pts[ei][0],
-                            p_b = edge_pts[ei][1],
-                            p_near_v0 = (e[0] == v0) ? p_a : p_b,
-                            p_near_v1 = (e[0] == v1) ? p_a : p_b,
-                            proj0 = p_near_v0 + n_f * v_dot(n_f, (p0 - p_near_v0)),
-                            proj1 = p_near_v1 + n_f * v_dot(n_f, (p0 - p_near_v1)),
-                            e_vec = verts0[v1] - verts0[v0],
-                            e_dir = v_norm(e_vec - n_f * v_dot(n_f, e_vec)),
-                            flip = v_dot((proj1 - proj0), e_dir) < 0,
-                            p0o = flip ? proj1 : proj0,
-                            p1o = flip ? proj0 : proj1
+                            p_pair = _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1),
+                            p0o = p_pair[0],
+                            p1o = p_pair[1]
                         )
                         each [p0o, p1o]
                 ]
         ],
-        face_edge_offsets = [
-            for (fi = [0:1:len(faces0)-1])
-                sum([for (j = [0:1:fi-1]) 2 * len(faces0[j])])
-        ],
+        face_edge_offsets = _ps_face_edge_offsets(faces0),
         face_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_pts3d[fi]) p ],
         face_edge_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_edge_pts3d[fi]) p ],
         edge_site_offset = 0,
@@ -599,8 +628,8 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
                 [
                     for (k = [0:1:n-1])
                         let(
-                            s0 = base + 2*k,
-                            s1 = base + 2*k + 1
+                            s0 = _ps_face_edge_site(base, k, false),
+                            s1 = _ps_face_edge_site(base, k, true)
                         )
                         each [[1, s0], [1, s1]]
                 ]
@@ -616,17 +645,12 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
                     v1 = e[1],
                     b0 = edge_site_offset + face_edge_offsets[f0],
                     b1 = edge_site_offset + face_edge_offsets[f1],
-                    k0_dir = _ps_face_edge_index(faces0[f0], v0, v1),
-                    k0 = (k0_dir >= 0) ? k0_dir : _ps_face_edge_index(faces0[f0], v1, v0),
-                    flip0 = (k0_dir < 0),
-                    k1_dir = _ps_face_edge_index(faces0[f1], v1, v0),
-                    k1 = (k1_dir >= 0) ? k1_dir : _ps_face_edge_index(faces0[f1], v0, v1),
-                    flip1 = (k1_dir < 0),
-                    _ = assert(k0 >= 0 && k1 >= 0, "cantitruncate: edge not found in adjacent face"),
-                    s0 = flip0 ? (b0 + 2*k0 + 1) : (b0 + 2*k0),
-                    s1 = flip0 ? (b0 + 2*k0) : (b0 + 2*k0 + 1),
-                    s2 = flip1 ? (b1 + 2*k1 + 1) : (b1 + 2*k1),
-                    s3 = flip1 ? (b1 + 2*k1) : (b1 + 2*k1 + 1)
+                    s_pair0 = _ps_face_edge_sites_for_face_edge(faces0, f0, v0, v1, b0),
+                    s_pair1 = _ps_face_edge_sites_for_face_edge(faces0, f1, v1, v0, b1),
+                    s0 = s_pair0[0],
+                    s1 = s_pair0[1],
+                    s2 = s_pair1[0],
+                    s3 = s_pair1[1]
                 )
                 [
                     [1, s0],
@@ -646,8 +670,8 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
                             pos = _ps_index_of(f, vi),
                             k_prev = (pos - 1 + n) % n,
                             base = edge_site_offset + face_edge_offsets[fi],
-                            s_prev = base + 2*k_prev + 1,
-                            s_next = base + 2*pos
+                            s_prev = _ps_face_edge_site(base, k_prev, true),
+                            s_next = _ps_face_edge_site(base, pos, false)
                         )
                         each [[1, s_prev], [1, s_next]]
                 ]
@@ -742,31 +766,15 @@ function _ps_cantitruncate_edge_metrics(poly, t, c) =
                         let(
                             v0 = f[k],
                             v1 = f[(k+1)%n],
-                            ei = ps_find_edge_index(edges, v0, v1),
-                            e = edges[ei],
-                            p_a = edge_pts[ei][0],
-                            p_b = edge_pts[ei][1],
-                            p_near_v0 = (e[0] == v0) ? p_a : p_b,
-                            p_near_v1 = (e[0] == v1) ? p_a : p_b,
-                            proj0 = p_near_v0 + n_f * v_dot(n_f, (p0 - p_near_v0)),
-                            proj1 = p_near_v1 + n_f * v_dot(n_f, (p0 - p_near_v1)),
-                            e_vec = verts0[v1] - verts0[v0],
-                            e_dir = v_norm(e_vec - n_f * v_dot(n_f, e_vec)),
-                            flip = v_dot((proj1 - proj0), e_dir) < 0,
-                            p0o = flip ? proj1 : proj0,
-                            p1o = flip ? proj0 : proj1
+                            p_pair = _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1),
+                            p0o = p_pair[0],
+                            p1o = p_pair[1]
                         )
                         each [p0o, p1o]
                 ]
         ],
-        face_edge_offsets = [
-            for (fi = [0:1:len(faces0)-1])
-                sum([for (j = [0:1:fi-1]) 2 * len(faces0[j])])
-        ],
-        face_offsets = [
-            for (fi = [0:1:len(faces0)-1])
-                sum([for (j = [0:1:fi-1]) len(faces0[j])])
-        ],
+        face_edge_offsets = _ps_face_edge_offsets(faces0),
+        face_offsets = _ps_face_offsets(faces0),
         face_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_pts3d[fi]) p ],
         face_edge_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_edge_pts3d[fi]) p ],
         edge_site_offset = 0,
@@ -782,8 +790,8 @@ function _ps_cantitruncate_edge_metrics(poly, t, c) =
                 [
                     for (k = [0:1:n-1])
                         let(
-                            s0 = base + 2*k,
-                            s1 = base + 2*k + 1
+                            s0 = _ps_face_edge_site(base, k, false),
+                            s1 = _ps_face_edge_site(base, k, true)
                         )
                         each [[1, s0], [1, s1]]
                 ]

@@ -122,6 +122,55 @@ module test_ps_point_eq__eps() {
     assert(!ps_point_eq([0,0,0], [0,0,1e-3], 1e-5), "point eq outside eps");
 }
 
+// --- prefix offsets / face edge helpers ---
+module test__ps_prefix_offsets__basic() {
+    counts = [3, 2, 4];
+    offs = _ps_prefix_offsets(counts, [0]);
+    assert(offs == [0,3,5,9], "prefix offsets");
+}
+
+module test__ps_face_offsets__basic() {
+    faces = [[0,1,2],[0,1,2,3]];
+    offs = _ps_face_offsets(faces);
+    assert(offs == [0,3,7], "face offsets");
+}
+
+module test__ps_face_edge_offsets__basic() {
+    faces = [[0,1,2],[0,1,2,3]];
+    offs = _ps_face_edge_offsets(faces);
+    assert(offs == [0,6,14], "face edge offsets");
+}
+
+module test__ps_face_edge_site__basic() {
+    assert(_ps_face_edge_site(10, 2, false) == 14, "edge site base+2k");
+    assert(_ps_face_edge_site(10, 2, true) == 15, "edge site base+2k+1");
+}
+
+module test__ps_face_edge_sites_for_face_edge__square() {
+    faces = [[0,1,2,3]];
+    base = 0;
+    s = _ps_face_edge_sites_for_face_edge(faces, 0, 1, 2, base);
+    assert(s == [2,3], "edge sites for v1->v2");
+    s2 = _ps_face_edge_sites_for_face_edge(faces, 0, 2, 1, base);
+    assert(s2 == [3,2], "edge sites for reversed edge");
+}
+
+module test__ps_project_edge_pts_for_face_edge__square_xy() {
+    verts = [[0,0,0],[1,0,0],[1,1,0],[0,1,0]];
+    faces = [[0,1,2,3]];
+    edges = _ps_edges_from_faces(faces);
+    edge_pts = [
+        for (ei = [0:1:len(edges)-1])
+            let(a = edges[ei][0], b = edges[ei][1], A = verts[a], B = verts[b])
+                [A + 0.25 * (B - A), B + 0.25 * (A - B)]
+    ];
+    n_f = [0,0,1];
+    p0 = [0,0,0];
+    pair = _ps_project_edge_pts_for_face_edge(verts, edges, edge_pts, n_f, p0, 0, 1);
+    // ordered along +X (edge 0->1)
+    assert(pair[0][0] < pair[1][0], "project edge pts order");
+}
+
 
 module test_find_edge_index__finds() {
     faces = poly_faces(_tetra_poly());
