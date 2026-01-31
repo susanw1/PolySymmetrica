@@ -4,6 +4,7 @@ use <../../polysymmetrica/core/transform.scad>
 use <../../polysymmetrica/core/truncation.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/regular_all.scad>
+use <../../polysymmetrica/models/archimedians_all.scad>
 use <../testing_util.scad>
 
 EPS = 1e-7;
@@ -153,8 +154,22 @@ module test_poly_cantitruncate__tetra_counts() {
 
     expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
     assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate faces count");
-    assert_int_eq(_count_faces_of_size(q, 3), 8, "cantitruncate tetra: 8 triangles");
+    assert_int_eq(_count_faces_of_size(q, 3), 4, "cantitruncate tetra: 4 triangles");
     assert_int_eq(_count_faces_of_size(q, 4), 6, "cantitruncate tetra: 6 quads");
+    assert_int_eq(_count_faces_of_size(q, 6), 4, "cantitruncate tetra: 4 hexagons");
+}
+
+module test_poly_cantitruncate_uniform__tetra_sanity() {
+    p = _tetra_poly();
+    sol = solve_cantitruncate_uniform(p, 0, 0.6, 0, 0.6, 6, 6);
+    assert(len(sol) == 3, "cantitruncate uniform solver returns [t,c,score]");
+    q = poly_cantitruncate(p, sol[0], sol[1]);
+    assert_poly_valid(q);
+}
+
+module test_great_rhombi__cube_square_faces() {
+    p = great_rhombicuboctahedron(8, 8);
+    assert_poly_valid(p);
 }
 module test_truncate__validity() {
     p = poly_truncate(tetrahedron(), 1/3);
@@ -296,6 +311,8 @@ module run_TestTruncation() {
     test_poly_cantellate__tetra_counts();
     test_poly_cantellate__cube_counts();
     test_poly_cantitruncate__tetra_counts();
+    test_poly_cantitruncate_uniform__tetra_sanity();
+    test_great_rhombi__cube_square_faces();
     test_truncate__validity();
     
     test_truncate__tetra_archimedean_counts();
