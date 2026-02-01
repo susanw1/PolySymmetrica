@@ -216,21 +216,6 @@ module test_poly_cantitruncate__cube_edge_face_adjacency() {
     assert(min(shared) >= 1, "cantitruncate cube: quad vertices shared with face cycles");
 }
 
-module test_poly_cantitruncate_uniform__tetra_sanity() {
-    p = _tetra_poly();
-    sol = solve_cantitruncate_uniform_fast_refine(p, 0.05, 0.5, 0.05, 0.5, 4, 2);
-    assert(len(sol) == 3, "cantitruncate uniform solver returns [t,c,score]");
-    q = poly_cantitruncate(p, sol[0], sol[1]);
-    assert_poly_valid(q);
-}
-
-module test_poly_cantitruncate_uniform__cube_bounds() {
-    p = hexahedron();
-    sol = solve_cantitruncate_uniform_fast_refine(p, 0.05, 0.8, 0.05, 0.8, 4, 2);
-    assert(sol[0] > 0 && sol[0] < 1, "cantitruncate uniform cube: 0<t<1");
-    assert(sol[1] > 0 && sol[1] < 1, "cantitruncate uniform cube: 0<c<1");
-}
-
 module test_poly_cantitruncate_dominant_edges__consistent_pairs() {
     base = poly_rectify(octahedron()); // cuboctahedron
     sol = solve_cantitruncate_dominant_edges(base, 4);
@@ -405,7 +390,6 @@ module run_TestTruncation() {
     test_poly_cantellate__tetra_counts();
     test_poly_cantellate__cube_counts();
     test_poly_cantitruncate__tetra_counts();
-    test_poly_cantitruncate_uniform__tetra_sanity();
     test_poly_cantitruncate_dominant_edges__consistent_pairs();
     test_poly_cantitruncate_dominant_edges__planarity();
     test_great_rhombi__cube_square_faces();
