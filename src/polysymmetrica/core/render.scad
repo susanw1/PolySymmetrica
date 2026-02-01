@@ -37,9 +37,14 @@ module poly_describe(poly, name = undef, detail = 1) {
                 face_verts = faces[$ps_face_idx],
                 basic1 = str("face#", $ps_face_idx, ": (", $ps_vertex_count, " verts) vert_idx: ", face_verts),
                 more2 = str(" poly_rad: ", $ps_face_midradius, " verts: ", [for (f = face_verts) verts[f]],
-                    " lens: ", [for (fi = [0:1:len(face_verts)-1]) norm(verts[face_verts[fi]]-verts[face_verts[(fi+1)%len(face_verts)]]) ])
+                    " lengths: ", [for (fi = [0:1:len(face_verts)-1]) norm(verts[face_verts[fi]]-verts[face_verts[(fi+1)%len(face_verts)]]) ]),
+                n = ps_face_normal(verts, face_verts),
+                v0 = verts[face_verts[0]],
+                plane_errs = [for (f = face_verts) abs(v_dot(n, (verts[f] - v0)))],
+                max_plane_err = (len(plane_errs) == 0) ? 0 : max(plane_errs),
+                more3 = str(" max_plane_err: ", max_plane_err)
             )
-            echo (str("  ", basic1, detail > 1? more2 : ""));
+            echo (str("  ", basic1, detail > 1 ? more2 : "", detail > 2 ? more3 : ""));
         }
         place_on_vertices(poly, 1) {
             let(
@@ -47,8 +52,6 @@ module poly_describe(poly, name = undef, detail = 1) {
                 more2 = str("vert_idx: ", verts[$ps_vertex_idx])
             )
             echo (str("  ", basic1, detail > 1? more2 : ""));
-//        echo (str("  vertex#", $ps_vertex_idx, ": (", $ps_vertex_valence, " edges), poly_rad: ", $ps_vert_radius,
-//            " vert_idx: ", verts[$ps_vertex_idx], ", neighbours_idx: ", $ps_vertex_neighbors_idx));
         }
         place_on_edges(poly, 1) {
             let(
@@ -56,27 +59,8 @@ module poly_describe(poly, name = undef, detail = 1) {
                 more2 = str(" ")
             )
             echo (str("  ", basic1, detail > 1? more2 : ""));
-//            echo (str("  edge#", $ps_edge_idx, ": len: ", $ps_edge_len, ", poly_rad: ", $ps_edge_midradius,
-//                ", verts_idx: ", $ps_edge_verts_idx, ", faces_idx: ", $ps_edge_adj_faces_idx));
         }
     }
     echo ("======================");
 }
 
-
-//// TESTING
-
-use <../models/octahedron.scad>
-use <../core/duals.scad>
-use <../core/truncation.scad>
-
-poly_describe(octahedron(), "Octahedron");
-//poly_describe(poly_dual(poly_truncate(octahedron())), "Dual of Trunc Octa");
-
-poly_render(octahedron(), 30);
-
-translate([100,0,0])
-difference() {
-    cube(60);
-    translate([10,10,0])poly_render(octahedron(), 30);
-}
