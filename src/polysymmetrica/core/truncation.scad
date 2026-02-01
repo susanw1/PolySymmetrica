@@ -962,31 +962,23 @@ function solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx=undef)
         faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
         edges = _ps_edges_from_faces(faces),
         edge_faces = ps_edge_faces_table(faces, edges),
-        ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
-        edge_vals = [
+        pair_keys = _ps_unique_pairs([
             for (ei = [0:1:len(edges)-1])
                 let(
-                    e = edges[ei],
                     fpair = edge_faces[ei],
                     s0 = len(faces[fpair[0]]),
-                    s1 = len(faces[fpair[1]]),
-                    a = min(s0, s1),
-                    b = max(s0, s1),
-                    n0 = ps_face_normal(verts, faces[fpair[0]]),
-                    n1 = ps_face_normal(verts, faces[fpair[1]]),
-                    alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1)),
-                    e_len = norm(verts[e[0]] - verts[e[1]]),
-                    d_e = (1 - 2*t) * e_len / (2 * sin(alpha/2))
+                    s1 = len(faces[fpair[1]])
                 )
-                [a, b, d_e]
-        ],
-        pair_keys = _ps_unique_pairs([for (v = edge_vals) [v[0], v[1]]]),
+                [min(s0, s1), max(s0, s1)]
+        ]),
         c_edge_by_pair = [
             for (p = pair_keys)
                 let(
-                    vals = [for (v = edge_vals) if (v[0] == p[0] && v[1] == p[1]) v[2]]
+                    c0 = _ps_map_face_c(p[0], c_by_size, 0),
+                    c1 = _ps_map_face_c(p[1], c_by_size, 0),
+                    c_edge = (c0 + c1) / 2
                 )
-                [p[0], p[1], (len(vals) == 0) ? 0 : (sum(vals) / len(vals)) / ir]
+                [p[0], p[1], c_edge]
         ]
     )
     [t, c_by_size, c_edge_by_pair];

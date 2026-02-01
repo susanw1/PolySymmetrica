@@ -3,7 +3,6 @@ use <../../core/placement.scad>
 use <../../core/duals.scad>
 use <../../core/truncation.scad>
 use <../../core/render.scad>
-use <../../core/validate.scad>
 
 use <../../models/regular_all.scad>
 use <../../models/archimedians_all.scad>
@@ -17,14 +16,9 @@ IR = 20 * SC;
 //p = (tetrahedron());
 //p = poly_truncate(octahedron());
 //p = (dodecahedron());
-//p = (poly_truncate(icosahedron()));
-//p = great_rhombicosidodecahedron();
-
-base = poly_dual(poly_rectify(octahedron()));
-s = solve_cantitruncate_trig(base);
-//s = [0.2, 0.7];
-p = poly_cantitruncate(base, s[0], s[1]);
-
+base = icosahedron();
+sol = solve_cantitruncate_trig(base);
+p = poly_dual(poly_cantitruncate(base, sol[0], sol[1]));
 
 EDGE_T = 3.5 * SC;
 FACE_T = 1.6 * SC;
@@ -33,7 +27,6 @@ INSET = 1.1 * SC;
 FACET_BASE_T = 1;
 FACET_BASE_W = 2.2;
 BASE_Z = -FACE_T / 4;
-
 
 /**
 * Generate skeletal frame:
@@ -78,6 +71,4 @@ module model(show_faces = undef, clear_airspace = true) {
     }
 }
 
-//model();
-poly_render(p,20);
-//assert_poly_valid_mode(p);
+model();

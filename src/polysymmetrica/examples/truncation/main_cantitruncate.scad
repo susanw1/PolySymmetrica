@@ -19,7 +19,7 @@ Demonstrates cantitruncation (two-parameter). Try varying t (face shift) and c (
 
 // Single example
 //demo(poly_cantitruncate(hexahedron(), 0.2, 0.1));
-demo(poly_cantitruncate(tetrahedron()));
+demo(poly_cantitruncate(tetrahedron(), 0.1, 0.2));
 
 // Uniform solver example (slow)
 //demo(poly_cantitruncate_uniform(hexahedron(), 0, 1, 0, 1, 12, 12));

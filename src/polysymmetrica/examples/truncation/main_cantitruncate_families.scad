@@ -18,5 +18,6 @@ p_sq = poly_cantitruncate_families(base, sol_sq[0], sol_sq[1], c_edge_by_pair=so
 sol_tri = solve_cantitruncate_dominant_edges(base, 3);
 p_tri = poly_cantitruncate_families(base, sol_tri[0], sol_tri[1], c_edge_by_pair=sol_tri[2]);
 
-translate([0, 0, 0]) demo(p_sq, detail=3);
-//translate([120, 0, 0]) demo(p_tri);
+translate([-100, 0, 0]) demo(base);
+translate([0, 0, 0]) demo(p_sq);
+translate([100, 0, 0]) demo(p_tri);
