@@ -67,6 +67,20 @@ function _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0
     )
     [flip ? proj1 : proj0, flip ? proj0 : proj1];
 
+function _ps_map_face_c(face_len, c_by_size, default_c=0) =
+    let(
+        idxs = [for (i = [0:1:len(c_by_size)-1]) if (c_by_size[i][0] == face_len) i]
+    )
+    (len(idxs) == 0) ? default_c : c_by_size[idxs[0]][1];
+
+function _ps_map_edge_c(face_len, adj_len, c_by_pair, default_c=0) =
+    let(
+        a = min(face_len, adj_len),
+        b = max(face_len, adj_len),
+        idxs = [for (i = [0:1:len(c_by_pair)-1]) if (c_by_pair[i][0] == a && c_by_pair[i][1] == b) i]
+    )
+    (len(idxs) == 0) ? default_c : c_by_pair[idxs[0]][2];
+
 
 // Intersect 2D lines n0·x=d0 and n1·x=d1.
 function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
@@ -101,6 +115,47 @@ function _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d,
                     n2d_fb = v_norm([e2d[1], -e2d[0]]),
                     n2d_use = (n2d_len < 1e-8) ? n2d_fb : (n2d / n2d_len),
                     d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0) + d_e,
+                    d2_use = (n2d_len < 1e-8) ? (v_dot(n2d_use, pts2d[k]) + d_f) : (d2 / n2d_len)
+                )
+                [n2d_use, d2_use]
+        ],
+        inset2d_raw = [
+            for (k = [0:1:n-1])
+                _ps_line2_intersect(
+                    lines[(k-1+n)%n][0], lines[(k-1+n)%n][1],
+                    lines[k][0], lines[k][1]
+                )
+        ],
+        inset2d = [
+            for (k = [0:1:n-1])
+                is_undef(inset2d_raw[k]) ? pts2d[k] : inset2d_raw[k]
+        ]
+    )
+    inset2d;
+
+// Same as _ps_face_inset_bisector_2d but uses per-edge d_e values.
+function _ps_face_inset_bisector_2d_edges(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
+    let(
+        n = len(f),
+        p0 = center - n_f * d_f,
+        lines = [
+            for (k = [0:1:n-1])
+                let(
+                    v0 = f[k],
+                    v1 = f[(k+1)%n],
+                    ei = ps_find_edge_index(edges, v0, v1),
+                    adj = edge_faces[ei],
+                    f_adj = (len(adj) < 2) ? fi : ((adj[0] == fi) ? adj[1] : adj[0]),
+                    n_adj = face_n[f_adj],
+                    n_edge_raw = n_f + n_adj,
+                    n_edge = (v_len(n_edge_raw) < 1e-8) ? n_f : v_norm(n_edge_raw),
+                    n2d = [v_dot(n_edge, ex), v_dot(n_edge, ey)],
+                    n2d_len = v_len(n2d),
+                    p1_2d = pts2d[(k+1)%n],
+                    e2d = [p1_2d[0]-pts2d[k][0], p1_2d[1]-pts2d[k][1]],
+                    n2d_fb = v_norm([e2d[1], -e2d[0]]),
+                    n2d_use = (n2d_len < 1e-8) ? n2d_fb : (n2d / n2d_len),
+                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0) + d_e_edges[k],
                     d2_use = (n2d_len < 1e-8) ? (v_dot(n2d_use, pts2d[k]) + d_f) : (d2 / n2d_len)
                 )
                 [n2d_use, d2_use]
@@ -665,6 +720,276 @@ function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
         cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+
+// Cantitruncation with per-face-family c values (indexed by face size).
+// c_by_size: list of [face_size, c] pairs; default_c used if size not found.
+function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_pair=undef, eps=1e-8, len_eps=1e-6) =
+    let(
+        t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
+        verts0 = poly_verts(poly),
+        faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
+        poly0 = make_poly(verts0, faces0, poly_e_over_ir(poly)),
+        edges = _ps_edges_from_faces(faces0),
+        edge_faces = ps_edge_faces_table(faces0, edges),
+        face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
+        ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
+        face_offsets = _ps_face_offsets(faces0),
+        // edge points (truncation-style): two per edge
+        edge_pts = [
+            for (ei = [0:1:len(edges)-1])
+                let(a = edges[ei][0], b = edges[ei][1], A = verts0[a], B = verts0[b])
+                [ A + t_eff * (B - A), B + t_eff * (A - B) ]
+        ],
+        face_sites = [
+            for (fi = [0:1:len(faces0)-1])
+                for (v = faces0[fi])
+                    [fi, v]
+        ],
+        face_pts3d = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    f = faces0[fi],
+                    n = len(f),
+                    c_face = _ps_map_face_c(n, c_by_size, default_c),
+                    d_f = -c_face * ir,
+                    n_f = face_n[fi],
+                    center = poly_face_center(poly, fi, 1),
+                    ex = poly_face_ex(poly, fi, 1),
+                    ey = poly_face_ey(poly, fi, 1),
+                    p0 = center - n_f * d_f,
+                    pts2d = [
+                        for (k = [0:1:n-1])
+                            let(p = verts0[f[k]] - center)
+                                [v_dot(p, ex), v_dot(p, ey)]
+                    ],
+                    d_e_edges = [
+                        for (k = [0:1:n-1])
+                            let(
+                                v0 = f[k],
+                                v1 = f[(k+1)%n],
+                                ei = ps_find_edge_index(edges, v0, v1),
+                                adj = edge_faces[ei],
+                                f_adj = (len(adj) < 2) ? fi : ((adj[0] == fi) ? adj[1] : adj[0]),
+                                c_edge = is_undef(c_edge_by_pair)
+                                    ? c_face
+                                    : _ps_map_edge_c(n, len(faces0[f_adj]), c_edge_by_pair, c_face)
+                            )
+                            c_edge * ir
+                    ],
+                    inset2d = _ps_face_inset_bisector_2d_edges(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
+                )
+                [
+                    for (k = [0:1:n-1])
+                        p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
+                ]
+        ],
+        face_edge_pts3d = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    f = faces0[fi],
+                    n = len(f),
+                    c_face = _ps_map_face_c(n, c_by_size, default_c),
+                    d_f = -c_face * ir,
+                    n_f = face_n[fi],
+                    center = poly_face_center(poly, fi, 1),
+                    p0 = center - n_f * d_f
+                )
+                [
+                    for (k = [0:1:n-1])
+                        let(
+                            v0 = f[k],
+                            v1 = f[(k+1)%n],
+                            p_pair = _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1),
+                            p0o = p_pair[0],
+                            p1o = p_pair[1]
+                        )
+                        each [p0o, p1o]
+                ]
+        ],
+        face_edge_offsets = _ps_face_edge_offsets(faces0),
+        face_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_pts3d[fi]) p ],
+        face_edge_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_edge_pts3d[fi]) p ],
+        edge_site_offset = 0,
+        face_site_offset = len(face_edge_pts_flat),
+        sites = concat(
+            [ for (i = [0:1:len(face_edge_pts_flat)-1]) [0, i] ],
+            face_sites
+        ),
+        site_points = concat(face_edge_pts_flat, face_pts_flat),
+        face_cycles = [
+            for (fi = [0:1:len(faces0)-1])
+                let(n = len(faces0[fi]), base = edge_site_offset + face_edge_offsets[fi])
+                [
+                    for (k = [0:1:n-1])
+                        let(
+                            s0 = _ps_face_edge_site(base, k, false),
+                            s1 = _ps_face_edge_site(base, k, true)
+                        )
+                        each [[1, s0], [1, s1]]
+                ]
+        ],
+        edge_cycles = [
+            for (ei = [0:1:len(edges)-1])
+                let(
+                    e = edges[ei],
+                    fpair = edge_faces[ei],
+                    f0 = fpair[0],
+                    f1 = fpair[1],
+                    v0 = e[0],
+                    v1 = e[1],
+                    b0 = edge_site_offset + face_edge_offsets[f0],
+                    b1 = edge_site_offset + face_edge_offsets[f1],
+                    s_pair0 = _ps_face_edge_sites_for_face_edge(faces0, f0, v0, v1, b0),
+                    s_pair1 = _ps_face_edge_sites_for_face_edge(faces0, f1, v1, v0, b1),
+                    s0 = s_pair0[0],
+                    s1 = s_pair0[1],
+                    s2 = s_pair1[0],
+                    s3 = s_pair1[1]
+                )
+                [
+                    [1, s0],
+                    [1, s1],
+                    [1, s2],
+                    [1, s3]
+                ]
+        ],
+        vert_cycles = [
+            for (vi = [0:1:len(verts0)-1])
+                let(fc = faces_around_vertex(poly0, vi, edges, edge_faces))
+                [
+                    for (fi = fc)
+                        let(
+                            f = faces0[fi],
+                            n = len(f),
+                            pos = _ps_index_of(f, vi),
+                            k_prev = (pos - 1 + n) % n,
+                            base = edge_site_offset + face_edge_offsets[fi],
+                            s_prev = _ps_face_edge_site(base, k_prev, true),
+                            s_next = _ps_face_edge_site(base, pos, false)
+                        )
+                        each [[1, s_prev], [1, s_next]]
+                ]
+        ],
+        cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
+    )
+    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+
+// Dominant-family trig solver (no grid search). Returns [t, c_by_size].
+function solve_cantitruncate_dominant(poly, dominant_size, edge_idx=undef) =
+    let(
+        verts = poly_verts(poly),
+        faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
+        sizes = [for (f = faces) len(f)],
+        dom_face_idx = [for (i = [0:1:len(faces)-1]) if (sizes[i] == dominant_size) i][0],
+        f = faces[dom_face_idx],
+        n = len(f),
+        v0 = f[0],
+        v_prev = f[(n-1)%n],
+        v_next = f[1],
+        a0 = v_norm(verts[v_prev] - verts[v0]),
+        a1 = v_norm(verts[v_next] - verts[v0]),
+        phi = acos(_ps_clamp(v_dot(a0, a1), -1, 1)),
+        t = 1 / (2 * (1 + sin(phi/2))),
+        edges = _ps_edges_from_faces(faces),
+        edge_faces = ps_edge_faces_table(faces, edges),
+        ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
+        a = norm(verts[v_next] - verts[v0]),
+        // compute target sums for each secondary family via edges with dominant
+        fam_sizes = _ps_sort([for (s = sizes) s]),
+        uniq_sizes = [for (i = [0:1:len(fam_sizes)-1]) if (i==0 || fam_sizes[i] != fam_sizes[i-1]) fam_sizes[i]],
+        other_sizes = [for (s = uniq_sizes) if (s != dominant_size) s],
+        targets = [
+            for (s = other_sizes)
+                let(
+                    edges_s = [
+                        for (ei = [0:1:len(edges)-1])
+                            let(
+                                fpair = edge_faces[ei],
+                                s0 = len(faces[fpair[0]]),
+                                s1 = len(faces[fpair[1]])
+                            )
+                            if ((s0 == dominant_size && s1 == s) || (s1 == dominant_size && s0 == s)) ei
+                    ],
+                    vals = [
+                        for (ei = edges_s)
+                            let(
+                                fpair = edge_faces[ei],
+                                n0 = ps_face_normal(verts, faces[fpair[0]]),
+                                n1 = ps_face_normal(verts, faces[fpair[1]]),
+                                alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1))
+                            )
+                            (1 - 2*t) * a / (2 * sin(alpha/2))
+                    ]
+                )
+                [s, (len(vals) == 0) ? undef : sum(vals)/len(vals)]
+        ],
+        // choose reference family (first with target) to set d_f_dom
+        has_other = (len(targets) > 0),
+        ref_idx = has_other ? [for (i = [0:1:len(targets)-1]) if (!is_undef(targets[i][1])) i][0] : undef,
+        ref_target = is_undef(ref_idx) ? undef : targets[ref_idx][1],
+        d_f_dom = is_undef(ref_target) ? 0 : (ref_target / 2),
+        c_by_size = concat(
+            [[dominant_size, abs(d_f_dom)/ir]],
+            [for (tgt = targets)
+                let(
+                    s = tgt[0],
+                    targ = tgt[1],
+                    d_f_s = is_undef(targ) ? d_f_dom : (targ - d_f_dom)
+                )
+                [s, abs(d_f_s)/ir]
+            ]
+        )
+    )
+    [t, c_by_size];
+
+// Build unique [a,b] pairs from a list of pairs (order is preserved).
+function _ps_unique_pairs(pairs, i=0, acc=[]) =
+    (i >= len(pairs)) ? acc
+  : let(
+        p = pairs[i],
+        has = (len([for (u = acc) if (u[0] == p[0] && u[1] == p[1]) 1]) > 0)
+    )
+    _ps_unique_pairs(pairs, i+1, has ? acc : concat(acc, [p]));
+
+// Dominant-family trig solver with per-edge-family c values.
+// Returns [t, c_by_size, c_edge_by_pair].
+function solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx=undef) =
+    let(
+        sol = solve_cantitruncate_dominant(poly, dominant_size, edge_idx),
+        t = sol[0],
+        c_by_size = sol[1],
+        verts = poly_verts(poly),
+        faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
+        edges = _ps_edges_from_faces(faces),
+        edge_faces = ps_edge_faces_table(faces, edges),
+        ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
+        edge_vals = [
+            for (ei = [0:1:len(edges)-1])
+                let(
+                    e = edges[ei],
+                    fpair = edge_faces[ei],
+                    s0 = len(faces[fpair[0]]),
+                    s1 = len(faces[fpair[1]]),
+                    a = min(s0, s1),
+                    b = max(s0, s1),
+                    n0 = ps_face_normal(verts, faces[fpair[0]]),
+                    n1 = ps_face_normal(verts, faces[fpair[1]]),
+                    alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1)),
+                    e_len = norm(verts[e[0]] - verts[e[1]]),
+                    d_e = (1 - 2*t) * e_len / (2 * sin(alpha/2))
+                )
+                [a, b, d_e]
+        ],
+        pair_keys = _ps_unique_pairs([for (v = edge_vals) [v[0], v[1]]]),
+        c_edge_by_pair = [
+            for (p = pair_keys)
+                let(
+                    vals = [for (v = edge_vals) if (v[0] == p[0] && v[1] == p[1]) v[2]]
+                )
+                [p[0], p[1], (len(vals) == 0) ? 0 : (sum(vals) / len(vals)) / ir]
+        ]
+    )
+    [t, c_by_size, c_edge_by_pair];
 
 // Measure how square an edge face is (edge length spread).
 function _ps_face_edge_spread(verts, face) =
