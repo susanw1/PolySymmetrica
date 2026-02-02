@@ -30,6 +30,21 @@ function _ps_face_points_to_indices(uniq, face_pts, eps) =
 function _ps_poly_from_face_points(faces_pts_all, eps, len_eps=undef) =
     let(
         len_eps_eff = is_undef(len_eps) ? eps : len_eps,
+        bad_pts = [
+            for (fi = [0:1:len(faces_pts_all)-1])
+                for (pi = [0:1:len(faces_pts_all[fi])-1])
+                    let(p = faces_pts_all[fi][pi])
+                    if (
+                        is_undef(p) ||
+                        (len(p) < 3) ||
+                        (sum([for (c = p) is_undef(c) ? 1 : 0]) > 0)
+                    )
+                    [fi, pi, p]
+        ],
+        _ = assert(
+            len(bad_pts) == 0,
+            str("transform: undef point at face ", bad_pts[0][0], " idx ", bad_pts[0][1], " p=", bad_pts[0][2])
+        ),
         all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
         uniq_verts = _ps_unique_points(all_pts, len_eps_eff),
         faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps_eff) ],
@@ -52,6 +67,25 @@ function ps_poly_transform_from_sites(verts0, sites, site_points, face_cycles, e
         faces_pts_all = [
             for (cy = face_cycles)
                 [ for (c = cy) (c[0] == 0) ? verts0[c[1]] : site_points[c[1]] ]
-        ]
+        ],
+        bad_cycles = [
+            for (cyi = [0:1:len(face_cycles)-1])
+                for (ci = [0:1:len(face_cycles[cyi])-1])
+                    let(
+                        c = face_cycles[cyi][ci],
+                        p = (c[0] == 0) ? verts0[c[1]] : site_points[c[1]]
+                    )
+                    if (
+                        is_undef(p) ||
+                        (len(p) < 3) ||
+                        (sum([for (v = p) is_undef(v) ? 1 : 0]) > 0)
+                    )
+                    [cyi, ci, c, p]
+        ],
+        _ = assert(
+            len(bad_cycles) == 0,
+            str("transform: bad cycle point at face_cycle ", bad_cycles[0][0],
+                " idx ", bad_cycles[0][1], " c=", bad_cycles[0][2], " p=", bad_cycles[0][3])
+        )
     )
     _ps_poly_from_face_points(faces_pts_all, eps, len_eps);

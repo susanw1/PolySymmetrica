@@ -7,8 +7,8 @@ T = 0.01;
 
 COLORS = [ "", "", "", "yellow", "red", "green", "blue", "gray", "red", "white", "red" ];
 
-module demo(p, ir = IR) {
-    poly_describe(p, detail = 0);
+module demo(p, ir = IR, detail = 0) {
+    poly_describe(p, detail = detail);
     place_on_faces(p, ir) {
         let (col = COLORS[$ps_vertex_count]) {
             color(col) {

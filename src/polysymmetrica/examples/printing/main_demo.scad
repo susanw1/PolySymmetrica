@@ -5,6 +5,7 @@ use <../../core/truncation.scad>
 use <../../core/render.scad>
 
 use <../../models/regular_all.scad>
+use <../../models/archimedians_all.scad>
 
 use <edge_seg.scad>
 use <face_plate.scad>
@@ -15,7 +16,9 @@ IR = 20 * SC;
 //p = (tetrahedron());
 //p = poly_truncate(octahedron());
 //p = (dodecahedron());
-p = (poly_truncate(icosahedron()));
+base = icosahedron();
+sol = solve_cantitruncate_trig(base);
+p = poly_dual(poly_cantitruncate(base, sol[0], sol[1]));
 
 EDGE_T = 3.5 * SC;
 FACE_T = 1.6 * SC;
@@ -24,7 +27,6 @@ INSET = 1.1 * SC;
 FACET_BASE_T = 1;
 FACET_BASE_W = 2.2;
 BASE_Z = -FACE_T / 4;
-
 
 /**
 * Generate skeletal frame:

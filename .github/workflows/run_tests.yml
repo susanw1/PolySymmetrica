@@ -40,4 +40,6 @@ jobs:
           openscad-nightly -o main_trunc.png src/polysymmetrica/examples/truncation/main_trunc.scad
           openscad-nightly -o main_hypertrunc.png src/polysymmetrica/examples/truncation/main_hypertrunc.scad
           openscad-nightly -o main_cant.png src/polysymmetrica/examples/truncation/main_cant.scad
-          
+          openscad-nightly -o main_chamfer.png src/polysymmetrica/examples/truncation/main_chamfer.scad
+          openscad-nightly -o main_cantitruncate.png src/polysymmetrica/examples/truncation/main_cantitruncate.scad
+          ls -l

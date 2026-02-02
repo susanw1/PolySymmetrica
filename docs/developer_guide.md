@@ -71,6 +71,8 @@ PolySymmetrica/
 │
 └─ docs/
     ├─ developer_guide.md
+    ├─ cantitruncation.md
+    ├─ cantellation.md
     └─ diagrams/
 ```
 
@@ -170,6 +172,14 @@ PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 | `$ps_poly_center_local`         |   ✅  |   ✅   |   ✅  | Polyhedral centre vector expressed in the current local coord frame (Faces/Edges/Verts). For vertices: `[0,0,-$ps_vert_radius]` by construction                |
 
 These make the system extremely expressive.
+
+### **3.4 Cantitruncation Notes**
+
+See `docs/cantitruncation.md` for current parameterization, trig solver, and dominant‑family notes.
+
+### **3.5 Cantellation Notes**
+
+See `docs/cantellation.md` for current parameterization, helpers, and planarity notes.
 
 #### Naming conventions for `$ps_*` variables
 

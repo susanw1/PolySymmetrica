@@ -233,6 +233,25 @@ function _ps_solve3(m, b, eps=1e-12) =
         _ps_det3(_ps_replace_col(m, 2, b)) / det
     ];
 
+///////////////////////////////////////
+// ---- Prefix offsets / face offsets ----
+// Prefix offsets for a list of counts: [0, c0, c0+c1, ...]
+function _ps_prefix_offsets(counts, acc=[]) =
+    (len(counts) == 0) ? acc :
+    let(last = (len(acc) == 0) ? 0 : acc[len(acc)-1])
+    _ps_prefix_offsets(
+        [for (i = [1:1:len(counts)-1]) counts[i]],
+        concat(acc, [last + counts[0]])
+    );
+
+function _ps_face_offsets(faces) =
+    let(counts = [for (f = faces) len(f)])
+    _ps_prefix_offsets(counts, [0]);
+
+function _ps_face_edge_offsets(faces) =
+    let(counts = [for (f = faces) 2 * len(f)])
+    _ps_prefix_offsets(counts, [0]);
+
 
 ///////////////////////////////////////
 // ---- Polygon helpers ----

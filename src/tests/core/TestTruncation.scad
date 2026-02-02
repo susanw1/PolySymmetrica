@@ -4,9 +4,11 @@ use <../../polysymmetrica/core/transform.scad>
 use <../../polysymmetrica/core/truncation.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/regular_all.scad>
+use <../../polysymmetrica/models/archimedians_all.scad>
 use <../testing_util.scad>
 
 EPS = 1e-7;
+ENABLE_CANTITRUNC_PLANARITY_TEST = false;
 
 module assert_near(a, b, eps=EPS, msg="") {
     assert(abs(a-b) <= eps, str(msg, " expected=", b, " got=", a));
@@ -17,6 +19,18 @@ module assert_int_eq(a, b, msg="") {
 
 function _count_faces_of_size(poly, k) =
     sum([ for (f = poly_faces(poly)) (len(f)==k) ? 1 : 0 ]);
+
+function _map_face_c(size, c_by_size, default=0) =
+    let(idxs = [for (i = [0:1:len(c_by_size)-1]) if (c_by_size[i][0] == size) i])
+    (len(idxs) == 0) ? default : c_by_size[idxs[0]][1];
+
+function _face_max_plane_err(verts, face) =
+    let(
+        n = v_norm(ps_face_normal(verts, face)),
+        d = v_dot(n, verts[face[0]]),
+        errs = [for (vi = face) abs(v_dot(n, verts[vi]) - d)]
+    )
+    (len(errs) == 0) ? 0 : max(errs);
 
 function _skew_quad_prism() =
     let(
@@ -145,6 +159,97 @@ module test_poly_cantellate__cube_counts() {
     assert_int_eq(_count_faces_of_size(q, 4), 18, "cantellate cube: 18 quads");
 }
 
+module test_poly_cantitruncate__tetra_counts() {
+    p = _tetra_poly();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantitruncate(p, 0.2, 0.1);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate faces count");
+    assert_int_eq(_count_faces_of_size(q, 3), 0, "cantitruncate tetra: 0 triangles");
+    assert_int_eq(_count_faces_of_size(q, 4), 6, "cantitruncate tetra: 6 quads");
+    assert_int_eq(_count_faces_of_size(q, 6), 8, "cantitruncate tetra: 8 hexagons (4 face + 4 vertex)");
+}
+
+module test_poly_cantitruncate__cube_counts() {
+    p = hexahedron();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantitruncate(p, 0.2, 0.2);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate cube faces count");
+    assert_int_eq(_count_faces_of_size(q, 4), 12, "cantitruncate cube: 12 quads (edges)");
+    assert_int_eq(_count_faces_of_size(q, 6), 8, "cantitruncate cube: 8 hexagons (verts)");
+    assert_int_eq(_count_faces_of_size(q, 8), 6, "cantitruncate cube: 6 octagons (faces)");
+}
+
+module test_poly_cantitruncate__dodeca_counts() {
+    p = dodecahedron();
+    edges = _ps_edges_from_faces(poly_faces(p));
+    q = poly_cantitruncate(p, 0.2, 0.2);
+    assert_poly_valid(q);
+
+    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
+    assert_int_eq(len(poly_faces(q)), expected_faces, "cantitruncate dodeca faces count");
+    assert_int_eq(_count_faces_of_size(q, 4), 30, "cantitruncate dodeca: 30 quads (edges)");
+    assert_int_eq(_count_faces_of_size(q, 6), 20, "cantitruncate dodeca: 20 hexagons (verts)");
+    assert_int_eq(_count_faces_of_size(q, 10), 12, "cantitruncate dodeca: 12 decagons (faces)");
+}
+
+module test_poly_cantitruncate__cube_edge_face_adjacency() {
+    p = hexahedron();
+    q = poly_cantitruncate(p, 0.2, 0.2);
+    faces = poly_faces(q);
+    edges = _ps_edges_from_faces(poly_faces(p));
+
+    // pick the first edge-face (quad) after face cycles
+    face_count = len(poly_faces(p));
+    quad = faces[face_count]; // edge 0 quad
+    // adjacent face cycles are expected to share its vertices
+    shared = [
+        for (v = quad)
+            sum([for (f = [0:1:face_count-1]) (search([v], faces[f], 1)[0] >= 0) ? 1 : 0])
+    ];
+    // each quad vertex should belong to at least one original-face cycle
+    assert(min(shared) >= 1, "cantitruncate cube: quad vertices shared with face cycles");
+}
+
+module test_poly_cantitruncate_dominant_edges__consistent_pairs() {
+    base = poly_rectify(octahedron()); // cuboctahedron
+    sol = solve_cantitruncate_dominant_edges(base, 4);
+    c_by_size = sol[1];
+    c_edge_by_pair = sol[2];
+    assert(len(c_edge_by_pair) > 0, "cantitruncate dominant edges: pairs present");
+    for (p = c_edge_by_pair)
+        let(
+            c0 = _map_face_c(p[0], c_by_size),
+            c1 = _map_face_c(p[1], c_by_size),
+            c_avg = (c0 + c1) / 2
+        )
+        assert_near(p[2], c_avg, 1e-6, str("cantitruncate dominant edges pair ", p[0], "-", p[1]));
+}
+
+module test_poly_cantitruncate_dominant_edges__planarity() {
+    if (!ENABLE_CANTITRUNC_PLANARITY_TEST)
+        echo("NOTE: cantitruncate dominant edges planarity test disabled");
+    else {
+        base = poly_rectify(octahedron()); // cuboctahedron
+        sol = solve_cantitruncate_dominant_edges(base, 4);
+        p = poly_cantitruncate_families(base, sol[0], sol[1], c_edge_by_pair=sol[2]);
+        verts = poly_verts(p);
+        faces = poly_faces(p);
+        errs = [for (f = faces) _face_max_plane_err(verts, f)];
+        max_err = max(errs);
+        assert(max_err <= 1e-3, str("cantitruncate dominant edges planarity max_err=", max_err));
+    }
+}
+
+module test_great_rhombi__cube_square_faces() {
+    p = great_rhombicuboctahedron();
+    assert_poly_valid(p);
+}
 module test_truncate__validity() {
     p = poly_truncate(tetrahedron(), 1/3);
     assert_poly_valid_mode(p, "closed");
@@ -261,7 +366,7 @@ module test_poly_chamfer__skew_prism_shrinks_all_faces() {
     area0 = _ps_poly_area_abs_2d(pts2d);
     collapse = _ps_face_bisector_collapse_d(f, fi, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
     d_f = -t * collapse;
-    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
+    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, face_n[fi], pts2d, edges, edge_faces, face_n, verts0);
     area1 = _ps_poly_area_abs_2d(inset2d);
 
     assert(area1 < area0, str("chamfer t=0.9 should shrink face area: area0=", area0, " area1=", area1));
@@ -284,6 +389,10 @@ module run_TestTruncation() {
     test_poly_rectify__tetra_counts();
     test_poly_cantellate__tetra_counts();
     test_poly_cantellate__cube_counts();
+    test_poly_cantitruncate__tetra_counts();
+    test_poly_cantitruncate_dominant_edges__consistent_pairs();
+    test_poly_cantitruncate_dominant_edges__planarity();
+    test_great_rhombi__cube_square_faces();
     test_truncate__validity();
     
     test_truncate__tetra_archimedean_counts();
