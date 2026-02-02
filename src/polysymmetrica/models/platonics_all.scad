@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 /**
-This is a handy utility file to pull in all 5 simple regular polyhedral definitions, including named functions for dodecahedron and hexahedron (cube).
+This is a handy utility file to pull in all 5 Platonic solid definitions, including named functions for dodecahedron and hexahedron (cube).
 */
 
 include <tetrahedron.scad>
@@ -14,4 +14,3 @@ include <icosahedron.scad>
 
 include <hexahedron.scad>
 include <dodecahedron.scad>
-

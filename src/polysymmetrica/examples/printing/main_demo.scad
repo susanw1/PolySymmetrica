@@ -4,7 +4,7 @@ use <../../core/duals.scad>
 use <../../core/truncation.scad>
 use <../../core/render.scad>
 
-use <../../models/regular_all.scad>
+use <../../models/platonics_all.scad>
 use <../../models/archimedians_all.scad>
 
 use <edge_seg.scad>
@@ -17,8 +17,9 @@ IR = 20 * SC;
 //p = poly_truncate(octahedron());
 //p = (dodecahedron());
 base = icosahedron();
-sol = solve_cantitruncate_trig(base);
-p = poly_dual(poly_cantitruncate(base, sol[0], sol[1]));
+//sol = solve_cantitruncate_trig(base);
+//s = poly_cantellate_norm(base, 0.5);
+p = poly_dual(poly_cantellate_norm(base, 0.5));
 
 EDGE_T = 3.5 * SC;
 FACE_T = 1.6 * SC;

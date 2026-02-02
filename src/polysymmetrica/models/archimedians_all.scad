@@ -1,5 +1,5 @@
 use <../core/truncation.scad>
-use <../models/regular_all.scad>
+use <../models/platonics_all.scad>
 
 // Great rhombi* via cantitruncate uniform solver (fast, edge-face metrics only)
 function great_rhombicuboctahedron() =
