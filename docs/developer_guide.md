@@ -72,6 +72,7 @@ PolySymmetrica/
 └─ docs/
     ├─ developer_guide.md
     ├─ cantitruncation.md
+    ├─ cantellation.md
     └─ diagrams/
 ```
 
@@ -175,6 +176,10 @@ These make the system extremely expressive.
 ### **3.4 Cantitruncation Notes**
 
 See `docs/cantitruncation.md` for current parameterization, trig solver, and dominant‑family notes.
+
+### **3.5 Cantellation Notes**
+
+See `docs/cantellation.md` for current parameterization, helpers, and planarity notes.
 
 #### Naming conventions for `$ps_*` variables
 
