@@ -7,6 +7,7 @@
 use <funcs.scad>
 use <duals.scad>  // for faces_around_vertex helpers
 use <transform.scad>
+use <transform_util.scad>
 
 // --- internal helpers ---
 
@@ -23,32 +24,7 @@ function _ps_face_has_dir(f, v0, v1) =
     let(pos = _ps_index_of(f, v0))
     (pos >= 0) ? (f[(pos+1)%len(f)] == v1) : false;
 
-// Index k where edge f[k]->f[k+1] matches (v0->v1), or -1 if not found.
-function _ps_face_edge_index(f, v0, v1) =
-    let(
-        n = len(f),
-        hits = [for (k = [0:1:n-1]) if (f[k] == v0 && f[(k+1)%n] == v1) k]
-    )
-    (len(hits) == 0) ? -1 : hits[0];
-
 function _ps_clamp(x, lo, hi) = (x < lo) ? lo : (x > hi) ? hi : x;
-
-function _ps_face_edge_site(base, k, near_next=false) =
-    base + 2*k + (near_next ? 1 : 0);
-
-// Return [s_near_v0, s_near_v1] for edge (v0,v1) on face fidx.
-function _ps_face_edge_sites_for_face_edge(faces, fidx, v0, v1, base) =
-    let(
-        f = faces[fidx],
-        k_dir = _ps_face_edge_index(f, v0, v1),
-        k = (k_dir >= 0) ? k_dir : _ps_face_edge_index(f, v1, v0),
-        flip = (k_dir < 0)
-    )
-    assert(k >= 0, "cantitruncate: edge not found in face")
-    [
-        flip ? _ps_face_edge_site(base, k, true) : _ps_face_edge_site(base, k, false),
-        flip ? _ps_face_edge_site(base, k, false) : _ps_face_edge_site(base, k, true)
-    ];
 
 // Project edge points to face plane and order along face edge direction.
 function _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1) =
@@ -66,90 +42,6 @@ function _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0
         flip = v_dot((proj1 - proj0), e_dir) < 0
     )
     [flip ? proj1 : proj0, flip ? proj0 : proj1];
-
-// Common poly prep: oriented faces, edges, edge->faces, normals, poly0.
-function _ps_poly_base(poly) =
-    let(
-        verts0 = poly_verts(poly),
-        faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
-        edges = _ps_edges_from_faces(faces0),
-        edge_faces = ps_edge_faces_table(faces0, edges),
-        face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
-        poly0 = make_poly(verts0, faces0, poly_e_over_ir(poly))
-    )
-    [verts0, faces0, edges, edge_faces, face_n, poly0];
-
-// Edge points: two per edge, located at fraction t along each edge.
-function _ps_edge_points(verts0, edges, t) =
-    [
-        for (ei = [0:1:len(edges)-1])
-            let(
-                a = edges[ei][0],
-                b = edges[ei][1],
-                A = verts0[a],
-                B = verts0[b]
-            )
-            [ A + t * (B - A), B + t * (A - B) ]
-    ];
-
-// Face cycles from face-edge sites (2n-gons).
-function _ps_face_cycles_from_face_edge_sites(faces0, face_edge_offsets) =
-    [
-        for (fi = [0:1:len(faces0)-1])
-            let(n = len(faces0[fi]), base = face_edge_offsets[fi])
-            [
-                for (k = [0:1:n-1])
-                    let(
-                        s0 = _ps_face_edge_site(base, k, false),
-                        s1 = _ps_face_edge_site(base, k, true)
-                    )
-                    each [[1, s0], [1, s1]]
-            ]
-    ];
-
-// Edge cycles from face-edge sites (quads).
-function _ps_edge_cycles_from_face_edge_sites(faces0, edges, edge_faces, face_edge_offsets) =
-    [
-        for (ei = [0:1:len(edges)-1])
-            let(
-                e = edges[ei],
-                fpair = edge_faces[ei],
-                f0 = fpair[0],
-                f1 = fpair[1],
-                v0 = e[0],
-                v1 = e[1],
-                b0 = face_edge_offsets[f0],
-                b1 = face_edge_offsets[f1],
-                s_pair0 = _ps_face_edge_sites_for_face_edge(faces0, f0, v0, v1, b0),
-                s_pair1 = _ps_face_edge_sites_for_face_edge(faces0, f1, v1, v0, b1)
-            )
-            [
-                [1, s_pair0[0]],
-                [1, s_pair0[1]],
-                [1, s_pair1[0]],
-                [1, s_pair1[1]]
-            ]
-    ];
-
-// Vertex cycles from face-edge sites (2*valence-gons).
-function _ps_vert_cycles_from_face_edge_sites(verts0, faces0, edges, edge_faces, face_edge_offsets, poly0) =
-    [
-        for (vi = [0:1:len(verts0)-1])
-            let(fc = faces_around_vertex(poly0, vi, edges, edge_faces))
-            [
-                for (fi = fc)
-                    let(
-                        f = faces0[fi],
-                        n = len(f),
-                        pos = _ps_index_of(f, vi),
-                        k_prev = (pos - 1 + n) % n,
-                        base = face_edge_offsets[fi],
-                        s_prev = _ps_face_edge_site(base, k_prev, true),
-                        s_next = _ps_face_edge_site(base, pos, false)
-                    )
-                    each [[1, s_prev], [1, s_next]]
-            ]
-    ];
 
 function _ps_map_face_c(face_len, c_by_size, default_c=0) =
     let(
@@ -177,10 +69,14 @@ function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
 
 // Inset polygon vertices using bisector-plane intersection lines per edge.
 // d_f shifts the face plane; d_e shifts the edge-bisector planes along their normals.
+// Inset polygon vertices using bisector-plane intersection lines per edge.
+// d_e may be a single value or a per-edge list (length n). Per-edge values
+// allow mixed-family cantitruncation to bias individual edge planes.
 function _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
     let(
         n = len(f),
         p0 = center - n_f * d_f,
+        d_e_list = (is_list(d_e) ? d_e : [for (_ = [0:1:n-1]) d_e]),
         lines = [
             for (k = [0:1:n-1])
                 let(
@@ -198,48 +94,7 @@ function _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d,
                     e2d = [p1_2d[0]-pts2d[k][0], p1_2d[1]-pts2d[k][1]],
                     n2d_fb = v_norm([e2d[1], -e2d[0]]),
                     n2d_use = (n2d_len < 1e-8) ? n2d_fb : (n2d / n2d_len),
-                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0) + d_e,
-                    d2_use = (n2d_len < 1e-8) ? (v_dot(n2d_use, pts2d[k]) + d_f) : (d2 / n2d_len)
-                )
-                [n2d_use, d2_use]
-        ],
-        inset2d_raw = [
-            for (k = [0:1:n-1])
-                _ps_line2_intersect(
-                    lines[(k-1+n)%n][0], lines[(k-1+n)%n][1],
-                    lines[k][0], lines[k][1]
-                )
-        ],
-        inset2d = [
-            for (k = [0:1:n-1])
-                is_undef(inset2d_raw[k]) ? pts2d[k] : inset2d_raw[k]
-        ]
-    )
-    inset2d;
-
-// Same as _ps_face_inset_bisector_2d but uses per-edge d_e values.
-function _ps_face_inset_bisector_2d_edges(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
-    let(
-        n = len(f),
-        p0 = center - n_f * d_f,
-        lines = [
-            for (k = [0:1:n-1])
-                let(
-                    v0 = f[k],
-                    v1 = f[(k+1)%n],
-                    ei = ps_find_edge_index(edges, v0, v1),
-                    adj = edge_faces[ei],
-                    f_adj = (len(adj) < 2) ? fi : ((adj[0] == fi) ? adj[1] : adj[0]),
-                    n_adj = face_n[f_adj],
-                    n_edge_raw = n_f + n_adj,
-                    n_edge = (v_len(n_edge_raw) < 1e-8) ? n_f : v_norm(n_edge_raw),
-                    n2d = [v_dot(n_edge, ex), v_dot(n_edge, ey)],
-                    n2d_len = v_len(n2d),
-                    p1_2d = pts2d[(k+1)%n],
-                    e2d = [p1_2d[0]-pts2d[k][0], p1_2d[1]-pts2d[k][1]],
-                    n2d_fb = v_norm([e2d[1], -e2d[0]]),
-                    n2d_use = (n2d_len < 1e-8) ? n2d_fb : (n2d / n2d_len),
-                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0) + d_e_edges[k],
+                    d2 = v_dot(n_edge, verts0[v0]) - v_dot(n_edge, p0) + d_e_list[k],
                     d2_use = (n2d_len < 1e-8) ? (v_dot(n2d_use, pts2d[k]) + d_f) : (d2 / n2d_len)
                 )
                 [n2d_use, d2_use]
@@ -816,7 +671,7 @@ function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_
                             )
                             c_edge * ir
                     ],
-                    inset2d = _ps_face_inset_bisector_2d_edges(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
+                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
                 )
                 [
                     for (k = [0:1:n-1])

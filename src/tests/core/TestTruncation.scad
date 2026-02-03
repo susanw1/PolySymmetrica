@@ -372,6 +372,38 @@ module test_poly_chamfer__skew_prism_shrinks_all_faces() {
     assert(area1 < area0, str("chamfer t=0.9 should shrink face area: area0=", area0, " area1=", area1));
 }
 
+module test__ps_face_inset_bisector_2d__list_matches_scalar() {
+    p = hexahedron();
+    verts0 = poly_verts(p);
+    faces0 = ps_orient_all_faces_outward(verts0, poly_faces(p));
+    edges = _ps_edges_from_faces(faces0);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [ for (f = faces0) ps_face_normal(verts0, f) ];
+
+    fi = 0;
+    f = faces0[fi];
+    n = len(f);
+    n_f = face_n[fi];
+    center = poly_face_center(p, fi, 1);
+    ex = poly_face_ex(p, fi, 1);
+    ey = poly_face_ey(p, fi, 1);
+    pts2d = [
+        for (k = [0:1:n-1])
+            let(v = verts0[f[k]] - center)
+                [v_dot(v, ex), v_dot(v, ey)]
+    ];
+
+    d_f = 0.1;
+    d_e = 0.2;
+    inset_scalar = _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0);
+    inset_list = _ps_face_inset_bisector_2d(f, fi, d_f, [for (_ = [0:1:n-1]) d_e], center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0);
+
+    for (k = [0:1:n-1]) {
+        assert_near(inset_list[k][0], inset_scalar[k][0], 1e-8, str("inset list x match ", k));
+        assert_near(inset_list[k][1], inset_scalar[k][1], 1e-8, str("inset list y match ", k));
+    }
+}
+
 
 
 // suite
@@ -403,6 +435,7 @@ module run_TestTruncation() {
     test_poly_chamfer__positive_t_inward();
     test_poly_chamfer__tetra_changes_geom();
     test_poly_chamfer__skew_prism_shrinks_all_faces();
+    test__ps_face_inset_bisector_2d__list_matches_scalar();
 }
 
 run_TestTruncation();
