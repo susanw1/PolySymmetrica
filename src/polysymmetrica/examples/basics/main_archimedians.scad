@@ -4,21 +4,7 @@ use <../truncation/util_demo.scad>
 
 // Render all Archimedean solids (snubs are stubs).
 
-archimedians = [
-    ["truncated_tetrahedron", truncated_tetrahedron()],
-    ["truncated_cube", truncated_cube()],
-    ["truncated_octahedron", truncated_octahedron()],
-    ["truncated_dodecahedron", truncated_dodecahedron()],
-    ["truncated_icosahedron", truncated_icosahedron()],
-    ["cuboctahedron", cuboctahedron()],
-    ["icosidodecahedron", icosidodecahedron()],
-    ["rhombicuboctahedron", rhombicuboctahedron()],
-    ["rhombicosidodecahedron", rhombicosidodecahedron()],
-    ["great_rhombicuboctahedron", great_rhombicuboctahedron()],
-    ["great_rhombicosidodecahedron", great_rhombicosidodecahedron()],
-    ["snub_cube", snub_cube()],
-    ["snub_dodecahedron", snub_dodecahedron()]
-];
+archimedians = archimedians_all();
 
 spacing = 120;
 label_height = 1;

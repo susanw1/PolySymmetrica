@@ -5,20 +5,20 @@ use <../truncation/util_demo.scad>
 
 // Archimedean + combo + Catalan display
 
+archs = archimedians_all();
+cats = catalans_all();
+
 rows = [
-    ["truncated_tetrahedron", truncated_tetrahedron(), "triakis_tetrahedron", triakis_tetrahedron()],
-    ["truncated_cube", truncated_cube(), "triakis_octahedron", triakis_octahedron()],
-    ["truncated_octahedron", truncated_octahedron(), "tetrakis_hexahedron", tetrakis_hexahedron()],
-    ["truncated_dodecahedron", truncated_dodecahedron(), "triakis_icosahedron", triakis_icosahedron()],
-    ["truncated_icosahedron", truncated_icosahedron(), "pentakis_dodecahedron", pentakis_dodecahedron()],
-    ["cuboctahedron", cuboctahedron(), "rhombic_dodecahedron", rhombic_dodecahedron()],
-    ["icosidodecahedron", icosidodecahedron(), "rhombic_triacontahedron", rhombic_triacontahedron()],
-    ["rhombicuboctahedron", rhombicuboctahedron(), "deltoidal_icositetrahedron", deltoidal_icositetrahedron()],
-    ["rhombicosidodecahedron", rhombicosidodecahedron(), "deltoidal_hexecontahedron", deltoidal_hexecontahedron()],
-    ["great_rhombicuboctahedron", great_rhombicuboctahedron(), "disdyakis_dodecahedron", disdyakis_dodecahedron()],
-    ["great_rhombicosidodecahedron", great_rhombicosidodecahedron(), "disdyakis_triacontahedron", disdyakis_triacontahedron()],
-    ["snub_cube", snub_cube(), "pentagonal_icositetrahedron", pentagonal_icositetrahedron()],
-    ["snub_dodecahedron", snub_dodecahedron(), "pentagonal_hexecontahedron", pentagonal_hexecontahedron()]
+    for (a = archs)
+        let(
+            name = a[0],
+            p = a[1],
+            d_map = archimedean_to_catalan_name(name),
+            d_idx = [for (i = [0:1:len(cats)-1]) if (cats[i][0] == d_map) i][0],
+            d_name = is_undef(d_idx) ? str(name, "_dual") : cats[d_idx][0],
+            d = is_undef(d_idx) ? undef : cats[d_idx][1]
+        )
+        [name, p, d_name, d]
 ];
 
 spacing_x = 140;
