@@ -2,7 +2,7 @@ use <../../core/duals.scad>
 use <../../core/truncation.scad>
 use <../../core/render.scad>
 
-use <../../models/regular_all.scad>
+use <../../models/platonics_all.scad>
 
 use <util_demo.scad>
 

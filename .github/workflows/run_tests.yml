@@ -37,9 +37,10 @@ jobs:
           openscad -o passed.stl  src/tests/run_all.scad
           openscad-nightly --version
           openscad-nightly -o passed.stl  src/tests/run_all.scad
-          openscad-nightly -o main_trunc.png src/polysymmetrica/examples/truncation/main_trunc.scad
-          openscad-nightly -o main_hypertrunc.png src/polysymmetrica/examples/truncation/main_hypertrunc.scad
-          openscad-nightly -o main_cant.png src/polysymmetrica/examples/truncation/main_cant.scad
-          openscad-nightly -o main_chamfer.png src/polysymmetrica/examples/truncation/main_chamfer.scad
-          openscad-nightly -o main_cantitruncate.png src/polysymmetrica/examples/truncation/main_cantitruncate.scad
-          ls -l
+
+          mkdir -p target/
+          for f in src/polysymmetrica/examples/{basics,truncation}/main_*.scad ; do
+            echo "Executing $f at $(date)"
+            openscad-nightly -o target/$(basename -s .scad "$f").png "$f"
+          done
+          ls -l target/

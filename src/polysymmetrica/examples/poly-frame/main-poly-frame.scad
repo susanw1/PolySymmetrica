@@ -4,7 +4,7 @@
 // Copyright 2025 Susan Witts
 // SPDX-License-Identifier: MIT
 
-use <../../models/regular_all.scad>
+use <../../models/platonics_all.scad>
 use <edge-mount.scad>
 
 

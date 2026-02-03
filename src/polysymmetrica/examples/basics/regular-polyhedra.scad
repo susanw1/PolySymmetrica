@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use <../../core/placement.scad>
-use <../../models/regular_all.scad>
+use <../../models/platonics_all.scad>
 
 
 /**

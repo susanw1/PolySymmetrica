@@ -1,7 +1,7 @@
 use <../polysymmetrica/core/funcs.scad>
 use <../polysymmetrica/core/placement.scad>
 
-use <../polysymmetrica/models/regular_all.scad>
+use <../polysymmetrica/models/platonics_all.scad>
 
 
 // Demo: draw neighbor-direction spikes around each vertex
