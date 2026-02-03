@@ -267,11 +267,12 @@ function poly_truncate(poly, t=undef, c=undef, eps = 1e-8) =
 // Rectification: replace each vertex with the midpoint of each incident edge.
 function poly_rectify(poly) =
     let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly),
-        faces0 = ps_orient_all_faces_outward(verts, faces),
-        poly0 = make_poly(verts, faces0, poly_e_over_ir(poly)),
-        edges = _ps_edges_from_faces(faces0),
+        base = _ps_poly_base(poly),
+        verts = base[0],
+        faces0 = base[1],
+        edges = base[2],
+        edge_faces = base[3],
+        poly0 = base[5],
 
         edge_mid = [
             for (e = edges)
@@ -294,7 +295,6 @@ function poly_rectify(poly) =
         ],
 
         // Faces corresponding to original vertices: cycle around the vertex.
-        edge_faces = ps_edge_faces_table(faces0, edges),
         vert_faces = [
             for (vi = [0:1:len(verts)-1])
                 let(
