@@ -247,8 +247,15 @@ function _ps_index_of_min(list) =
 
 // --- main truncation ---
 
-function poly_truncate(poly, t, eps = 1e-8) =
-    let(t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t)
+function _ps_truncate_norm_to_t(poly, c) =
+    _ps_truncate_default_t(poly) * c;
+
+function poly_truncate(poly, t=undef, c=undef, eps = 1e-8) =
+    let(
+        t_eff = !is_undef(t)
+            ? t
+            : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly))
+    )
     // should this assert? Or should we allow, or silently call rectify?
     assert(t_eff != 0.5, "'t' cannot be 0.5 as this produces degenerate vertices - use poly_rectify() instead")
     (t_eff == 0) 
@@ -409,7 +416,28 @@ function _ps_face_offset_pts(verts0, faces0, face_n, df) =
             ]
     ];
 
-function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
+function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_idx=0) =
+    let(
+        verts = poly_verts(poly),
+        edges = _ps_edges_from_faces(poly_faces(poly)),
+        e0 = edges[0],
+        edge_len = norm(verts[e0[1]] - verts[e0[0]]),
+        ir = edge_len / poly_e_over_ir(poly),
+        df_max_eff = is_undef(df_max) ? (2 * ir) : df_max,
+        df_mid = cantellate_square_df(poly, 0, df_max_eff, steps, family_edge_idx),
+        df = (c <= 0.5)
+            ? (2 * c * df_mid)
+            : (df_mid + (c - 0.5) * 2 * (df_max_eff - df_mid))
+    )
+    df;
+
+function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6) =
+    let(
+        df_eff = !is_undef(df)
+            ? df
+            : (!is_undef(c) ? _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx)
+                            : _ps_cantellate_df_from_c(poly, 0.5, df_max, steps, family_edge_idx))
+    )
     let(
         verts0 = poly_verts(poly),
         faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
@@ -419,7 +447,7 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
 
         face_n = [ for (f = faces0) ps_face_normal(verts0, f) ],
         // offset face corners: one point per (face, vertex) incidence
-        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df),
+        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df_eff),
         face_offsets = _ps_face_offsets(faces0),
         sites = [
             for (fi = [0:1:len(faces0)-1])
@@ -475,9 +503,11 @@ function poly_cantellate(poly, df, eps = 1e-8, len_eps = 1e-6) =
 // Chamfer: face faces + edge faces (no vertex faces).
 // t is a signed face-plane offset as a fraction of each face's collapse distance.
 // Positive t = inward chamfer; negative t = anti-chamfer.
-function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
+function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
     let(
-        t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
+        t_eff = !is_undef(t)
+            ? t
+            : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly)),
         _t_ok = assert(abs(t_eff) != 1, "poly_chamfer: |t| must not be 1 (t=±1 collapses faces; use cleanup/hyper mode)"),
         verts0 = poly_verts(poly),
         faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
@@ -572,10 +602,13 @@ function poly_chamfer(poly, t, eps = 1e-8, len_eps = 1e-6) =
 
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
-function poly_cantitruncate(poly, t, c, eps = 1e-8, len_eps = 1e-6) =
+function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
     let(
-        t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
-        c_eff = is_undef(c) ? 0 : c,
+        sol = (is_undef(t) && is_undef(c)) ? solve_cantitruncate_trig(poly) : [t, c],
+        t_eff = is_undef(sol[0]) ? _ps_truncate_default_t(poly) : sol[0],
+        c_eff = is_undef(sol[1]) ? 0 : sol[1]
+    )
+    let(
         verts0 = poly_verts(poly),
         faces0 = ps_orient_all_faces_outward(verts0, poly_faces(poly)),
         poly0 = make_poly(verts0, faces0, poly_e_over_ir(poly)),
@@ -1067,20 +1100,8 @@ function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0,
 // Normalized cantellation: map c in [0,1] to df in [0, df_max],
 // with c=0.5 hitting the computed square-edge df.
 function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6) =
-    let(
-        c0 = (c < 0) ? 0 : ((c > 1) ? 1 : c),
-        verts = poly_verts(poly),
-        edges = _ps_edges_from_faces(poly_faces(poly)),
-        e0 = edges[0],
-        edge_len = norm(verts[e0[1]] - verts[e0[0]]),
-        ir = edge_len / poly_e_over_ir(poly),
-        df_max_eff = is_undef(df_max) ? (2 * ir) : df_max,
-        df_mid = cantellate_square_df(poly, 0, df_max_eff, steps, family_edge_idx),
-        df = (c0 <= 0.5)
-            ? (2 * c0 * df_mid)
-            : (df_mid + (c0 - 0.5) * 2 * (df_max_eff - df_mid))
-    )
-    poly_cantellate(poly, df, eps, len_eps);
+    let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
+    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
 
 
 
