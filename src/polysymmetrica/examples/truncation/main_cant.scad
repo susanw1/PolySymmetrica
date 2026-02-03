@@ -1,4 +1,5 @@
 use <../../core/truncation.scad>
+use <../../core/cantellation.scad>
 
 use <../../models/platonics_all.scad>
 
@@ -18,4 +19,3 @@ for (   p = [ [-1, undef],
         else
             demo(poly_cantellate(p[1], t[1]));
 }
-

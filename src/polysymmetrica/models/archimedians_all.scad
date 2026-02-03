@@ -1,4 +1,5 @@
 use <../core/truncation.scad>
+use <../core/cantellation.scad>
 use <../models/platonics_all.scad>
 
 /**
