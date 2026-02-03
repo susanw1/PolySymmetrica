@@ -6,7 +6,7 @@ Archimedean solids derived from Platonic bases.
 Snubs are left as stubs for now.
 */
 
-// ---- Truncations (t = 1/3) ----
+// ---- Truncations ----
 
 function truncated_tetrahedron() = poly_truncate(tetrahedron());
 function truncated_cube() = poly_truncate(hexahedron());
@@ -21,8 +21,19 @@ function icosidodecahedron() = poly_rectify(dodecahedron());
 
 // ---- Cantellations (small rhombi*) ----
 
-function rhombicuboctahedron() = poly_cantellate(hexahedron(), 1/3);
-function rhombicosidodecahedron() = poly_cantellate(dodecahedron(), 1/3);
+function rhombicuboctahedron() =
+    let(
+        base = hexahedron(),
+        df = cantellate_square_df(base, 0, 1, 40, 0)
+    )
+    poly_cantellate(base, df);
+
+function rhombicosidodecahedron() =
+    let(
+        base = dodecahedron(),
+        df = cantellate_square_df(base, 0, 1, 40, 0)
+    )
+    poly_cantellate(base, df);
 
 // ---- Cantitruncations (great rhombi*) ----
 
