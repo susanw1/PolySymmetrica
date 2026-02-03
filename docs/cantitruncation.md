@@ -4,7 +4,7 @@ This document captures current cantitruncation behavior, parameterization, and t
 
 ## Parameterization
 
-`poly_cantitruncate(poly, t, c, eps, len_eps)`
+`poly_cantitruncate(poly, t=undef, c=undef, eps, len_eps)`
 
 - **t** controls edge‑point placement along each original edge.
   - `t=0` at original vertices, `t=0.5` at mid‑edge.
@@ -12,6 +12,7 @@ This document captures current cantitruncation behavior, parameterization, and t
 - **c** controls face/edge expansion.
   - `d_f = -c * ir` (face plane shift along normal)
   - `d_e =  c * ir` (edge‑bisector plane offset)
+If both `t` and `c` are `undef`, the trig solver is used for regular bases.
 
 Topology (current):
 - Face cycles: 2n‑gons built from *face‑edge points*.
@@ -97,8 +98,7 @@ p = poly_cantitruncate_families(base, sol[0], sol[1], c_edge_by_pair=sol[2]);
 
 ### Regular base (trig solver)
 ```
-p = poly_cantitruncate(hexahedron(), solve_cantitruncate_trig(hexahedron())[0],
-                                   solve_cantitruncate_trig(hexahedron())[1]);
+p = poly_cantitruncate(hexahedron()); // defaults to trig solver for regular bases
 ```
 
 ### Dominant family (mixed faces)

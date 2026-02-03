@@ -4,12 +4,12 @@ This document captures current cantellation behavior, parameterization, and solv
 
 ## Parameterization
 
-`poly_cantellate(poly, df, dv=0, de=0, eps, len_eps)`
+`poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps, len_eps)`
 
 - **df** controls face offsets (how far original faces move along their normals).
-- **dv** controls vertex offsets (how far original vertices move along their radial direction).
-- **de** controls edge offsets (how far original edges move along their bisector planes).
-- If `dv`/`de` are omitted, defaults may be applied by the caller (some examples map `dv`/`de` to `df`).
+- **c** provides a normalized knob; `c=0.5` targets square edge faces (via `cantellate_square_df`).
+- If `df` is omitted, `c` (or a default `c=0.5`) is used to derive a `df`.
+- `df_max` bounds the normalized mapping; `steps` controls the square‑target search.
 
 Topology (current):
 - Face cycles: original faces (expanded) become larger polygons.
@@ -32,16 +32,16 @@ Cantellation is constructed from three components:
    - Built from edge‑adjacent points around each original vertex.
 
 Current limitations:
-- Some mixed‑family shapes can show slight warping depending on how offsets are balanced.
-- Extreme offsets (large `df/dv/de`) can yield self‑intersections or degenerate faces; use with care.
+- Mixed‑family bases can show slight warping depending on how offsets are balanced.
+- Extreme offsets (large `df`) can yield self‑intersections or degenerate faces; use with care.
 
 ## Solvers / Helpers
 
 - `cantellate_square_df(poly, df_min, df_max, steps, family_edge_idx, eps)`
   - Searches for a `df` that makes a chosen edge‑family as square as possible.
 
-- `poly_cantellate_norm(poly, c, df_max=undef, eps, len_eps)`
-  - Normalized cantellation (maps a user `c in [0,1]` to a `df` range).
+- `poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps, len_eps)`
+  - Normalized cantellation (maps `c in [0,1]` to a `df` range).
   - Intended as the user‑friendly entry point for many examples.
 
 ## Inspecting Planarity
@@ -50,9 +50,9 @@ Use `poly_describe(poly, detail=3)` to echo `max_plane_err` per face. This is th
 
 ## Usage Examples
 
-### Basic cantellation
+### Basic cantellation (explicit df)
 ```
-p = poly_cantellate(hexahedron(), 0.2);
+p = poly_cantellate(hexahedron(), df = 0.2);
 ```
 
 ### Normalized cantellation
