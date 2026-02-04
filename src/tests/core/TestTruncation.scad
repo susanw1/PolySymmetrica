@@ -378,6 +378,11 @@ module test__ps_face_inset_bisector_2d__list_matches_scalar() {
     }
 }
 
+module test__ps_is_regular_base__detects_regular() {
+    assert(_ps_is_regular_base(hexahedron()), "regular base: cube");
+    assert(!_ps_is_regular_base(cuboctahedron()), "irregular base: cuboctahedron");
+}
+
 
 
 // suite
@@ -408,6 +413,7 @@ module run_TestTruncation() {
     test_poly_chamfer__tetra_changes_geom();
     test_poly_chamfer__skew_prism_shrinks_all_faces();
     test__ps_face_inset_bisector_2d__list_matches_scalar();
+    test__ps_is_regular_base__detects_regular();
 }
 
 run_TestTruncation();

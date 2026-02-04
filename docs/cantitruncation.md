@@ -12,7 +12,7 @@ This document captures current cantitruncation behavior, parameterization, and t
 - **c** controls face/edge expansion.
   - `d_f = -c * ir` (face plane shift along normal)
   - `d_e =  c * ir` (edge‑bisector plane offset)
-If both `t` and `c` are `undef`, the trig solver is used for regular bases.
+If both `t` and `c` are `undef`, the trig solver is used **only for regular bases** (single face size + single edge length). Otherwise it falls back to `_ps_truncate_default_t(poly)` and `c=0`.
 
 Topology (current):
 - Face cycles: 2n‑gons built from *face‑edge points*.

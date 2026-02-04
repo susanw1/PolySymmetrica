@@ -26,6 +26,20 @@ function _ps_face_has_dir(f, v0, v1) =
 
 function _ps_clamp(x, lo, hi) = (x < lo) ? lo : (x > hi) ? hi : x;
 
+function _ps_all_near(vals, eps) =
+    (len(vals) == 0) ? true : (max(vals) - min(vals) <= eps);
+
+// True if poly has a single face size and single edge length (within eps).
+function _ps_is_regular_base(poly, eps=1e-6) =
+    let(
+        verts = poly_verts(poly),
+        faces0 = ps_orient_all_faces_outward(verts, poly_faces(poly)),
+        edges = _ps_edges_from_faces(faces0),
+        face_sizes = [for (f = faces0) len(f)],
+        edge_lens = [for (e = edges) norm(verts[e[1]] - verts[e[0]])]
+    )
+    _ps_all_near(face_sizes, eps) && _ps_all_near(edge_lens, eps);
+
 // Project edge points to face plane and order along face edge direction.
 function _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1) =
     let(
@@ -430,7 +444,7 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
 function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
     let(
-        sol = (is_undef(t) && is_undef(c)) ? solve_cantitruncate_trig(poly) : [t, c],
+        sol = (is_undef(t) && is_undef(c) && _ps_is_regular_base(poly)) ? solve_cantitruncate_trig(poly) : [t, c],
         t_eff = is_undef(sol[0]) ? _ps_truncate_default_t(poly) : sol[0],
         c_eff = is_undef(sol[1]) ? 0 : sol[1]
     )
