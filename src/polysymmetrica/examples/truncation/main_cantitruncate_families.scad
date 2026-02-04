@@ -1,4 +1,5 @@
 use <../../core/truncation.scad>
+use <../../core/solvers.scad>
 use <../../core/render.scad>
 use <../../models/platonics_all.scad>
 use <util_demo.scad>

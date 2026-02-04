@@ -54,17 +54,26 @@ PolySymmetrica/
 │   │   ├─ core/
 │   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
 │   │   │   ├─ placement.scad       # face/edge/vertex placement
-│   │   │   ├─ truncation.scad      # poly_truncate and helpers
+│   │   │   ├─ truncation.scad      # truncate/rectify/chamfer/cantellate/cantitruncate
+│   │   │   ├─ solvers.scad         # parameter solvers (cantitruncate, etc.)
+│   │   │   ├─ transform.scad       # site-based mesh assembly
+│   │   │   ├─ transform_util.scad  # shared transform helpers
+│   │   │   ├─ validate.scad        # poly validity checks
+│   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
 │   │   │
 │   │   ├─ models/
+│   │   │   ├─ platonics_all.scad
+│   │   │   ├─ archimedians_all.scad
+│   │   │   ├─ catalans_all.scad
+│   │   │   ├─ johnson_all.scad
 │   │   │   ├─ tetrahedron.scad
 │   │   │   ├─ octahedron.scad
 │   │   │   └─ icosahedron.scad
 │   │   │
 │   │   └─ examples/
-│   │       ├─ basics/                 # core placement demos
-│   │       ├─ truncation/             # trunc/rectify/cantellate demos
+│   │       ├─ basics/                 # core placement + archimedean/catalan demos
+│   │       ├─ truncation/             # trunc/rectify/cantellate/cantitruncate demos
 │   │       ├─ poly-frame/             # frame + mount experiments
 │   │       └─ printing/               # printable face/frame experiments
 │   └─ tests/...
@@ -73,7 +82,7 @@ PolySymmetrica/
     ├─ developer_guide.md
     ├─ cantitruncation.md
     ├─ cantellation.md
-    └─ diagrams/
+    └─ images/
 ```
 
 Each module is deliberately small so that users can take only what they need.
@@ -104,6 +113,9 @@ This compact representation allows:
 * exact dual construction,
 * clean symmetry placement,
 * compatibility with truncations and derived families.
+
+**Face winding:** PolySymmetrica follows OpenSCAD’s LHR convention.
+Faces are ordered **clockwise when viewed from outside**.
 
 ---
 
@@ -287,6 +299,15 @@ dodecahedron() = poly_dual(icosahedron());
 
 Tetrahedron is self-dual.
 
+### **4.3 Aggregated Sets**
+
+```scad
+platonics_all();      // [["tetrahedron", fn], ...]
+archimedians_all();   // 13 Archimedeans as [name, fn] (snubs are stubs)
+catalans_all();       // Catalan duals as [name, fn] (snubs are stubs)
+johnsons_all();       // early previews (approx / WIP)
+```
+
 ---
 
 ## **5. Usage Examples**
@@ -368,8 +389,12 @@ The descriptor is then compatible with all placement operators.
 
 Implemented:
 
+* **Truncation**
 * **Rectification**
+* **Chamfer**
 * **Cantellation / expansion**
+* **Cantitruncation**
+* **Catalans** via `poly_dual(...)` of Archimedeans
 
 Planned:
 
@@ -381,6 +406,7 @@ Operator parameters follow their construction, so the sign may differ by operato
 
 * **Chamfer**: positive `t` offsets face planes **inward** (toward the poly center); negative `t` produces an anti‑chamfer.
 * **Cantellate/expand**: positive offsets typically push new edge/vertex features **outward** from the original poly.
+* **Cantitruncate**: `t` is a truncation-style edge fraction; `c` offsets face/edge planes by `±c * ir` (see `docs/cantitruncation.md`).
 
 ### **6.3 Custom placement modes**
 
@@ -428,7 +454,8 @@ Confirm:
 * ✔ Primitive Platonic descriptors
 * ✔ Dual-generated cube and dodecahedron
 * ✔ Convex dual operator
-* ✔ General truncation/rectification/cantellation operators (`core/truncation.scad`)
+* ✔ Truncation/rectification/chamfer/cantellate/cantitruncation (`core/truncation.scad`)
+* ✔ Solver helpers (`core/solvers.scad`)
 * ✔ Archimedean generation via truncation/cantellation
 * ✔ Catalan generation via duals
 * ✔ Catalan scaling to ensure dual overlay

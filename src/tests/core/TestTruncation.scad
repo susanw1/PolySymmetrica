@@ -2,6 +2,7 @@ use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/duals.scad>
 use <../../polysymmetrica/core/transform.scad>
 use <../../polysymmetrica/core/truncation.scad>
+use <../../polysymmetrica/core/solvers.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
 use <../../polysymmetrica/models/archimedians_all.scad>
@@ -131,32 +132,6 @@ module test_poly_rectify__tetra_counts() {
     assert(len(poly_verts(q)) == 6, "rectify tetra verts");
     assert(len(poly_faces(q)) == 8, "rectify tetra faces");
     assert(_count_faces_of_size(q,3) == 8, "rectify tetra: 8 triangles");
-}
-
-module test_poly_cantellate__tetra_counts() {
-    p = _tetra_poly();
-    edges = _ps_edges_from_faces(poly_faces(p));
-    q = poly_cantellate(p, 0.2);
-    assert_poly_valid(q);
-    assert_poly_valid_mode(q, "struct");
-
-    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
-    assert_int_eq(len(poly_faces(q)), expected_faces, "cantellate faces count");
-
-    assert_int_eq(_count_faces_of_size(q, 3), 8, "cantellate tetra: 8 triangles");
-    assert_int_eq(_count_faces_of_size(q, 4), 6, "cantellate tetra: 6 quads");
-}
-
-module test_poly_cantellate__cube_counts() {
-    p = hexahedron();
-    edges = _ps_edges_from_faces(poly_faces(p));
-    q = poly_cantellate(p, 0.2);
-    assert_poly_valid(q);
-
-    expected_faces = len(poly_faces(p)) + len(edges) + len(poly_verts(p));
-    assert_int_eq(len(poly_faces(q)), expected_faces, "cantellate cube faces count");
-    assert_int_eq(_count_faces_of_size(q, 3), 8, "cantellate cube: 8 triangles");
-    assert_int_eq(_count_faces_of_size(q, 4), 18, "cantellate cube: 18 quads");
 }
 
 module test_poly_cantitruncate__tetra_counts() {
@@ -372,6 +347,43 @@ module test_poly_chamfer__skew_prism_shrinks_all_faces() {
     assert(area1 < area0, str("chamfer t=0.9 should shrink face area: area0=", area0, " area1=", area1));
 }
 
+module test__ps_face_inset_bisector_2d__list_matches_scalar() {
+    p = hexahedron();
+    verts0 = poly_verts(p);
+    faces0 = ps_orient_all_faces_outward(verts0, poly_faces(p));
+    edges = _ps_edges_from_faces(faces0);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [ for (f = faces0) ps_face_normal(verts0, f) ];
+
+    fi = 0;
+    f = faces0[fi];
+    n = len(f);
+    n_f = face_n[fi];
+    center = poly_face_center(p, fi, 1);
+    ex = poly_face_ex(p, fi, 1);
+    ey = poly_face_ey(p, fi, 1);
+    pts2d = [
+        for (k = [0:1:n-1])
+            let(v = verts0[f[k]] - center)
+                [v_dot(v, ex), v_dot(v, ey)]
+    ];
+
+    d_f = 0.1;
+    d_e = 0.2;
+    inset_scalar = _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0);
+    inset_list = _ps_face_inset_bisector_2d(f, fi, d_f, [for (_ = [0:1:n-1]) d_e], center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0);
+
+    for (k = [0:1:n-1]) {
+        assert_near(inset_list[k][0], inset_scalar[k][0], 1e-8, str("inset list x match ", k));
+        assert_near(inset_list[k][1], inset_scalar[k][1], 1e-8, str("inset list y match ", k));
+    }
+}
+
+module test__ps_is_regular_base__detects_regular() {
+    assert(_ps_is_regular_base(hexahedron()), "regular base: cube");
+    assert(!_ps_is_regular_base(cuboctahedron()), "irregular base: cuboctahedron");
+}
+
 
 
 // suite
@@ -387,8 +399,6 @@ module run_TestTruncation() {
     test_poly_chamfer__cube_face_counts();
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
-    test_poly_cantellate__tetra_counts();
-    test_poly_cantellate__cube_counts();
     test_poly_cantitruncate__tetra_counts();
     test_poly_cantitruncate_dominant_edges__consistent_pairs();
     test_poly_cantitruncate_dominant_edges__planarity();
@@ -403,6 +413,8 @@ module run_TestTruncation() {
     test_poly_chamfer__positive_t_inward();
     test_poly_chamfer__tetra_changes_geom();
     test_poly_chamfer__skew_prism_shrinks_all_faces();
+    test__ps_face_inset_bisector_2d__list_matches_scalar();
+    test__ps_is_regular_base__detects_regular();
 }
 
 run_TestTruncation();

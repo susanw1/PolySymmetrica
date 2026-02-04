@@ -16,13 +16,13 @@ include <hexahedron.scad>
 include <dodecahedron.scad>
 
 /**
-Return all Platonic solids as [[name, poly], ...].
-Note: this constructs every poly when called.
+Return all Platonic solids as [[name, fn], ...],
+where fn is a zero-arg function returning the poly.
 */
 function platonics_all() = [
-    ["tetrahedron", tetrahedron()],
-    ["hexahedron", hexahedron()],
-    ["octahedron", octahedron()],
-    ["dodecahedron", dodecahedron()],
-    ["icosahedron", icosahedron()]
+    ["tetrahedron", function() tetrahedron()],
+    ["hexahedron", function() hexahedron()],
+    ["octahedron", function() octahedron()],
+    ["dodecahedron", function() dodecahedron()],
+    ["icosahedron", function() icosahedron()]
 ];

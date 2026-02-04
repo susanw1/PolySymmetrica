@@ -59,21 +59,22 @@ function archimedean_to_catalan_name(n) =
     (len(idxs) == 0 || idxs[0] < 0) ? undef : pairs[idxs[0]][1];
 
 /**
-Return all Catalan solids as [[name, poly], ...].
-Note: this constructs every poly when called; snub duals are undef.
+Return all Catalan solids as [[name, fn], ...],
+where fn is a zero-arg function returning the poly.
+Snub duals return undef.
 */
 function catalans_all() = [
-    ["triakis_tetrahedron", triakis_tetrahedron()],
-    ["triakis_octahedron", triakis_octahedron()],
-    ["tetrakis_hexahedron", tetrakis_hexahedron()],
-    ["triakis_icosahedron", triakis_icosahedron()],
-    ["pentakis_dodecahedron", pentakis_dodecahedron()],
-    ["rhombic_dodecahedron", rhombic_dodecahedron()],
-    ["rhombic_triacontahedron", rhombic_triacontahedron()],
-    ["deltoidal_icositetrahedron", deltoidal_icositetrahedron()],
-    ["deltoidal_hexecontahedron", deltoidal_hexecontahedron()],
-    ["disdyakis_dodecahedron", disdyakis_dodecahedron()],
-    ["disdyakis_triacontahedron", disdyakis_triacontahedron()],
-    ["pentagonal_icositetrahedron", pentagonal_icositetrahedron()],
-    ["pentagonal_hexecontahedron", pentagonal_hexecontahedron()]
+    ["triakis_tetrahedron", function() triakis_tetrahedron()],
+    ["triakis_octahedron", function() triakis_octahedron()],
+    ["tetrakis_hexahedron", function() tetrakis_hexahedron()],
+    ["triakis_icosahedron", function() triakis_icosahedron()],
+    ["pentakis_dodecahedron", function() pentakis_dodecahedron()],
+    ["rhombic_dodecahedron", function() rhombic_dodecahedron()],
+    ["rhombic_triacontahedron", function() rhombic_triacontahedron()],
+    ["deltoidal_icositetrahedron", function() deltoidal_icositetrahedron()],
+    ["deltoidal_hexecontahedron", function() deltoidal_hexecontahedron()],
+    ["disdyakis_dodecahedron", function() disdyakis_dodecahedron()],
+    ["disdyakis_triacontahedron", function() disdyakis_triacontahedron()],
+    ["pentagonal_icositetrahedron", function() pentagonal_icositetrahedron()],
+    ["pentagonal_hexecontahedron", function() pentagonal_hexecontahedron()]
 ];

@@ -16,7 +16,7 @@ for (p = with_index([
      c = with_index([0.01, 0.1, 0.2], 0)) {
     translate([120 * c[0], 120 * p[0], -120 * t[0]])
         if (is_undef(p[1])) 
-            text(str("t=", t[1]));
+            linear_extrude(1) text(str("t=", t[1]));
         else
             demo(poly_cantitruncate(p[1], t[1], c[1]));
 }
