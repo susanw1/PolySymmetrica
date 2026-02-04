@@ -58,21 +58,22 @@ function snub_cube() = undef; // TODO
 function snub_dodecahedron() = undef; // TODO
 
 /**
-Return all Archimedean solids as [[name, poly], ...].
-Note: this constructs every poly when called; snubs are undef.
+Return all Archimedean solids as [[name, fn], ...],
+where fn is a zero-arg function returning the poly.
+Snubs return undef.
 */
 function archimedians_all() = [
-    ["truncated_tetrahedron", truncated_tetrahedron()],
-    ["truncated_cube", truncated_cube()],
-    ["truncated_octahedron", truncated_octahedron()],
-    ["truncated_dodecahedron", truncated_dodecahedron()],
-    ["truncated_icosahedron", truncated_icosahedron()],
-    ["cuboctahedron", cuboctahedron()],
-    ["icosidodecahedron", icosidodecahedron()],
-    ["rhombicuboctahedron", rhombicuboctahedron()],
-    ["rhombicosidodecahedron", rhombicosidodecahedron()],
-    ["great_rhombicuboctahedron", great_rhombicuboctahedron()],
-    ["great_rhombicosidodecahedron", great_rhombicosidodecahedron()],
-    ["snub_cube", snub_cube()],
-    ["snub_dodecahedron", snub_dodecahedron()]
+    ["truncated_tetrahedron", function() truncated_tetrahedron()],
+    ["truncated_cube", function() truncated_cube()],
+    ["truncated_octahedron", function() truncated_octahedron()],
+    ["truncated_dodecahedron", function() truncated_dodecahedron()],
+    ["truncated_icosahedron", function() truncated_icosahedron()],
+    ["cuboctahedron", function() cuboctahedron()],
+    ["icosidodecahedron", function() icosidodecahedron()],
+    ["rhombicuboctahedron", function() rhombicuboctahedron()],
+    ["rhombicosidodecahedron", function() rhombicosidodecahedron()],
+    ["great_rhombicuboctahedron", function() great_rhombicuboctahedron()],
+    ["great_rhombicosidodecahedron", function() great_rhombicosidodecahedron()],
+    ["snub_cube", function() snub_cube()],
+    ["snub_dodecahedron", function() snub_dodecahedron()]
 ];

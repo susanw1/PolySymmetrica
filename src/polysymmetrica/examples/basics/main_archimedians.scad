@@ -15,7 +15,7 @@ label_z = -15;
 for (a = with_index(archimedians)) {
     i = a[0];
     name = a[1][0];
-    p = a[1][1];
+    p = a[1][1]();
     if (!is_undef(p)) {
         translate([spacing * i, 0, 0]) demo(p, name=name);
         translate([spacing * i, label_y, label_z])

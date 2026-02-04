@@ -302,7 +302,7 @@ Tetrahedron is self-dual.
 ### **4.3 Aggregated Sets**
 
 ```scad
-platonics_all();      // [["tetrahedron", ...], ...]
+platonics_all();      // [["tetrahedron", fn], ...]
 archimedians_all();   // 13 Archimedeans (snubs are stubs)
 catalans_all();       // Catalan duals (snubs are stubs)
 johnsons_all();       // early previews (approx / WIP)

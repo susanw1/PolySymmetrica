@@ -12,11 +12,11 @@ rows = [
     for (a = archs)
         let(
             name = a[0],
-            p = a[1],
+            p = a[1](),
             d_map = archimedean_to_catalan_name(name),
             d_idx = [for (i = [0:1:len(cats)-1]) if (cats[i][0] == d_map) i][0],
             d_name = is_undef(d_idx) ? str(name, "_dual") : cats[d_idx][0],
-            d = is_undef(d_idx) ? undef : cats[d_idx][1]
+            d = is_undef(d_idx) ? undef : cats[d_idx][1]()
         )
         [name, p, d_name, d]
 ];

@@ -14,8 +14,8 @@ applied to the 5 platonics plus cuboctahedron and icosidodecahedron.
 shapes = concat(
     platonics_all(),
     [
-        ["cuboctahedron", cuboctahedron()],
-        ["icosidodecahedron", icosidodecahedron()]
+        ["cuboctahedron", function() cuboctahedron()],
+        ["icosidodecahedron", function() icosidodecahedron()]
     ]
 );
 
@@ -50,7 +50,8 @@ for (t = with_index(transforms)) {
                 text(t[1][0], size=label_size, halign="left", valign="center");
 
     for (s = with_index(shapes)) {
-        p = t[1][1](s[1][1]);
+        p0 = s[1][1]();
+        p = t[1][1](p0);
         name = str(s[1][0], " (", t[1][0], ")");
         translate([spacing_x * s[0], spacing_y * t[0], 0]) demo(p, name=name);
     }
