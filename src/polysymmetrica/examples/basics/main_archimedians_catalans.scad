@@ -28,11 +28,12 @@ label_size = 8;
 label_x = -40;
 label_z = -40;
 
-for (i = [0:1:len(rows)-1]) {
-    poly_name = rows[i][0];
-    p = rows[i][1];
-    d_name = rows[i][2];
-    d = rows[i][3];
+for (r = with_index(rows)) {
+    i = r[0];
+    poly_name = r[1][0];
+    p = r[1][1];
+    d_name = r[1][2];
+    d = r[1][3];
 
     // Archimedean
     if (!is_undef(p)) {

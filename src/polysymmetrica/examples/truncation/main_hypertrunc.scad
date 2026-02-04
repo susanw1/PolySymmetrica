@@ -15,15 +15,15 @@ But values outside the range 0 < t < 0.5 cause the new vertex faces to over-exte
 * 0.5 < t <= 1: hyper-truncation
 * t > 1: quasi-truncation
 */
-for (   p = [ [-1, undef],
-            [0, tetrahedron()] , [1, hexahedron()], [2, octahedron()], [3, dodecahedron()], [4, icosahedron()]], 
-        t = [[-1, -0.3], [0, 0.01], [1, 0.2], [2, 0.45], [3, 0.55], 
-            [4, 0.7], [5, 0.9], [6, 1.0], [7, 1.5], [8, 2.5]]) {
+for (   p = with_index([
+                undef,
+                tetrahedron(), hexahedron(), octahedron(), dodecahedron(), icosahedron()
+            ], -1),
+        t = with_index([ -0.3, 0.01, 0.2, 0.45, 0.55, 0.7, 0.9, 1.0, 1.5, 2.5 ], -1)) {
     translate([100 * t[0], 100 * p[0], 0]) 
         if (is_undef(p[1])) 
-            text(str("t=", t[1]));
+            linear_extrude(1) text(str("t=", t[1]));
         else
             demo(poly_truncate(p[1], t[1]));
 }        
-
 
