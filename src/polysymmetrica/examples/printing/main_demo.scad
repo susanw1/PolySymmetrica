@@ -2,7 +2,6 @@ use <../../core/funcs.scad>
 use <../../core/placement.scad>
 use <../../core/duals.scad>
 use <../../core/truncation.scad>
-use <../../core/cantellation.scad>
 use <../../core/render.scad>
 
 use <../../models/platonics_all.scad>

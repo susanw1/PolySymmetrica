@@ -1,5 +1,5 @@
 use <../../core/truncation.scad>
-use <../../core/cantellation.scad>
+use <../../core/solvers.scad>
 
 use <../../models/platonics_all.scad>
 use <../../models/archimedians_all.scad>
@@ -28,6 +28,15 @@ transforms = [
     ["cantitruncate", function(p) poly_cantitruncate(p)]
 ];
 
+function _cantitruncate_demo(name, p) =
+    (name == "cuboctahedron") ?
+        let(sol = solve_cantitruncate_dominant_edges(p, 4))
+        poly_cantitruncate_families(p, sol[0], sol[1], c_edge_by_pair=sol[2]) :
+    (name == "icosidodecahedron") ?
+        let(sol = solve_cantitruncate_dominant_edges(p, 5))
+        poly_cantitruncate_families(p, sol[0], sol[1], c_edge_by_pair=sol[2]) :
+        poly_cantitruncate(p);
+
 spacing_x = 140;
 spacing_y = 140;
 label_h = 1;
@@ -51,7 +60,7 @@ for (t = with_index(transforms)) {
 
     for (s = with_index(shapes)) {
         p0 = s[1][1]();
-        p = t[1][1](p0);
+        p = (t[1][0] == "cantitruncate") ? _cantitruncate_demo(s[1][0], p0) : t[1][1](p0);
         name = str(s[1][0], " (", t[1][0], ")");
         translate([spacing_x * s[0], spacing_y * t[0], 0]) demo(p, name=name);
     }

@@ -1,6 +1,6 @@
 # Cantitruncation Notes
 
-This document captures current cantitruncation behavior, parameterization, and the non‑grid (trig) solvers. It is a working note, not final user documentation.
+This document captures current cantitruncation behavior, parameterization, and the non‑grid (trig) solvers. It is a working note, not final user documentation. Solver implementations live in `core/solvers.scad`.
 
 ## Parameterization
 

@@ -54,8 +54,8 @@ PolySymmetrica/
 │   │   ├─ core/
 │   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
 │   │   │   ├─ placement.scad       # face/edge/vertex placement
-│   │   │   ├─ truncation.scad      # truncate/rectify/chamfer/cantitruncate
-│   │   │   ├─ cantellation.scad    # cantellation + square df helpers
+│   │   │   ├─ truncation.scad      # truncate/rectify/chamfer/cantellate/cantitruncate
+│   │   │   ├─ solvers.scad         # parameter solvers (cantitruncate, etc.)
 │   │   │   ├─ transform.scad       # site-based mesh assembly
 │   │   │   ├─ transform_util.scad  # shared transform helpers
 │   │   │   ├─ validate.scad        # poly validity checks
@@ -303,8 +303,8 @@ Tetrahedron is self-dual.
 
 ```scad
 platonics_all();      // [["tetrahedron", fn], ...]
-archimedians_all();   // 13 Archimedeans (snubs are stubs)
-catalans_all();       // Catalan duals (snubs are stubs)
+archimedians_all();   // 13 Archimedeans as [name, fn] (snubs are stubs)
+catalans_all();       // Catalan duals as [name, fn] (snubs are stubs)
 johnsons_all();       // early previews (approx / WIP)
 ```
 
@@ -454,8 +454,8 @@ Confirm:
 * ✔ Primitive Platonic descriptors
 * ✔ Dual-generated cube and dodecahedron
 * ✔ Convex dual operator
-* ✔ Truncation/rectification/chamfer/cantitruncation (`core/truncation.scad`)
-* ✔ Cantellation helpers and operator (`core/cantellation.scad`)
+* ✔ Truncation/rectification/chamfer/cantellate/cantitruncation (`core/truncation.scad`)
+* ✔ Solver helpers (`core/solvers.scad`)
 * ✔ Archimedean generation via truncation/cantellation
 * ✔ Catalan generation via duals
 * ✔ Catalan scaling to ensure dual overlay

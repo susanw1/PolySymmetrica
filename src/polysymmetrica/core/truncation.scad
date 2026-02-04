@@ -8,6 +8,7 @@ use <funcs.scad>
 use <duals.scad>  // for faces_around_vertex helpers
 use <transform.scad>
 use <transform_util.scad>
+use <solvers.scad>
 
 // --- internal helpers ---
 
@@ -23,8 +24,6 @@ function _ps_edge_site_index(edges, a, b, near_v) =
 function _ps_face_has_dir(f, v0, v1) =
     let(pos = _ps_index_of(f, v0))
     (pos >= 0) ? (f[(pos+1)%len(f)] == v1) : false;
-
-function _ps_clamp(x, lo, hi) = (x < lo) ? lo : (x > hi) ? hi : x;
 
 function _ps_all_near(vals, eps) =
     (len(vals) == 0) ? true : (max(vals) - min(vals) <= eps);
@@ -56,21 +55,6 @@ function _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0
         flip = v_dot((proj1 - proj0), e_dir) < 0
     )
     [flip ? proj1 : proj0, flip ? proj0 : proj1];
-
-function _ps_map_face_c(face_len, c_by_size, default_c=0) =
-    let(
-        idxs = [for (i = [0:1:len(c_by_size)-1]) if (c_by_size[i][0] == face_len) i]
-    )
-    (len(idxs) == 0) ? default_c : c_by_size[idxs[0]][1];
-
-function _ps_map_edge_c(face_len, adj_len, c_by_pair, default_c=0) =
-    let(
-        a = min(face_len, adj_len),
-        b = max(face_len, adj_len),
-        idxs = [for (i = [0:1:len(c_by_pair)-1]) if (c_by_pair[i][0] == a && c_by_pair[i][1] == b) i]
-    )
-    (len(idxs) == 0) ? default_c : c_by_pair[idxs[0]][2];
-
 
 // Intersect 2D lines n0·x=d0 and n1·x=d1.
 function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
@@ -440,6 +424,161 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
+// Cantellation/expansion:
+// - face faces remain n-gons (one point per original vertex)
+// - edge faces are quads (rectangles/squares)
+// - vertex faces are valence-gons
+// df offsets faces along their normals; edge/vertex faces are derived from those offsets.
+function _ps_face_offset_pts(verts0, faces0, face_n, df) =
+    [
+        for (fi = [0:1:len(faces0)-1])
+            let(
+                f = faces0[fi],
+                n = len(f),
+                n_f = face_n[fi]
+            )
+            [
+                for (k = [0:1:n-1])
+                    let(v = f[k])
+                    verts0[v] + df * n_f
+            ]
+    ];
+
+function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_idx=0) =
+    let(
+        verts = poly_verts(poly),
+        edges = _ps_edges_from_faces(poly_faces(poly)),
+        e0 = edges[0],
+        edge_len = norm(verts[e0[1]] - verts[e0[0]]),
+        ir = edge_len / poly_e_over_ir(poly),
+        df_max_eff = is_undef(df_max) ? (2 * ir) : df_max,
+        df_mid = cantellate_square_df(poly, 0, df_max_eff, steps, family_edge_idx),
+        df = (c <= 0.5)
+            ? (2 * c * df_mid)
+            : (df_mid + (c - 0.5) * 2 * (df_max_eff - df_mid))
+    )
+    df;
+
+function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6) =
+    let(
+        df_eff = !is_undef(df)
+            ? df
+            : (!is_undef(c) ? _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx)
+                            : _ps_cantellate_df_from_c(poly, 0.5, df_max, steps, family_edge_idx))
+    )
+    let(
+        base = _ps_poly_base(poly),
+        verts0 = base[0],
+        faces0 = base[1],
+        edges = base[2],
+        edge_faces = base[3],
+        face_n = base[4],
+        poly0 = base[5],
+        // offset face corners: one point per (face, vertex) incidence
+        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df_eff),
+        face_offsets = _ps_face_offsets(faces0),
+        sites = [
+            for (fi = [0:1:len(faces0)-1])
+                for (v = faces0[fi])
+                    [fi, v]
+        ],
+        site_points = [
+            for (fi = [0:1:len(faces0)-1])
+                for (p = face_pts[fi])
+                    p
+        ],
+        face_cycles = [
+            for (fi = [0:1:len(faces0)-1])
+                let(n = len(faces0[fi]))
+                [ for (k = [0:1:n-1]) [1, face_offsets[fi] + k] ]
+        ],
+        edge_cycles = [
+            for (ei = [0:1:len(edges)-1])
+                let(
+                    e = edges[ei],
+                    fpair = edge_faces[ei],
+                    f0 = fpair[0],
+                    f1 = fpair[1],
+                    v0 = e[0],
+                    v1 = e[1],
+                    pos0 = _ps_index_of(faces0[f0], v0),
+                    pos1 = _ps_index_of(faces0[f0], v1),
+                    pos2 = _ps_index_of(faces0[f1], v1),
+                    pos3 = _ps_index_of(faces0[f1], v0)
+                )
+                [
+                    [1, face_offsets[f0] + pos0],
+                    [1, face_offsets[f0] + pos1],
+                    [1, face_offsets[f1] + pos2],
+                    [1, face_offsets[f1] + pos3]
+                ]
+        ],
+        vert_cycles = [
+            for (vi = [0:1:len(verts0)-1])
+                let(fc = faces_around_vertex(poly0, vi, edges, edge_faces))
+                [
+                    for (fi = fc)
+                        let(pos = _ps_index_of(faces0[fi], vi))
+                            [1, face_offsets[fi] + pos]
+                ]
+        ],
+        cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
+    )
+    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+
+// Measure how square an edge face is (edge length spread).
+function _ps_face_edge_spread(verts, face) =
+    let(
+        n = len(face),
+        ls = (n < 2) ? [] : [for (i = [0:1:n-1]) norm(verts[face[i]] - verts[face[(i+1)%n]])]
+    )
+    (n == 4) ? (max(ls) - min(ls)) : undef;
+
+// Solve df so that the chosen edge-face family is as square as possible.
+function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0, eps=1e-9) =
+    let(
+        faces0 = ps_orient_all_faces_outward(poly_verts(poly), poly_faces(poly)),
+        edges0 = _ps_edges_from_faces(faces0),
+        edge_faces0 = ps_edge_faces_table(faces0, edges0),
+        fpair = edge_faces0[family_edge_idx],
+        key = (len(fpair) == 2) ? ((len(faces0[fpair[0]]) <= len(faces0[fpair[1]]))
+            ? [len(faces0[fpair[0]]), len(faces0[fpair[1]])]
+            : [len(faces0[fpair[1]]), len(faces0[fpair[0]])]) : [0,0],
+        family_edges = [
+            for (ei = [0:1:len(edge_faces0)-1])
+                let(
+                    fpair_i = edge_faces0[ei],
+                    key_i = (len(fpair_i) == 2) ? ((len(faces0[fpair_i[0]]) <= len(faces0[fpair_i[1]]))
+                        ? [len(faces0[fpair_i[0]]), len(faces0[fpair_i[1]])]
+                        : [len(faces0[fpair_i[1]]), len(faces0[fpair_i[0]])]) : [0,0]
+                )
+                if (key_i == key) ei
+        ],
+        df_vals = [for (i = [0:1:steps]) df_min + (df_max - df_min) * i / steps],
+        cands = [
+            for (df = df_vals)
+                let(
+                    q = poly_cantellate(poly, df),
+                    faces_q = poly_faces(q),
+                    face_count = len(faces0),
+                    errs = [for (ei = family_edges) _ps_face_edge_spread(poly_verts(q), faces_q[face_count + ei])],
+                    ok = len([for (e = errs) if (!is_undef(e)) 1]) == len(errs)
+                )
+                if (ok) [df, sum(errs)]
+        ],
+        _ = assert(len(cands) > 0, "cantellate_square_df: no valid candidates"),
+        errs = [for (c = cands) c[1]],
+        e_min = min(errs),
+        idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0]
+    )
+    cands[idx][0];
+
+// Normalized cantellation: map c in [0,1] to df in [0, df_max],
+// with c=0.5 hitting the computed square-edge df.
+function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6) =
+    let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
+    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
+
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
 function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
@@ -630,146 +769,6 @@ function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
-// Dominant-family trig solver (no grid search). Returns [t, c_by_size].
-function solve_cantitruncate_dominant(poly, dominant_size, edge_idx=undef) =
-    let(
-        verts = poly_verts(poly),
-        faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
-        sizes = [for (f = faces) len(f)],
-        dom_face_idx = [for (i = [0:1:len(faces)-1]) if (sizes[i] == dominant_size) i][0],
-        f = faces[dom_face_idx],
-        n = len(f),
-        v0 = f[0],
-        v_prev = f[(n-1)%n],
-        v_next = f[1],
-        a0 = v_norm(verts[v_prev] - verts[v0]),
-        a1 = v_norm(verts[v_next] - verts[v0]),
-        phi = acos(_ps_clamp(v_dot(a0, a1), -1, 1)),
-        t = 1 / (2 * (1 + sin(phi/2))),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges),
-        ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
-        a = norm(verts[v_next] - verts[v0]),
-        // compute target sums for each secondary family via edges with dominant
-        fam_sizes = _ps_sort([for (s = sizes) s]),
-        uniq_sizes = [for (i = [0:1:len(fam_sizes)-1]) if (i==0 || fam_sizes[i] != fam_sizes[i-1]) fam_sizes[i]],
-        other_sizes = [for (s = uniq_sizes) if (s != dominant_size) s],
-        targets = [
-            for (s = other_sizes)
-                let(
-                    edges_s = [
-                        for (ei = [0:1:len(edges)-1])
-                            let(
-                                fpair = edge_faces[ei],
-                                s0 = len(faces[fpair[0]]),
-                                s1 = len(faces[fpair[1]])
-                            )
-                            if ((s0 == dominant_size && s1 == s) || (s1 == dominant_size && s0 == s)) ei
-                    ],
-                    vals = [
-                        for (ei = edges_s)
-                            let(
-                                fpair = edge_faces[ei],
-                                n0 = ps_face_normal(verts, faces[fpair[0]]),
-                                n1 = ps_face_normal(verts, faces[fpair[1]]),
-                                alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1))
-                            )
-                            (1 - 2*t) * a / (2 * sin(alpha/2))
-                    ]
-                )
-                [s, (len(vals) == 0) ? undef : sum(vals)/len(vals)]
-        ],
-        // choose reference family (first with target) to set d_f_dom
-        has_other = (len(targets) > 0),
-        ref_idx = has_other ? [for (i = [0:1:len(targets)-1]) if (!is_undef(targets[i][1])) i][0] : undef,
-        ref_target = is_undef(ref_idx) ? undef : targets[ref_idx][1],
-        d_f_dom = is_undef(ref_target) ? 0 : (ref_target / 2),
-        c_by_size = concat(
-            [[dominant_size, abs(d_f_dom)/ir]],
-            [for (tgt = targets)
-                let(
-                    s = tgt[0],
-                    targ = tgt[1],
-                    d_f_s = is_undef(targ) ? d_f_dom : (targ - d_f_dom)
-                )
-                [s, abs(d_f_s)/ir]
-            ]
-        )
-    )
-    [t, c_by_size];
-
-// Build unique [a,b] pairs from a list of pairs (order is preserved).
-function _ps_unique_pairs(pairs, i=0, acc=[]) =
-    (i >= len(pairs)) ? acc
-  : let(
-        p = pairs[i],
-        has = (len([for (u = acc) if (u[0] == p[0] && u[1] == p[1]) 1]) > 0)
-    )
-    _ps_unique_pairs(pairs, i+1, has ? acc : concat(acc, [p]));
-
-// Dominant-family trig solver with per-edge-family c values.
-// Returns [t, c_by_size, c_edge_by_pair].
-function solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx=undef) =
-    let(
-        sol = solve_cantitruncate_dominant(poly, dominant_size, edge_idx),
-        t = sol[0],
-        c_by_size = sol[1],
-        verts = poly_verts(poly),
-        faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges),
-        pair_keys = _ps_unique_pairs([
-            for (ei = [0:1:len(edges)-1])
-                let(
-                    fpair = edge_faces[ei],
-                    s0 = len(faces[fpair[0]]),
-                    s1 = len(faces[fpair[1]])
-                )
-                [min(s0, s1), max(s0, s1)]
-        ]),
-        c_edge_by_pair = [
-            for (p = pair_keys)
-                let(
-                    c0 = _ps_map_face_c(p[0], c_by_size, 0),
-                    c1 = _ps_map_face_c(p[1], c_by_size, 0),
-                    c_edge = (c0 + c1) / 2
-                )
-                [p[0], p[1], c_edge]
-        ]
-    )
-    [t, c_by_size, c_edge_by_pair];
-
-// Trig-based solver for regular bases (one edge type).
-// Uses face interior angle and dihedral to compute t and c directly.
-function solve_cantitruncate_trig(poly, face_idx=0, edge_idx=undef) =
-    let(
-        verts = poly_verts(poly),
-        faces = ps_orient_all_faces_outward(verts, poly_faces(poly)),
-        f = faces[face_idx],
-        n = len(f),
-        v0 = f[0],
-        v_prev = f[(n-1)%n],
-        v_next = f[1],
-        a0 = v_norm(verts[v_prev] - verts[v0]),
-        a1 = v_norm(verts[v_next] - verts[v0]),
-        phi = acos(_ps_clamp(v_dot(a0, a1), -1, 1)),
-        t = 1 / (2 * (1 + sin(phi/2))),
-        edges = _ps_edges_from_faces(faces),
-        ei = is_undef(edge_idx) ? ps_find_edge_index(edges, v0, v_next) : edge_idx,
-        fpair = ps_edge_faces_table(faces, edges)[ei],
-        f0 = fpair[0],
-        f1 = fpair[1],
-        n0 = ps_face_normal(verts, faces[f0]),
-        n1 = ps_face_normal(verts, faces[f1]),
-        // alpha is angle between outward normals
-        alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1)),
-        a = norm(verts[v_next] - verts[v0]),
-        ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
-        // across-face distance uses sin(alpha/2); for cube alpha=90 so sin=cos
-        d_f = (1 - 2*t) * a / (2 * sin(alpha/2)),
-        c = abs(d_f) / ir
-    )
-    [t, c];
 
 
 // Compute per-corner truncation estimate t = 1/(2+r),

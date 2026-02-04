@@ -2,6 +2,7 @@ use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/duals.scad>
 use <../../polysymmetrica/core/transform.scad>
 use <../../polysymmetrica/core/truncation.scad>
+use <../../polysymmetrica/core/solvers.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
 use <../../polysymmetrica/models/archimedians_all.scad>

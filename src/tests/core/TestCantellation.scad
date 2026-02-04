@@ -1,6 +1,5 @@
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/truncation.scad>
-use <../../polysymmetrica/core/cantellation.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
 use <../testing_util.scad>
 
