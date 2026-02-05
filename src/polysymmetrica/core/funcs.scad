@@ -10,6 +10,8 @@
 function poly_verts(poly)      = poly[0];
 function poly_faces(poly)      = poly[1];
 function poly_e_over_ir(poly)  = poly[2];
+// Derive edge list from a poly's faces.
+function poly_edges(poly)      = _ps_edges_from_faces(poly_faces(poly));
 
 // Constructor with full validation and optional auto-computation
 function make_poly(verts, faces, e_over_ir=undef) =

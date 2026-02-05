@@ -384,6 +384,30 @@ module test__ps_is_regular_base__detects_regular() {
     assert(!_ps_is_regular_base(cuboctahedron()), "irregular base: cuboctahedron");
 }
 
+module test_poly_snub__cube_counts() {
+    p = hexahedron();
+    q = poly_snub(p);
+    assert_poly_valid(q);
+
+    assert_int_eq(len(poly_verts(q)), 24, "snub cube verts count");
+    assert_int_eq(len(poly_edges(q)), 60, "snub cube edges count");
+    assert_int_eq(len(poly_faces(q)), 38, "snub cube faces count");
+    assert_int_eq(_count_faces_of_size(q, 3), 32, "snub cube: 32 triangles");
+    assert_int_eq(_count_faces_of_size(q, 4), 6, "snub cube: 6 squares");
+}
+
+module test_poly_snub__dodeca_counts() {
+    p = dodecahedron();
+    q = poly_snub(p);
+    assert_poly_valid(q);
+
+    assert_int_eq(len(poly_verts(q)), 60, "snub dodeca verts count");
+    assert_int_eq(len(poly_edges(q)), 150, "snub dodeca edges count");
+    assert_int_eq(len(poly_faces(q)), 92, "snub dodeca faces count");
+    assert_int_eq(_count_faces_of_size(q, 3), 80, "snub dodeca: 80 triangles");
+    assert_int_eq(_count_faces_of_size(q, 5), 12, "snub dodeca: 12 pentagons");
+}
+
 
 
 // suite
@@ -415,6 +439,8 @@ module run_TestTruncation() {
     test_poly_chamfer__skew_prism_shrinks_all_faces();
     test__ps_face_inset_bisector_2d__list_matches_scalar();
     test__ps_is_regular_base__detects_regular();
+    test_poly_snub__cube_counts();
+    test_poly_snub__dodeca_counts();
 }
 
 run_TestTruncation();

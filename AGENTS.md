@@ -49,6 +49,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - The test failure we saw was duplicate indices in vertex faces; it was fixed by constructing vertex faces as intersections of the vertex plane and the two incident edge planes per face (see `poly_cantellate` in `src/polysymmetrica/core/truncation.scad`).
 - Debugging helpers live in `src/polysymmetrica/examples/truncation/debug_cant_vertex.scad` and can isolate face families or print edge/face mappings.
 - A generic validity suite is not enough for cantellation; operation-specific tests (face-family counts, edge-face adjacency) should be added once design stabilizes.
+- Cantellation operators now live in `src/polysymmetrica/core/truncation.scad`; solver helpers live in `src/polysymmetrica/core/solvers.scad`.
 - **Orientation now uses OpenSCAD LHR** (CW from outside). Models are LHR; `ps_face_normal` and `poly_face_ez` follow LHR. `poly_render` no longer flips faces.
 - `face_plate` expects LHR/CW 2D input order for `pts` and aligned `diheds`; bevel sign must match LHR.
 - `poly_chamfer` now builds hex edge faces (true chamfer): edge faces include original vertices; vertex faces are omitted.

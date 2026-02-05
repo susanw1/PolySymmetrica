@@ -54,8 +54,8 @@ function great_rhombicosidodecahedron() =
 
 // ---- Snubs (stubs) ----
 
-function snub_cube() = undef; // TODO
-function snub_dodecahedron() = undef; // TODO
+function snub_cube() = poly_snub(hexahedron());
+function snub_dodecahedron() = poly_snub(dodecahedron());
 
 /**
 Return all Archimedean solids as [[name, fn], ...],

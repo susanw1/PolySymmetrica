@@ -65,6 +65,10 @@ function _ps_line2_intersect(n0, d0, n1, d1, eps=1e-12) =
         (n0[0]*d1 - d0*n1[0]) / det
     ];
 
+function _ps_rot2d(p, ang) =
+    let(c = cos(ang), s = sin(ang))
+    [p[0]*c - p[1]*s, p[0]*s + p[1]*c];
+
 // Inset polygon vertices using bisector-plane intersection lines per edge.
 // d_f shifts the face plane; d_e shifts the edge-bisector planes along their normals.
 // Inset polygon vertices using bisector-plane intersection lines per edge.
@@ -578,6 +582,92 @@ function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0,
 function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6) =
     let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
     poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
+
+// Snub (chiral): twist face-edge sites within each face plane and triangulate edge cycles.
+function _ps_snub_edge_spread(poly, t_eff, c_eff, angle, handedness=1) =
+    let(
+        base = _ps_poly_base(poly),
+        verts0 = base[0],
+        faces0 = base[1],
+        edges = base[2],
+        edge_faces = base[3],
+        face_n = base[4],
+        poly0 = base[5],
+        ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
+        d_f = -c_eff * ir,
+        edge_pts = _ps_edge_points(verts0, edges, t_eff),
+        ei = 0,
+        e = edges[ei],
+        fpair = edge_faces[ei],
+        f0 = fpair[0],
+        f1 = fpair[1],
+        v0 = e[0],
+        // third face around v0
+        fc = faces_around_vertex(poly0, v0, edges, edge_faces),
+        f_other = [for (fi = fc) if (fi != f0 && fi != f1) fi][0],
+        s_f0 = _ps_snub_face_edge_site_point(verts0, faces0, face_n, edge_pts, d_f, f0, v0, handedness, angle, poly0),
+        s_f1 = _ps_snub_face_edge_site_point(verts0, faces0, face_n, edge_pts, d_f, f1, v0, handedness, angle, poly0),
+        s_o = _ps_snub_face_edge_site_point(verts0, faces0, face_n, edge_pts, d_f, f_other, v0, handedness, angle, poly0),
+        tri = (handedness >= 0) ? [s_f0, s_f1, s_o] : [s_f1, s_f0, s_o],
+        lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ]
+    )
+    max(lens) - min(lens);
+
+function _ps_snub_default_angle(poly, t_eff, c_eff, handedness=1, steps=60, eps=1e-9) =
+    let(
+        angs = [for (i = [0:1:steps]) 0 + 60 * i / steps],
+        cands = [for (a = angs) [a, _ps_snub_edge_spread(poly, t_eff, c_eff, a, handedness)]],
+        errs = [for (c = cands) c[1]],
+        e_min = min(errs),
+        idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0]
+    )
+    cands[idx][0];
+
+function _ps_snub_face_edge_site_point(verts0, faces0, face_n, edge_pts, d_f, fi, v0, handedness, angle, poly0) =
+    let(
+        f = faces0[fi],
+        pos = _ps_index_of(f, v0),
+        v1 = f[(pos+1)%len(f)],
+        n_f = face_n[fi],
+        center = poly_face_center(poly0, fi, 1),
+        ex = poly_face_ex(poly0, fi, 1),
+        ey = poly_face_ey(poly0, fi, 1),
+        p0 = center - n_f * d_f,
+        p_pair = _ps_project_edge_pts_for_face_edge(verts0, _ps_edges_from_faces(faces0), edge_pts, n_f, p0, v0, v1),
+        p0o = p_pair[0],
+        p0_2d = _ps_rot2d([v_dot(p0o - p0, ex), v_dot(p0o - p0, ey)], handedness * angle)
+    )
+    p0 + ex * p0_2d[0] + ey * p0_2d[1];
+
+function poly_snub(poly, angle=undef, t=undef, c=undef, handedness=1, eps=1e-8, len_eps=1e-6) =
+    let(
+        c_eff = is_undef(c) ? 0.5 : c,
+        // For now, use cantellate geometry and split edge-squares into triangles.
+        df_eff = _ps_cantellate_df_from_c(poly, c_eff),
+        q = poly_cantellate(poly, df_eff),
+        verts = poly_verts(q),
+        faces_q = poly_faces(q),
+        base = _ps_poly_base(poly),
+        faces0 = base[1],
+        edges = base[2],
+        face_count = len(faces0),
+        edge_count = len(edges),
+        // face groups in cantellate: [face faces][edge faces][vertex faces]
+        face_faces = [for (i = [0:1:face_count-1]) faces_q[i]],
+        edge_faces = [for (i = [0:1:edge_count-1]) faces_q[face_count + i]],
+        vert_faces = [for (i = [0:1:len(faces_q)-face_count-edge_count-1]) faces_q[face_count + edge_count + i]],
+        edge_tris = [
+            for (f = edge_faces)
+                let(a = f[0], b = f[1], c = f[2], d = f[3])
+                (handedness >= 0)
+                    ? [ [a, b, c], [a, c, d] ]
+                    : [ [a, b, d], [b, c, d] ]
+        ],
+        edge_tris_flat = [for (t = edge_tris) each t],
+        faces_new = concat(face_faces, edge_tris_flat, vert_faces),
+        faces_oriented = ps_orient_all_faces_outward(verts, faces_new)
+    )
+    make_poly(verts, faces_oriented, poly_e_over_ir(q));
 
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
