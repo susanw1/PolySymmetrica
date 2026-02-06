@@ -408,6 +408,16 @@ module test_poly_snub__dodeca_counts() {
     assert_int_eq(_count_faces_of_size(q, 5), 12, "snub dodeca: 12 pentagons");
 }
 
+module test_poly_snub__cube_twist_moves_vertices() {
+    p = hexahedron();
+    q0 = poly_snub(p, 0);
+    q1 = poly_snub(p, 20);
+    verts0 = poly_verts(q0);
+    verts1 = poly_verts(q1);
+    max_d = max([for (i = [0:1:len(verts0)-1]) norm(verts1[i] - verts0[i])]);
+    assert(max_d > 1e-4, "snub cube: twist moves vertices");
+}
+
 
 
 // suite
@@ -441,6 +451,7 @@ module run_TestTruncation() {
     test__ps_is_regular_base__detects_regular();
     test_poly_snub__cube_counts();
     test_poly_snub__dodeca_counts();
+    test_poly_snub__cube_twist_moves_vertices();
 }
 
 run_TestTruncation();

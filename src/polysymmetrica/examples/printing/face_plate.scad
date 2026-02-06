@@ -28,7 +28,7 @@ function _line_intersect_2d(n1, d1, n2, d2) =
         ];
 
 
-function _rot_axis(v, axis, ang) =
+function ps_rot_axis(v, axis, ang) =
     let(
         a = v_norm(axis),
         c = cos(ang),
@@ -155,7 +155,7 @@ function _bottom_pts2d_from_bevel(top_pts, diheds, ht) =
                     e = v_norm([p1[0]-p0[0], p1[1]-p0[1], 0]),
                     n0 = [0,0,1],
                     // LHR: rotate outward normal toward adjacent face by +dihedral.
-                    n1 = _rot_axis(n0, e, diheds[k]),
+                    n1 = ps_rot_axis(n0, e, diheds[k]),
                     n_side = v_norm(n0 + n1),
                     n_xy = [n_side[0], n_side[1]],
                     d2_raw = v_dot(n_xy, p0) + n_side[2] * ht,

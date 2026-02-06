@@ -184,6 +184,20 @@ function ps_face_radius_stat(poly, face_k=undef) =
 
 // ---- Face-family helpers ----
 
+// Return [[k, count], ...] for each face size k, sorted by k ascending.
+function ps_face_family_list(poly) =
+    let(
+        faces = poly_faces(poly),
+        sizes = [ for (f = faces) len(f) ],
+        uniq = [
+            for (i = [0:len(sizes)-1])
+                let(k = sizes[i])
+                    if (sum([ for (j = [0:1:i-1]) sizes[j] == k ? 1 : 0 ]) == 0) k
+        ],
+        ks = sort(uniq)
+    )
+    [ for (k = ks) [k, sum([ for (s = sizes) s == k ? 1 : 0 ])] ];
+
 // Return [k, count] for the face size that appears most frequently.
 // Ties are resolved by choosing the smallest k.
 function ps_face_family_mode(poly) =
