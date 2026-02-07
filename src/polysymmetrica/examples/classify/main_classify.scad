@@ -1,0 +1,37 @@
+use <../../core/classify.scad>
+use <../../core/render.scad>
+use <../../models/platonics_all.scad>
+use <../../models/archimedians_all.scad>
+use <../../models/catalans_all.scad>
+use <../truncation/util_demo.scad>
+
+/**
+Classification demo: shows face/edge/vertex family counts for a few shapes.
+*/
+
+spacing = 120;
+
+module show_classify(p, name, pos=[0,0,0]) {
+    translate(pos) demo(p, name=name);
+    show_poly(p, detail = 10);
+    cls = poly_classify(p, 0);
+}
+
+
+//show_poly(truncated_tetrahedron());
+//show_poly(rhombicuboctahedron());
+//show_poly(great_rhombicuboctahedron());
+show_poly(rhombic_triacontahedron());
+
+
+//show_classify(hexahedron(), "cube", [spacing, 0, 0]);
+//show_classify(octahedron(), "octa", [spacing*2, 0, 0]);
+//show_classify(dodecahedron(), "dodeca", [spacing*3, 0, 0]);
+//show_classify(icosahedron(), "icosa", [spacing*4, 0, 0]);
+//
+//show_classify(poly_truncate(octahedron()), "trunc_octa", [0, -spacing, 0]);
+//show_classify(rhombicuboctahedron(), "rhombicubocta", [spacing, -spacing, 0]);
+//show_classify(great_rhombicuboctahedron(), "great_rhombicubocta", [spacing*2, -spacing, 0]);
+//show_classify(deltoidal_icositetrahedron(), "deltoidal_icositetra", [spacing*3, -spacing, 0]);
+//show_classify(disdyakis_dodecahedron(), "disdyakis_dodeca", [spacing*4, -spacing, 0]);
+
