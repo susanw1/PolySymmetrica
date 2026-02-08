@@ -1,3 +1,4 @@
+use <../../core/truncation.scad>
 use <../../core/classify.scad>
 use <../../core/render.scad>
 use <../../models/platonics_all.scad>
@@ -13,15 +14,21 @@ spacing = 120;
 
 module show_classify(p, name, pos=[0,0,0]) {
     translate(pos) demo(p, name=name);
-    show_poly(p, detail = 10);
+    show_poly(p, detail = 1);
     cls = poly_classify(p, 0);
 }
 
+p = poly_truncate(rhombic_triacontahedron());
+poly_render(p, 40);
+show_poly(p, detail=2, include_geom = true);
+
+
 
 //show_poly(truncated_tetrahedron());
-//show_poly(rhombicuboctahedron());
-//show_poly(great_rhombicuboctahedron());
-show_poly(rhombic_triacontahedron());
+//show_poly(cuboctahedron(), detail=5);
+//show_poly(rhombicuboctahedron(), detail = 3);
+//show_poly(great_rhombicuboctahedron(), detail = 3);
+//show_poly(poly_truncate(rhombic_triacontahedron()), detail = 3);
 
 
 //show_classify(hexahedron(), "cube", [spacing, 0, 0]);

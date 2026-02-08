@@ -25,6 +25,14 @@ function _ps_group_by_key(keys) =
             [k, [for (i = [0:1:len(keys)-1]) if (keys[i] == k) i]]
     ];
 
+// Map each element index -> family id.
+function _ps_family_ids(n, fams) =
+    [
+        for (i = [0:1:n-1])
+            let(hit = [for (fi = [0:1:len(fams)-1]) if (search(i, fams[fi][1]) != []) fi])
+            (len(hit) == 0) ? -1 : hit[0]
+    ];
+
 function _ps_rotate(list, k) =
     let(n = len(list))
     [for (i = [0:1:n-1]) list[(i + k) % n]];
@@ -65,11 +73,7 @@ function _ps_cyclic_canonical(seq, mode="max", allow_reflect=false) =
     )
     best;
 
-function _ps_face_keys(poly, detail, eps) =
-    let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly)
-    )
+function _ps_face_keys_from(verts, faces, detail, eps) =
     [
         for (f = faces)
             let(
@@ -85,13 +89,10 @@ function _ps_face_keys(poly, detail, eps) =
                 : [n, _ps_round(avg_len, eps)]
     ];
 
-function _ps_edge_keys(poly, detail, eps) =
-    let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges)
-    )
+function _ps_face_keys(poly, detail, eps) =
+    _ps_face_keys_from(poly_verts(poly), poly_faces(poly), detail, eps);
+
+function _ps_edge_keys_from(verts, faces, edges, edge_faces, detail, eps) =
     [
         for (ei = [0:1:len(edges)-1])
             let(
@@ -107,12 +108,24 @@ function _ps_edge_keys(poly, detail, eps) =
                 : [ks[0], ks[1], _ps_round(el, eps)]
     ];
 
-function _ps_vert_keys(poly, detail, eps) =
+function _ps_edge_keys(poly, detail, eps) =
     let(
         verts = poly_verts(poly),
         faces = poly_faces(poly),
         edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces, edges)
+    )
+    _ps_edge_keys_from(verts, faces, edges, edge_faces, detail, eps);
+
+function _ps_edge_keys_list(edges) =
+    [for (e = edges) _ps_ordered_pair(e[0], e[1])];
+
+function _ps_edge_index(edge_keys, a, b) =
+    let(e = _ps_ordered_pair(a, b), idxs = search(e, edge_keys))
+    idxs[0];
+
+function _ps_vert_keys_from(verts, faces, edges, edge_faces, detail, eps) =
+    let(
         valences = [
             for (vi = [0:1:len(verts)-1])
                 sum([for (e = edges) (e[0] == vi || e[1] == vi) ? 1 : 0])
@@ -121,7 +134,7 @@ function _ps_vert_keys(poly, detail, eps) =
     [
         for (vi = [0:1:len(verts)-1])
             let(
-                fc = faces_around_vertex(poly, vi, edges, edge_faces),
+                fc = faces_around_vertex([verts, faces, 0], vi, edges, edge_faces),
                 ks = _ps_cyclic_canonical([for (fi = fc) len(faces[fi])], "max", false),
                 elens = [
                     for (e = edges)
@@ -135,17 +148,21 @@ function _ps_vert_keys(poly, detail, eps) =
                 : concat([valences[vi]], ks, [_ps_round(avg_len, eps)])
     ];
 
-function _ps_refine_face_keys(poly, face_keys) =
+function _ps_vert_keys(poly, detail, eps) =
     let(
+        verts = poly_verts(poly),
         faces = poly_faces(poly),
         edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges),
+        edge_faces = ps_edge_faces_table(faces, edges)
+    )
+    _ps_vert_keys_from(verts, faces, edges, edge_faces, detail, eps);
+
+// Refine face keys using neighboring face topology (by face_nbr_keys).
+function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, edges, edge_faces, edge_keys) =
+    let(
+        faces = poly_faces(poly),
         face_fams = _ps_group_by_key(face_keys),
-        face_ids = [
-            for (fi = [0:1:len(faces)-1])
-                let(hit = [for (i = [0:1:len(face_fams)-1]) if (len([for (idx = face_fams[i][1]) if (idx == fi) 1]) > 0) i])
-                (len(hit) == 0) ? -1 : hit[0]
-        ]
+        face_ids = _ps_family_ids(len(faces), face_fams)
     )
     [
         for (fi = [0:1:len(faces)-1])
@@ -156,34 +173,25 @@ function _ps_refine_face_keys(poly, face_keys) =
                         let(
                             a = f[k],
                             b = f[(k+1)%len(f)],
-                            ei = ps_find_edge_index(edges, a, b),
+                            ei = _ps_edge_index(edge_keys, a, b),
                             fpair = edge_faces[ei],
                             f_other = (fpair[0] == fi) ? fpair[1] : fpair[0]
                         )
-                        face_ids[f_other]
+                        face_nbr_keys[f_other][0]
                 ],
-                nbr_key = _ps_cyclic_canonical(nbr_ids, "max", false)
+                // Face neighborhoods are cyclic up to rotation and reflection.
+                nbr_key = _ps_cyclic_canonical(nbr_ids, "max", true)
             )
             concat(face_keys[fi], [nbr_key])
     ];
 
-function _ps_refine_edge_keys(poly, edge_keys, face_keys, vert_keys) =
+function _ps_refine_edge_keys(poly, edge_keys, face_keys, vert_keys, edges, edge_faces) =
     let(
         faces = poly_faces(poly),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges),
         face_fams = _ps_group_by_key(face_keys),
         vert_fams = _ps_group_by_key(vert_keys),
-        face_ids = [
-            for (fi = [0:1:len(faces)-1])
-                let(hit = [for (i = [0:1:len(face_fams)-1]) if (len([for (idx = face_fams[i][1]) if (idx == fi) 1]) > 0) i])
-                (len(hit) == 0) ? -1 : hit[0]
-        ],
-        vert_ids = [
-            for (vi = [0:1:len(poly_verts(poly))-1])
-                let(hit = [for (i = [0:1:len(vert_fams)-1]) if (len([for (idx = vert_fams[i][1]) if (idx == vi) 1]) > 0) i])
-                (len(hit) == 0) ? -1 : hit[0]
-        ]
+        face_ids = _ps_family_ids(len(faces), face_fams),
+        vert_ids = _ps_family_ids(len(poly_verts(poly)), vert_fams)
     )
     [
         for (ei = [0:1:len(edges)-1])
@@ -200,17 +208,11 @@ function _ps_refine_edge_keys(poly, edge_keys, face_keys, vert_keys) =
             concat(edge_keys[ei], [fk, vk])
     ];
 
-function _ps_refine_vert_keys(poly, vert_keys, face_keys) =
+function _ps_refine_vert_keys(poly, vert_keys, face_keys, edges, edge_faces) =
     let(
         faces = poly_faces(poly),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges),
         face_fams = _ps_group_by_key(face_keys),
-        face_ids = [
-            for (fi = [0:1:len(faces)-1])
-                let(hit = [for (i = [0:1:len(face_fams)-1]) if (len([for (idx = face_fams[i][1]) if (idx == fi) 1]) > 0) i])
-                (len(hit) == 0) ? -1 : hit[0]
-        ]
+        face_ids = _ps_family_ids(len(faces), face_fams)
     )
     [
         for (vi = [0:1:len(poly_verts(poly))-1])
@@ -225,74 +227,80 @@ function _ps_refine_vert_keys(poly, vert_keys, face_keys) =
 function _ps_keys_equal(a, b) =
     (len(a) == len(b)) ? (min([for (i = [0:1:len(a)-1]) a[i] == b[i] ? 1 : 0]) == 1) : false;
 
-function _ps_refine_face_keys_iter(poly, keys, max_iter=6) =
-    let(next = _ps_refine_face_keys(poly, keys))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_face_keys_iter(poly, next, max_iter - 1));
+function _ps_refine_face_keys_iter(poly, keys, face_nbr_keys, edges, edge_faces, edge_keys, max_iter=6) =
+    let(next = _ps_refine_face_keys(poly, keys, face_nbr_keys, edges, edge_faces, edge_keys))
+    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_face_keys_iter(poly, next, face_nbr_keys, edges, edge_faces, edge_keys, max_iter - 1));
 
-function _ps_refine_edge_keys_iter(poly, keys, face_keys, vert_keys, max_iter=6) =
-    let(next = _ps_refine_edge_keys(poly, keys, face_keys, vert_keys))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_edge_keys_iter(poly, next, face_keys, vert_keys, max_iter - 1));
+function _ps_refine_edge_keys_iter(poly, keys, face_keys, vert_keys, edges, edge_faces, max_iter=6) =
+    let(next = _ps_refine_edge_keys(poly, keys, face_keys, vert_keys, edges, edge_faces))
+    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_edge_keys_iter(poly, next, face_keys, vert_keys, edges, edge_faces, max_iter - 1));
 
-function _ps_refine_vert_keys_iter(poly, keys, face_keys, max_iter=6) =
-    let(next = _ps_refine_vert_keys(poly, keys, face_keys))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_vert_keys_iter(poly, next, face_keys, max_iter - 1));
+function _ps_refine_vert_keys_iter(poly, keys, face_keys, edges, edge_faces, max_iter=6) =
+    let(next = _ps_refine_vert_keys(poly, keys, face_keys, edges, edge_faces))
+    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_vert_keys_iter(poly, next, face_keys, edges, edge_faces, max_iter - 1));
 
 // Return [face_families, edge_families, vert_families].
 // Each family is [key, idxs].
 // detail:
 //   0 = topology only
 //   1 = topology + neighbour refinement
-//   2 = topology + neighbour refinement + geometry
-//   3 = iterated neighbour refinement (radius)
+//   2 = iterated neighbour refinement (radius)
+// include_geom: when true, append geometry info (avg edge lengths).
 // radius controls how far neighbour refinement propagates (default 1).
-function poly_classify(poly, detail=1, eps=1e-6, radius=1) =
+function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
     let(
+        faces = poly_faces(poly),
+        edges = _ps_edges_from_faces(faces),
+        edge_faces = ps_edge_faces_table(faces, edges),
+        edge_keys = _ps_edge_keys_list(edges),
+        verts = poly_verts(poly),
+
         // Topology-only keys
-        face_topo = _ps_face_keys(poly, 0, eps),
-        edge_topo = _ps_edge_keys(poly, 0, eps),
-        vert_topo = _ps_vert_keys(poly, 0, eps),
+        face_topo = _ps_face_keys_from(verts, faces, 0, eps),
+        edge_topo = _ps_edge_keys_from(verts, faces, edges, edge_faces, 0, eps),
+        vert_topo = _ps_vert_keys_from(verts, faces, edges, edge_faces, 0, eps),
 
         // Optional geometry keys (avg edge lengths)
-        face_geom = _ps_face_keys(poly, 1, eps),
-        edge_geom = _ps_edge_keys(poly, 1, eps),
-        vert_geom = _ps_vert_keys(poly, 1, eps),
+        face_geom = _ps_face_keys_from(verts, faces, 1, eps),
+        edge_geom = _ps_edge_keys_from(verts, faces, edges, edge_faces, 1, eps),
+        vert_geom = _ps_vert_keys_from(verts, faces, edges, edge_faces, 1, eps),
 
         // Neighbor refinement (topology only)
         face_ref = (detail >= 1)
-            ? ((detail >= 3)
-                ? _ps_refine_face_keys_iter(poly, face_topo, radius)
-                : _ps_refine_face_keys(poly, face_topo))
+            ? ((detail >= 2)
+                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, edges, edge_faces, edge_keys, radius)
+                : _ps_refine_face_keys(poly, face_topo, face_topo, edges, edge_faces, edge_keys))
             : face_topo,
         vert_ref = (detail >= 1)
-            ? ((detail >= 3)
-                ? _ps_refine_vert_keys_iter(poly, vert_topo, face_topo, radius)
-                : _ps_refine_vert_keys(poly, vert_topo, face_topo))
+            ? ((detail >= 2)
+                ? _ps_refine_vert_keys_iter(poly, vert_topo, face_topo, edges, edge_faces, radius)
+                : _ps_refine_vert_keys(poly, vert_topo, face_topo, edges, edge_faces))
             : vert_topo,
         edge_ref = (detail >= 1)
-            ? ((detail >= 3)
-                ? _ps_refine_edge_keys_iter(poly, edge_topo, face_topo, vert_topo, radius)
-                : _ps_refine_edge_keys(poly, edge_topo, face_topo, vert_topo))
+            ? ((detail >= 2)
+                ? _ps_refine_edge_keys_iter(poly, edge_topo, face_topo, vert_topo, edges, edge_faces, radius)
+                : _ps_refine_edge_keys(poly, edge_topo, face_topo, vert_topo, edges, edge_faces))
             : edge_topo,
 
-        // Add geometry last (detail=2)
-        face_keys = (detail >= 2)
+        // Add geometry last (optional)
+        face_keys = include_geom
             ? [for (i = [0:1:len(face_ref)-1]) concat(face_ref[i], [face_geom[i][1]])]
             : face_ref,
-        edge_keys = (detail >= 2)
+        edge_keys2 = include_geom
             ? [for (i = [0:1:len(edge_ref)-1]) concat(edge_ref[i], [edge_geom[i][2]])]
             : edge_ref,
-        vert_keys = (detail >= 2)
+        vert_keys = include_geom
             ? [for (i = [0:1:len(vert_ref)-1]) concat(vert_ref[i], [vert_geom[i][len(vert_geom[i])-1]])]
             : vert_ref,
         face_fams = _ps_group_by_key(face_keys),
-        edge_fams = _ps_group_by_key(edge_keys),
+        edge_fams = _ps_group_by_key(edge_keys2),
         vert_fams = _ps_group_by_key(vert_keys)
     )
     [face_fams, edge_fams, vert_fams];
 
 // Pretty-print classification info for a poly.
-module show_poly(poly, detail=1, eps=1e-6) {
-    cls = poly_classify(poly, detail, eps);
+module show_poly(poly, detail=1, eps=1e-6, radius=1, include_geom=false) {
+    cls = poly_classify(poly, detail, eps, radius, include_geom);
     face_fams = cls[0];
     edge_fams = cls[1];
     vert_fams = cls[2];
@@ -301,16 +309,16 @@ module show_poly(poly, detail=1, eps=1e-6) {
     echo("face_families:", len(face_fams));
     for (i = [0:1:len(face_fams)-1])
         let(k = face_fams[i][0], idxs = face_fams[i][1])
-            echo("  face_family#", i, "key=", k, "(n, avg_edge_len)", "count=", len(idxs), "idxs=", idxs);
+            echo("  face_family#", i, "key=", k, include_geom ? "(n, avg_edge_len)" : "(n)", "count=", len(idxs), "idxs=", idxs);
 
     echo("edge_families:", len(edge_fams));
     for (i = [0:1:len(edge_fams)-1])
         let(k = edge_fams[i][0], idxs = edge_fams[i][1])
-            echo("  edge_family#", i, "key=", k, "(adj face sizes, edge_len)", "count=", len(idxs), "idxs=", idxs);
+            echo("  edge_family#", i, "key=", k, include_geom ? "(adj face sizes, edge_len)" : "(adj face sizes)", "count=", len(idxs), "idxs=", idxs);
 
     echo("vert_families:", len(vert_fams));
     for (i = [0:1:len(vert_fams)-1])
         let(k = vert_fams[i][0], idxs = vert_fams[i][1])
-            echo("  vert_family#", i, "key=", k, "(valence, face sizes..., avg_edge_len)", "count=", len(idxs), "idxs=", idxs);
+            echo("  vert_family#", i, "key=", k, include_geom ? "(valence, face sizes..., avg_edge_len)" : "(valence, face sizes...)", "count=", len(idxs), "idxs=", idxs);
     echo("====================");
 }
