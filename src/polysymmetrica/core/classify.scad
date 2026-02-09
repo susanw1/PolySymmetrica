@@ -245,7 +245,7 @@ function _ps_refine_edge_keys_iter(poly, keys, face_keys, vert_keys, edges, edge
 
 function _ps_refine_vert_keys_iter(poly, keys, face_keys, edges, edge_faces, max_iter=6) =
     let(next = _ps_refine_vert_keys(poly, keys, face_keys, edges, edge_faces))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_vert_keys_iter(poly, next, next, edges, edge_faces, max_iter - 1));
+    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_vert_keys_iter(poly, next, face_keys, edges, edge_faces, max_iter - 1));
 
 // Return [face_families, edge_families, vert_families].
 // Each family is [key, idxs].
