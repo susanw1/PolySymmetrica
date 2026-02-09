@@ -251,6 +251,7 @@ function _ps_refine_vert_keys_iter(poly, keys, face_keys, edges, edge_faces, max
 // radius controls how far neighbour refinement propagates (default 1).
 function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
     let(
+        radius_eff = is_undef(radius) ? 1 : radius,
         faces = poly_faces(poly),
         edges = _ps_edges_from_faces(faces),
         edge_faces = ps_edge_faces_table(faces, edges),
@@ -263,24 +264,24 @@ function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
         vert_topo = _ps_vert_keys_from(verts, faces, edges, edge_faces, 0, eps),
 
         // Optional geometry keys (avg edge lengths)
-        face_geom = _ps_face_keys_from(verts, faces, 1, eps),
-        edge_geom = _ps_edge_keys_from(verts, faces, edges, edge_faces, 1, eps),
-        vert_geom = _ps_vert_keys_from(verts, faces, edges, edge_faces, 1, eps),
+        face_geom = include_geom ? _ps_face_keys_from(verts, faces, 1, eps) : [],
+        edge_geom = include_geom ? _ps_edge_keys_from(verts, faces, edges, edge_faces, 1, eps) : [],
+        vert_geom = include_geom ? _ps_vert_keys_from(verts, faces, edges, edge_faces, 1, eps) : [],
 
         // Neighbor refinement (topology only)
         face_ref = (detail >= 1)
             ? ((detail >= 2)
-                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts), radius)
+                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts), radius_eff)
                 : _ps_refine_face_keys(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts)))
             : face_topo,
         vert_ref = (detail >= 1)
             ? ((detail >= 2)
-                ? _ps_refine_vert_keys_iter(poly, vert_topo, face_topo, edges, edge_faces, radius)
+                ? _ps_refine_vert_keys_iter(poly, vert_topo, face_topo, edges, edge_faces, radius_eff)
                 : _ps_refine_vert_keys(poly, vert_topo, face_topo, edges, edge_faces))
             : vert_topo,
         edge_ref = (detail >= 1)
             ? ((detail >= 2)
-                ? _ps_refine_edge_keys_iter(poly, edge_topo, face_topo, vert_topo, edges, edge_faces, radius)
+                ? _ps_refine_edge_keys_iter(poly, edge_topo, face_topo, vert_topo, edges, edge_faces, radius_eff)
                 : _ps_refine_edge_keys(poly, edge_topo, face_topo, vert_topo, edges, edge_faces))
             : edge_topo,
 
