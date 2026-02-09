@@ -75,8 +75,10 @@ module test_classify__detail_refines_faces() {
     d = poly_dual(p);
     counts0 = _classify_counts(d, 0);
     counts1 = _classify_counts(d, 1);
+    counts2 = _classify_counts(d, 2);
     assert_int_eq(counts0[0], 1, "detail=0: dual trunc rhomb triacont faces = 1");
     assert_int_eq(counts1[0], 2, "detail=1: dual trunc rhomb triacont faces = 2");
+    assert_int_eq(counts2[0], 2, "detail=2: dual trunc rhomb triacont faces = 2");
 }
 
 module test_classify__group_by_key_composite() {
