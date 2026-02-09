@@ -79,6 +79,19 @@ module test_classify__detail_refines_faces() {
     assert_int_eq(counts1[0], 2, "detail=1: dual trunc rhomb triacont faces = 2");
 }
 
+module test_classify__group_by_key_composite() {
+    keys = [
+        [3, [1, 2]],
+        [3, [1, 2]],
+        [4, [0]],
+        [3, [1, 2]],
+        [4, [0]]
+    ];
+    fams = _ps_group_by_key(keys);
+    assert_int_eq(len(fams), 2, "group_by_key: two families");
+    assert_int_eq(len(fams[0][1]) + len(fams[1][1]), 5, "group_by_key: total count");
+}
+
 
 module run_TestClassify() {
     test_classify__platonics_single_family();
@@ -87,4 +100,5 @@ module run_TestClassify() {
     test_classify__rhombi_duals_face_family();
     test_classify__dual_trunc_rhomb_triaconta_faces_split();
     test_classify__detail_refines_faces();
+    test_classify__group_by_key_composite();
 }

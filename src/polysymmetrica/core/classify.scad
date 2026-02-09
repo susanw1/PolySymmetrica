@@ -18,11 +18,17 @@ function _ps_unique_keys(keys) =
                 keys[i]
     ];
 
+function _ps_key_str(k) = str(k);
+
 function _ps_group_by_key(keys) =
-    let(uniq = _ps_unique_keys(keys))
+    let(
+        key_strs = [for (k = keys) _ps_key_str(k)],
+        uniq_strs = _ps_unique_keys(key_strs)
+    )
     [
-        for (k = uniq)
-            [k, [for (i = [0:1:len(keys)-1]) if (keys[i] == k) i]]
+        for (ks = uniq_strs)
+            let(idxs = [for (i = [0:1:len(keys)-1]) if (key_strs[i] == ks) i])
+                [keys[idxs[0]], idxs]
     ];
 
 // Map each element index -> family id.
@@ -269,10 +275,13 @@ function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
         vert_geom = include_geom ? _ps_vert_keys_from(verts, faces, edges, edge_faces, 1, eps) : [],
 
         // Neighbor refinement (topology only)
+        face_ids_topo = _ps_family_ids(len(faces), _ps_group_by_key(face_topo)),
+        vert_ids_topo = _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)),
+
         face_ref = (detail >= 1)
             ? ((detail >= 2)
-                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts), radius_eff)
-                : _ps_refine_face_keys(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts)))
+                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, vert_ids_topo, edges, edge_faces, edge_keys, len(verts), radius_eff)
+                : _ps_refine_face_keys(poly, face_topo, face_topo, vert_ids_topo, edges, edge_faces, edge_keys, len(verts)))
             : face_topo,
         vert_ref = (detail >= 1)
             ? ((detail >= 2)
