@@ -158,7 +158,7 @@ function _ps_vert_keys(poly, detail, eps) =
     _ps_vert_keys_from(verts, faces, edges, edge_faces, detail, eps);
 
 // Refine face keys using neighboring face topology (by face_nbr_keys).
-function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, edges, edge_faces, edge_keys, nv) =
+function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, vert_ids, edges, edge_faces, edge_keys, nv) =
     let(
         faces = poly_faces(poly),
         face_fams = _ps_group_by_key(face_keys),
@@ -179,10 +179,12 @@ function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, edges, edge_faces,
                         )
                         face_nbr_keys[f_other][0]
                 ],
+                v_ids = [for (vi = f) vert_ids[vi]],
                 // Face neighborhoods are cyclic up to rotation and reflection.
-                nbr_key = _ps_cyclic_canonical(nbr_ids, "max", true)
+                nbr_key = _ps_cyclic_canonical(nbr_ids, "max", true),
+                v_key = _ps_cyclic_canonical(v_ids, "max", true)
             )
-            concat(face_keys[fi], [nbr_key])
+            concat(face_keys[fi], [nbr_key, v_key])
     ];
 
 function _ps_refine_edge_keys(poly, edge_keys, face_keys, vert_keys, edges, edge_faces) =
@@ -227,9 +229,9 @@ function _ps_refine_vert_keys(poly, vert_keys, face_keys, edges, edge_faces) =
 function _ps_keys_equal(a, b) =
     (len(a) == len(b)) ? (min([for (i = [0:1:len(a)-1]) a[i] == b[i] ? 1 : 0]) == 1) : false;
 
-function _ps_refine_face_keys_iter(poly, keys, face_nbr_keys, edges, edge_faces, edge_keys, nv, max_iter=6) =
-    let(next = _ps_refine_face_keys(poly, keys, face_nbr_keys, edges, edge_faces, edge_keys, nv))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_face_keys_iter(poly, next, face_nbr_keys, edges, edge_faces, edge_keys, nv, max_iter - 1));
+function _ps_refine_face_keys_iter(poly, keys, face_nbr_keys, vert_ids, edges, edge_faces, edge_keys, nv, max_iter=6) =
+    let(next = _ps_refine_face_keys(poly, keys, face_nbr_keys, vert_ids, edges, edge_faces, edge_keys, nv))
+    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_face_keys_iter(poly, next, face_nbr_keys, vert_ids, edges, edge_faces, edge_keys, nv, max_iter - 1));
 
 function _ps_refine_edge_keys_iter(poly, keys, face_keys, vert_keys, edges, edge_faces, max_iter=6) =
     let(next = _ps_refine_edge_keys(poly, keys, face_keys, vert_keys, edges, edge_faces))
@@ -268,8 +270,8 @@ function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
         // Neighbor refinement (topology only)
         face_ref = (detail >= 1)
             ? ((detail >= 2)
-                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, edges, edge_faces, edge_keys, len(verts), radius)
-                : _ps_refine_face_keys(poly, face_topo, face_topo, edges, edge_faces, edge_keys, len(verts)))
+                ? _ps_refine_face_keys_iter(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts), radius)
+                : _ps_refine_face_keys(poly, face_topo, face_topo, _ps_family_ids(len(verts), _ps_group_by_key(vert_topo)), edges, edge_faces, edge_keys, len(verts)))
             : face_topo,
         vert_ref = (detail >= 1)
             ? ((detail >= 2)
