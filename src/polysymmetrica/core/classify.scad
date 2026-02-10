@@ -167,8 +167,8 @@ function _ps_vert_keys(poly, detail, eps) =
 function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, vert_ids, edges, edge_faces, edge_keys, nv) =
     let(
         faces = poly_faces(poly),
-        face_fams = _ps_group_by_key(face_keys),
-        face_ids = _ps_family_ids(len(faces), face_fams)
+        face_nbr_fams = _ps_group_by_key(face_nbr_keys),
+        face_nbr_ids = _ps_family_ids(len(faces), face_nbr_fams)
     )
     [
         for (fi = [0:1:len(faces)-1])
@@ -183,7 +183,7 @@ function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, vert_ids, edges, e
                             fpair = edge_faces[ei],
                             f_other = (fpair[0] == fi) ? fpair[1] : fpair[0]
                         )
-                        face_nbr_keys[f_other][0]
+                        face_nbr_ids[f_other]
                 ],
                 v_ids = [for (vi = f) vert_ids[vi]],
                 // Face neighborhoods are cyclic up to rotation and reflection.
