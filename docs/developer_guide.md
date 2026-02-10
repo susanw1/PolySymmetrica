@@ -119,6 +119,22 @@ Faces are ordered **clockwise when viewed from outside**.
 
 ---
 
+### **3.2 Classification (Families)**
+
+`poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false)` groups faces, edges, and vertices into families.
+
+- Returns `[face_fams, edge_fams, vert_fams]`, each as `[key, idxs]`.
+- `detail`:
+  - `0`: topology only (face size, edge-adjacent face sizes, vertex valence + cyclic face sizes).
+  - `1`: topology + one-pass neighbour refinement.
+  - `2`: iterated neighbour refinement (propagates by `radius`).
+- `include_geom`: when true, appends average edge length to keys (rounded by `eps`).
+- `radius`: controls propagation depth for `detail=2` refinement.
+
+Helper for printing: `show_poly(poly, detail, eps, radius, include_geom)`.
+
+---
+
 ### **3.2 Inter-Radius Scaling**
 
 PolySymmetrica uses **inter-radius** = radius to the midpoint of an edge as its main input scale.
