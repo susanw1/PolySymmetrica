@@ -236,16 +236,19 @@ function _ps_keys_equal(a, b) =
     (len(a) == len(b)) ? (min([for (i = [0:1:len(a)-1]) a[i] == b[i] ? 1 : 0]) == 1) : false;
 
 function _ps_refine_face_keys_iter(poly, keys, vert_ids, edges, edge_faces, edge_keys, nv, max_iter=6) =
+    (max_iter <= 0) ? keys :
     let(next = _ps_refine_face_keys(poly, keys, keys, vert_ids, edges, edge_faces, edge_keys, nv))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_face_keys_iter(poly, next, vert_ids, edges, edge_faces, edge_keys, nv, max_iter - 1));
+    _ps_keys_equal(next, keys) ? keys : _ps_refine_face_keys_iter(poly, next, vert_ids, edges, edge_faces, edge_keys, nv, max_iter - 1);
 
 function _ps_refine_edge_keys_iter(poly, keys, face_keys, vert_keys, edges, edge_faces, max_iter=6) =
+    (max_iter <= 0) ? keys :
     let(next = _ps_refine_edge_keys(poly, keys, face_keys, vert_keys, edges, edge_faces))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_edge_keys_iter(poly, next, face_keys, vert_keys, edges, edge_faces, max_iter - 1));
+    _ps_keys_equal(next, keys) ? keys : _ps_refine_edge_keys_iter(poly, next, face_keys, vert_keys, edges, edge_faces, max_iter - 1);
 
 function _ps_refine_vert_keys_iter(poly, keys, face_keys, edges, edge_faces, max_iter=6) =
+    (max_iter <= 0) ? keys :
     let(next = _ps_refine_vert_keys(poly, keys, face_keys, edges, edge_faces))
-    _ps_keys_equal(next, keys) ? keys : (max_iter <= 0 ? next : _ps_refine_vert_keys_iter(poly, next, face_keys, edges, edge_faces, max_iter - 1));
+    _ps_keys_equal(next, keys) ? keys : _ps_refine_vert_keys_iter(poly, next, face_keys, edges, edge_faces, max_iter - 1);
 
 // Return [face_families, edge_families, vert_families].
 // Each family is [key, idxs].
