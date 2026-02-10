@@ -288,7 +288,7 @@ function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
             : face_topo,
         vert_ref = (detail >= 1)
             ? ((detail >= 2)
-                ? _ps_refine_vert_keys_iter(poly, vert_topo, face_topo, edges, edge_faces, radius_eff)
+                ? _ps_refine_vert_keys_iter(poly, vert_topo, face_ref, edges, edge_faces, radius_eff)
                 : _ps_refine_vert_keys(poly, vert_topo, face_topo, edges, edge_faces))
             : vert_topo,
         edge_ref = (detail >= 1)
