@@ -6,6 +6,7 @@
 
 use <funcs.scad>
 use <duals.scad>  // for faces_around_vertex helpers
+use <classify.scad>
 use <transform.scad>
 use <transform_util.scad>
 use <solvers.scad>
@@ -71,7 +72,9 @@ function _ps_rot2d(p, ang) =
     [p[0]*c - p[1]*s, p[0]*s + p[1]*c];
 
 // Inset polygon vertices using bisector-plane intersection lines per edge.
-// d_f shifts the face plane; d_e shifts the edge-bisector planes along their normals.
+// d_f shifts the face plane outward (along face normal) in caller space; note the
+// internal p0 uses center - n_f*d_f so positive d_f still means outward overall.
+// d_e shifts the edge-bisector planes along their normals.
 // Inset polygon vertices using bisector-plane intersection lines per edge.
 // d_e may be a single value or a per-edge list (length n). Per-edge values
 // allow mixed-family cantitruncation to bias individual edge planes.
@@ -585,26 +588,22 @@ function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0
     poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
 
 // Snub (chiral): twist cantellated face points within each face plane and triangulate edge cycles.
-function _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, angle, handedness=1) =
+function _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, angle, handedness=1, edge_reps=undef) =
     let(
-        v0 = 0,
-        fc = faces_around_vertex(poly0, v0, edges, edge_faces),
-        edges_v = [
-            for (ei = [0:1:len(edges)-1])
-                if (edges[ei][0] == v0 || edges[ei][1] == v0) ei
-        ],
+        edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
         errs_all = [
-            for (ei = edges_v)
+            for (ei = edge_list)
                 let(
                     e = edges[ei],
                     fpair = edge_faces[ei],
                     f0 = fpair[0],
                     f1 = fpair[1],
-                    v1 = (e[0] == v0) ? e[1] : e[0],
-                    p00 = _ps_snub_face_point(verts0, faces0, face_n, df, f0, v0, handedness, angle, poly0),
-                    p01 = _ps_snub_face_point(verts0, faces0, face_n, df, f0, v1, handedness, angle, poly0),
-                    p11 = _ps_snub_face_point(verts0, faces0, face_n, df, f1, v1, handedness, angle, poly0),
-                    p10 = _ps_snub_face_point(verts0, faces0, face_n, df, f1, v0, handedness, angle, poly0),
+                    v0 = e[0],
+                    v1 = e[1],
+                    p00 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f0, v0, handedness, angle, poly0),
+                    p01 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f0, v1, handedness, angle, poly0),
+                    p11 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f1, v1, handedness, angle, poly0),
+                    p10 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f1, v0, handedness, angle, poly0),
                     tris = (handedness >= 0)
                         ? [ [p00, p01, p11], [p00, p11, p10] ]
                         : [ [p00, p01, p10], [p01, p11, p10] ],
@@ -621,25 +620,9 @@ function _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, po
                     ]
                 )
                 (sum(errs_tri) / len(errs_tri))
-        ],
-        // Include the vertex-face triangle around v0 (if it is triangular) so the solver
-        // also balances the true snub triangles, not just edge splits.
-        err_vtri = (len(fc) == 3)
-            ? let(
-                p0 = _ps_snub_face_point(verts0, faces0, face_n, df, fc[0], v0, handedness, angle, poly0),
-                p1 = _ps_snub_face_point(verts0, faces0, face_n, df, fc[1], v0, handedness, angle, poly0),
-                p2 = _ps_snub_face_point(verts0, faces0, face_n, df, fc[2], v0, handedness, angle, poly0),
-                lens = [ norm(p0-p1), norm(p1-p2), norm(p2-p0) ],
-                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                r0 = lens[0] / avg,
-                r1 = lens[1] / avg,
-                r2 = lens[2] / avg
-              )
-              (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-            : 0,
-        errs_all2 = concat(errs_all, [err_vtri])
+        ]
     )
-    (len(errs_all2) == 0) ? undef : (sum(errs_all2) / len(errs_all2));
+    (len(errs_all) == 0) ? undef : (sum(errs_all) / len(errs_all));
 
 function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, eps=1e-9) =
     let(
@@ -650,10 +633,12 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, eps=1e-9) =
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
+        cls = poly_classify(poly, 1),
+        edge_reps = [for (f = cls[1]) f[1][0]],
         angs = [for (i = [1:1:steps]) 60 * i / steps],
         cands = [
             for (a = angs)
-                let(sp = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness))
+                let(sp = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness, edge_reps))
                 if (!is_undef(sp)) [a, sp]
         ],
         _ = assert(len(cands) > 0, "snub: no valid angle candidates"),
@@ -684,6 +669,8 @@ function _ps_snub_default_params(poly, handedness=1, df_steps=12, a_steps=40, ep
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
+        cls = poly_classify(poly, 1),
+        edge_reps = [for (f = cls[1]) f[1][0]],
         // Search df in a conservative fraction of poly IR.
         ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
         df_max = 2 * ir,
@@ -694,7 +681,7 @@ function _ps_snub_default_params(poly, handedness=1, df_steps=12, a_steps=40, ep
                 let(
                     spreads = [
                         for (a = angs)
-                            let(sp = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness))
+                            let(sp = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness, edge_reps))
                                 if (!is_undef(sp)) [a, sp]
                     ],
                     ok = len(spreads) > 0,
@@ -711,8 +698,8 @@ function _ps_snub_default_params(poly, handedness=1, df_steps=12, a_steps=40, ep
         idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0],
         df_best = cands[idx][0],
         a_best = cands[idx][1],
-        err_a0 = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 0, handedness),
-        err_a20 = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 20, handedness),
+        err_a0 = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 0, handedness, edge_reps),
+        err_a20 = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 20, handedness, edge_reps),
         _0 = echo(str(
             "snub: default param search min_err=", e_min,
             " df=", df_best,
@@ -761,7 +748,7 @@ function _ps_snub_default_params_full(poly, handedness=1, df_steps=8, a_steps=12
     )
     [df_best, a_best];
 
-function _ps_snub_face_point(verts0, faces0, face_n, df, fi, v0, handedness, angle, poly0) =
+function _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, fi, v0, handedness, angle, poly0) =
     let(
         f = faces0[fi],
         n_f = face_n[fi],
@@ -769,8 +756,16 @@ function _ps_snub_face_point(verts0, faces0, face_n, df, fi, v0, handedness, ang
         ex = poly_face_ex(poly0, fi, 1),
         ey = poly_face_ey(poly0, fi, 1),
         p_base = center + df * n_f,
-        v_rel = verts0[v0] - center,
-        p0_2d = _ps_rot2d([v_dot(v_rel, ex), v_dot(v_rel, ey)], handedness * angle)
+        pts2d = [
+            for (k = [0:1:len(f)-1])
+                let(p = verts0[f[k]] - center)
+                    [v_dot(p, ex), v_dot(p, ey)]
+        ],
+        // d_f is outward for callers; _ps_face_inset_bisector_2d uses p0 = center - n_f*d_f,
+        // so pass -df. d_e follows the same outward convention, so pass -df there too.
+        inset2d = _ps_face_inset_bisector_2d(f, fi, -df, -df, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+        pos = _ps_index_of(f, v0),
+        p0_2d = _ps_rot2d(inset2d[pos], handedness * angle)
     )
     p_base + ex * p0_2d[0] + ey * p0_2d[1];
 
@@ -786,14 +781,14 @@ function poly_snub(poly, angle=undef, c=undef, handedness=1, family_k=undef, eps
     let(
         _ = assert(poly_valid(poly, "struct"), "snub: requires structurally valid poly"),
         params = (is_undef(c) && is_undef(angle) && is_undef(family_k))
-            ? (_ps_is_regular_base(poly) ? _ps_snub_default_params_full(poly, handedness) : _ps_snub_default_params(poly, handedness))
+            ? _ps_snub_default_params(poly, handedness)
             : undef,
         fam = is_undef(family_k) ? ps_face_family_mode(poly)[0] : family_k,
         df_base = is_undef(c)
             ? (is_undef(params)
                 ? (is_undef(family_k) ? _ps_cantellate_df_from_c(poly, 0.5) : (0.5 * ps_face_radius_stat(poly, fam)))
                 : params[0])
-            : c,
+            : _ps_cantellate_df_from_c(poly, c),
         // Default to equilateral twist unless an explicit angle is provided.
         angle_eff = is_undef(angle)
             ? let(
@@ -818,15 +813,24 @@ function poly_snub(poly, angle=undef, c=undef, handedness=1, family_k=undef, eps
                     n_f = face_n[fi],
                     center = poly_face_center(poly0, fi, 1),
                     ex = poly_face_ex(poly0, fi, 1),
-                    ey = poly_face_ey(poly0, fi, 1)
+                    ey = poly_face_ey(poly0, fi, 1),
+                    d_f = df_base,
+                    d_e = df_base,
+                    pts2d = [
+                        for (k = [0:1:n-1])
+                            let(p = verts0[f[k]] - center)
+                                [v_dot(p, ex), v_dot(p, ey)]
+                    ],
+                    // d_f is outward for callers; _ps_face_inset_bisector_2d uses p0 = center - n_f*d_f.
+                    // d_e follows the same outward convention.
+                    inset2d = _ps_face_inset_bisector_2d(f, fi, -d_f, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
                 )
                 [
                     for (k = [0:1:n-1])
                         let(
                             v = f[k],
-                            p_base = center + df_base * n_f,
-                            v_rel = verts0[v] - center,
-                            p0_2d = _ps_rot2d([v_dot(v_rel, ex), v_dot(v_rel, ey)], handedness * angle_eff)
+                            p_base = center + d_f * n_f,
+                            p0_2d = _ps_rot2d(inset2d[k], handedness * angle_eff)
                         )
                         p_base + ex * p0_2d[0] + ey * p0_2d[1]
                 ]
