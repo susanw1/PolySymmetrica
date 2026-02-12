@@ -10,6 +10,7 @@ use <../testing_util.scad>
 
 EPS = 1e-7;
 ENABLE_CANTITRUNC_PLANARITY_TEST = false;
+ENABLE_SNUB_PERF_SMOKE = false;
 
 module assert_near(a, b, eps=EPS, msg="") {
     assert(abs(a-b) <= eps, str(msg, " expected=", b, " got=", a));
@@ -477,6 +478,18 @@ module test_poly_snub__fixed_c_auto_beats_zero_angle() {
     assert(_edge_rel_spread(q1) < _edge_rel_spread(q0), "snub cube fixed-c auto-angle improves edge uniformity vs angle=0");
 }
 
+// Informational performance smoke test for default snub solving.
+// This is intentionally non-failing and opt-in to avoid slowing normal CI/dev runs.
+module perf_snub__defaults_smoke() {
+    echo("PERF_SNUB: start cube default");
+    q0 = poly_snub(hexahedron());
+    echo("PERF_SNUB: done cube default", "v/f/e", len(poly_verts(q0)), len(poly_faces(q0)), len(poly_edges(q0)), "e_over_ir", poly_e_over_ir(q0));
+
+    echo("PERF_SNUB: start dodeca default");
+    q1 = poly_snub(dodecahedron());
+    echo("PERF_SNUB: done dodeca default", "v/f/e", len(poly_verts(q1)), len(poly_faces(q1)), len(poly_edges(q1)), "e_over_ir", poly_e_over_ir(q1));
+}
+
 
 
 // suite
@@ -515,6 +528,10 @@ module run_TestTruncation() {
     test_poly_snub__cube_default_params_reasonable();
     test_poly_snub__fixed_c_angle_solver_nonzero();
     test_poly_snub__fixed_c_auto_beats_zero_angle();
+    if (ENABLE_SNUB_PERF_SMOKE)
+        perf_snub__defaults_smoke();
+    else
+        echo("NOTE: snub perf smoke test disabled");
 }
 
 run_TestTruncation();
