@@ -21,6 +21,15 @@ module assert_int_eq(a, b, msg="") {
 function _count_faces_of_size(poly, k) =
     sum([ for (f = poly_faces(poly)) (len(f)==k) ? 1 : 0 ]);
 
+function _edge_rel_spread(poly) =
+    let(
+        verts = poly_verts(poly),
+        edges = poly_edges(poly),
+        lens = [for (e = edges) norm(verts[e[0]] - verts[e[1]])],
+        avg = (len(lens) == 0) ? 0 : (sum(lens) / len(lens))
+    )
+    (len(lens) == 0 || avg == 0) ? 0 : ((max(lens) - min(lens)) / avg);
+
 function _map_face_c(size, c_by_size, default=0) =
     let(idxs = [for (i = [0:1:len(c_by_size)-1]) if (c_by_size[i][0] == size) i])
     (len(idxs) == 0) ? default : c_by_size[idxs[0]][1];
@@ -398,7 +407,9 @@ module test_poly_snub__cube_counts() {
 
 module test_poly_snub__dodeca_counts() {
     p = dodecahedron();
-    q = poly_snub(p);
+    // Use explicit parameters here to keep test runtime bounded;
+    // default-solving behavior is covered by cube default tests.
+    q = poly_snub(p, c=0.07, angle=15);
     assert_poly_valid(q);
 
     assert_int_eq(len(poly_verts(q)), 60, "snub dodeca verts count");
@@ -410,12 +421,60 @@ module test_poly_snub__dodeca_counts() {
 
 module test_poly_snub__cube_twist_moves_vertices() {
     p = hexahedron();
-    q0 = poly_snub(p, 0);
-    q1 = poly_snub(p, 20);
+    q0 = poly_snub(p, angle=0, c=0.2);
+    q1 = poly_snub(p, angle=20, c=0.2);
     verts0 = poly_verts(q0);
     verts1 = poly_verts(q1);
     max_d = max([for (i = [0:1:len(verts0)-1]) norm(verts1[i] - verts0[i])]);
     assert(max_d > 1e-4, "snub cube: twist moves vertices");
+}
+
+module test_poly_snub__cube_edge_tris_near_equilateral() {
+    p = hexahedron();
+    q = poly_snub(p);
+    verts = poly_verts(q);
+    faces = poly_faces(q);
+    edges = poly_edges(q);
+    edge_faces = ps_edge_faces_table(faces, edges);
+    tri_faces = [for (fi = [0:1:len(faces)-1]) if (len(faces[fi]) == 3) fi];
+    tri_sq = [
+        for (fi = tri_faces)
+            let(nbrs = [for (ei = [0:1:len(edges)-1]) if (edge_faces[ei][0] == fi || edge_faces[ei][1] == fi) (edge_faces[ei][0] == fi ? edge_faces[ei][1] : edge_faces[ei][0])])
+            if (len([for (n = nbrs) if (n >= 0 && len(faces[n]) == 4) n]) > 0) fi
+    ];
+    errs = [
+        for (fi = tri_sq)
+            let(f = faces[fi])
+                let(
+                    l0 = norm(verts[f[0]] - verts[f[1]]),
+                    l1 = norm(verts[f[1]] - verts[f[2]]),
+                    l2 = norm(verts[f[2]] - verts[f[0]]),
+                    avg = (l0 + l1 + l2) / 3
+                )
+                max([abs(l0-avg), abs(l1-avg), abs(l2-avg)]) / avg
+    ];
+    err = (len(errs) == 0) ? 1 : max(errs);
+    assert(err < 0.25, "snub cube: edge triangles near equilateral");
+}
+
+module test_poly_snub__cube_default_params_reasonable() {
+    p = hexahedron();
+    params = _ps_snub_default_params(p);
+    assert(params[3] == "regular", "snub cube: regular-tier default");
+    assert(params[2] > 0.03 && params[2] < 0.12, str("snub cube: c in expected range got=", params[2]));
+    assert(params[1] > 8 && params[1] < 25, str("snub cube: angle in expected range got=", params[1]));
+}
+
+module test_poly_snub__fixed_c_angle_solver_nonzero() {
+    a = _ps_snub_default_angle_c(hexahedron(), 0.07, steps=8, a_max=30);
+    assert(a > 8 && a < 25, str("snub cube fixed-c angle should be nonzero got=", a));
+}
+
+module test_poly_snub__fixed_c_auto_beats_zero_angle() {
+    p = hexahedron();
+    q0 = poly_snub(p, c=0.07, angle=0);
+    q1 = poly_snub(p, c=0.07);
+    assert(_edge_rel_spread(q1) < _edge_rel_spread(q0), "snub cube fixed-c auto-angle improves edge uniformity vs angle=0");
 }
 
 
@@ -452,6 +511,10 @@ module run_TestTruncation() {
     test_poly_snub__cube_counts();
     test_poly_snub__dodeca_counts();
     test_poly_snub__cube_twist_moves_vertices();
+    test_poly_snub__cube_edge_tris_near_equilateral();
+    test_poly_snub__cube_default_params_reasonable();
+    test_poly_snub__fixed_c_angle_solver_nonzero();
+    test_poly_snub__fixed_c_auto_beats_zero_angle();
 }
 
 run_TestTruncation();

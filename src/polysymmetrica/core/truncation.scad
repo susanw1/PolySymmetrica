@@ -624,7 +624,38 @@ function _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, po
     )
     (len(errs_all) == 0) ? undef : (sum(errs_all) / len(errs_all));
 
-function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, eps=1e-9) =
+// Uniformity objective for snub defaults:
+// collect all edge types induced by edge-face quads and minimize global spread.
+function _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, angle, handedness=1, edge_reps=undef, eps=1e-12) =
+    let(
+        edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
+        lens_all = [
+            for (ei = edge_list)
+                let(
+                    e = edges[ei],
+                    fpair = edge_faces[ei],
+                    f0 = fpair[0],
+                    f1 = fpair[1],
+                    v0 = e[0],
+                    v1 = e[1],
+                    p00 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f0, v0, handedness, angle, poly0),
+                    p01 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f0, v1, handedness, angle, poly0),
+                    p11 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f1, v1, handedness, angle, poly0),
+                    p10 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, f1, v0, handedness, angle, poly0),
+                    l_face0 = norm(p00 - p01),
+                    l_face1 = norm(p10 - p11),
+                    l_vert0 = norm(p00 - p10),
+                    l_vert1 = norm(p01 - p11),
+                    l_diag = (handedness >= 0) ? norm(p00 - p11) : norm(p01 - p10)
+                )
+                each [l_face0, l_face1, l_vert0, l_vert1, l_diag]
+        ],
+        good = (len(lens_all) > 0) && (len([for (l = lens_all) if (is_undef(l) || l <= eps) 1]) == 0),
+        avg = good ? (sum(lens_all) / len(lens_all)) : undef
+    )
+    (!good || avg <= eps) ? undef : ((max(lens_all) - min(lens_all)) / avg);
+
+function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, eps=1e-9) =
     let(
         base = _ps_poly_base(poly),
         verts0 = base[0],
@@ -635,11 +666,11 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, eps=1e-9) =
         poly0 = base[5],
         cls = poly_classify(poly, 1),
         edge_reps = [for (f = cls[1]) f[1][0]],
-        angs = [for (i = [1:1:steps]) 60 * i / steps],
+        angs = [for (i = [0:1:steps]) a_max * i / steps],
         cands = [
             for (a = angs)
-                let(sp = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness, edge_reps))
-                if (!is_undef(sp)) [a, sp]
+                let(err = _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness, edge_reps))
+                if (!is_undef(err)) [a, err]
         ],
         _ = assert(len(cands) > 0, "snub: no valid angle candidates"),
         errs = [for (c = cands) c[1]],
@@ -649,7 +680,7 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, eps=1e-9) =
         a0 = cands[0][1],
         a20 = (len(idx20) > 0) ? cands[idx20[0]][1] : undef,
         _0 = echo(str(
-            "snub: default angle search min_err=", e_min,
+            "snub: angle solve (fixed df) min_err=", e_min,
             " at angle=", cands[idx][0],
             " (df=", df, ")",
             " err@angle0=", a0,
@@ -658,9 +689,43 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, eps=1e-9) =
     )
     cands[idx][0];
 
-// Solve for a df/angle pair that makes edge-face triangles as equilateral as possible.
-// Used only when both c (interpreted as df) and angle are unspecified.
-function _ps_snub_default_params(poly, handedness=1, df_steps=12, a_steps=40, eps=1e-9) =
+// Solve angle for fixed c using full global edge-uniformity objective.
+function _ps_snub_default_angle_c(poly, c, handedness=1, steps=16, a_max=30, eps=1e-9) =
+    let(
+        angs = [for (i = [0:1:steps]) a_max * i / steps],
+        cands = [
+            for (a = angs)
+                let(
+                    q = poly_snub(poly, angle=a, c=c, handedness=handedness),
+                    edges = poly_edges(q),
+                    verts = poly_verts(q),
+                    lens = [for (e = edges) norm(verts[e[0]] - verts[e[1]])],
+                    avg = (len(lens) == 0) ? 0 : (sum(lens) / len(lens)),
+                    err = (len(lens) == 0 || avg == 0) ? undef : ((max(lens) - min(lens)) / avg)
+                )
+                if (!is_undef(err)) [a, err]
+        ],
+        _ = assert(len(cands) > 0, "snub: no valid angle candidates for fixed c"),
+        errs = [for (c0 = cands) c0[1]],
+        e_min = min(errs),
+        idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0],
+        a0 = cands[0][1],
+        idx20 = [for (i = [0:1:len(cands)-1]) if (abs(cands[i][0] - 20) <= 1e-6) i],
+        a20 = (len(idx20) > 0) ? cands[idx20[0]][1] : undef,
+        _0 = echo(str(
+            "snub: angle solve (fixed c) min_err=", e_min,
+            " at angle=", cands[idx][0],
+            " (c=", c, ")",
+            " err@angle0=", a0,
+            is_undef(a20) ? "" : str(" err@angle20=", a20)
+        ))
+    )
+    cands[idx][0];
+
+// Solve for default snub parameters with a tiered strategy:
+// regular -> family representative -> bounded heuristic.
+// Returns [df, angle, c, tier].
+function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
     let(
         base = _ps_poly_base(poly),
         verts0 = base[0],
@@ -670,83 +735,97 @@ function _ps_snub_default_params(poly, handedness=1, df_steps=12, a_steps=40, ep
         face_n = base[4],
         poly0 = base[5],
         cls = poly_classify(poly, 1),
-        edge_reps = [for (f = cls[1]) f[1][0]],
-        // Search df in a conservative fraction of poly IR.
-        ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
-        df_max = 2 * ir,
-        dfs = [for (i = [1:1:df_steps]) df_max * i / (df_steps + 1)],
-        angs = [for (i = [1:1:a_steps]) 60 * i / a_steps],
-        cands = [
-            for (df = dfs)
+        ff = len(cls[0]),
+        ef = len(cls[1]),
+        vf = len(cls[2]),
+        is_reg = _ps_is_regular_base(poly),
+        tier = is_reg ? "regular" : ((ff <= 3 && ef <= 4 && vf <= 4) ? "family" : "heuristic"),
+        c_steps = (tier == "family") ? 16 : 10,
+        a_steps = (tier == "family") ? 18 : 14,
+        c_max = (tier == "family") ? 0.2 : 0.25,
+        a_max = 35,
+        reg_c_steps = (len(edges) <= 12) ? 6 : 4,
+        reg_a_steps = (len(edges) <= 12) ? 8 : 6,
+        edge_reps_all = [for (f = cls[1]) f[1][0]],
+        edge_reps = (tier == "heuristic" && len(edge_reps_all) > 12)
+            ? [for (i = [0:1:11]) edge_reps_all[i]]
+            : edge_reps_all,
+        reg_best = is_reg ? _ps_snub_default_params_full(poly, handedness, c_steps=reg_c_steps, a_steps=reg_a_steps, c_max=0.15, a_max=25, eps=eps) : undef,
+        c_vals = is_reg ? [] : [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
+        angs = is_reg ? [] : [for (i = [0:1:a_steps]) a_max * i / a_steps],
+        cands = is_reg ? [] : [
+            for (c = c_vals)
                 let(
-                    spreads = [
+                    df = _ps_cantellate_df_from_c(poly, c),
+                    errs = [
                         for (a = angs)
-                            let(sp = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness, edge_reps))
-                                if (!is_undef(sp)) [a, sp]
+                            let(err = _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, a, handedness, edge_reps))
+                            if (!is_undef(err)) [a, err]
                     ],
-                    ok = len(spreads) > 0,
-                    errs = ok ? [for (s = spreads) s[1]] : [],
-                    e_min = ok ? min(errs) : undef,
-                    idx = ok ? [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0] : undef,
-                    a_best = ok ? spreads[idx][0] : undef
+                    ok = len(errs) > 0,
+                    err_vals = ok ? [for (x = errs) x[1]] : [],
+                    e_min = ok ? min(err_vals) : undef,
+                    idx = ok ? [for (i = [0:1:len(err_vals)-1]) if (abs(err_vals[i] - e_min) <= eps) i][0] : undef,
+                    a_best = ok ? errs[idx][0] : undef
                 )
-                if (ok) [df, a_best, e_min]
+                if (ok) [df, a_best, c, e_min]
         ],
-        _ = assert(len(cands) > 0, "snub: no valid (c, angle) candidates"),
-        errs = [for (c = cands) c[2]],
-        e_min = min(errs),
-        idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0],
-        df_best = cands[idx][0],
-        a_best = cands[idx][1],
-        err_a0 = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 0, handedness, edge_reps),
-        err_a20 = _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 20, handedness, edge_reps),
+        _ = is_reg ? 0 : assert(len(cands) > 0, "snub: no valid (c, angle) candidates"),
+        all_errs = is_reg ? [] : [for (c = cands) c[3]],
+        e_min = is_reg ? reg_best[3] : min(all_errs),
+        idx = is_reg ? undef : [for (i = [0:1:len(all_errs)-1]) if (abs(all_errs[i] - e_min) <= eps) i][0],
+        df_best = is_reg ? reg_best[0] : cands[idx][0],
+        a_best = is_reg ? reg_best[1] : cands[idx][1],
+        c_best = is_reg ? reg_best[2] : cands[idx][2],
+        err_a0 = _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 0, handedness, edge_reps),
+        err_a20 = _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, 20, handedness, edge_reps),
         _0 = echo(str(
-            "snub: default param search min_err=", e_min,
+            "snub: default auto tier=", tier,
+            " families(f/e/v)=", ff, "/", ef, "/", vf,
+            " min_err=", e_min,
+            " c=", c_best,
             " df=", df_best,
             " angle=", a_best,
             " err@angle0=", err_a0,
             is_undef(err_a20) ? "" : str(" err@angle20=", err_a20)
         ))
     )
-    [df_best, a_best];
+    [df_best, a_best, c_best, tier];
 
-// Solve for a df/angle pair by minimizing edge-length variance of the full snubbed poly.
-// This is slower but more robust for regular bases.
-function _ps_snub_default_params_full(poly, handedness=1, df_steps=8, a_steps=12, eps=1e-9) =
+// Solve for a c/angle pair by minimizing edge-length variance of the full snubbed poly.
+// This is slower but robust for regular bases.
+function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, a_steps=12, c_max=0.2, a_max=30, eps=1e-9) =
     let(
-        base = _ps_poly_base(poly),
-        verts0 = base[0],
-        edges0 = base[2],
-        ir = min([for (e = edges0) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
-        df_max = 1.5 * ir,
-        dfs = [for (i = [1:1:df_steps]) df_max * i / (df_steps + 1)],
-        angs = [for (i = [1:1:a_steps]) 60 * i / a_steps],
+        cs = [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
+        angs = [for (i = [0:1:a_steps]) a_max * i / a_steps],
         cands = [
-            for (df = dfs)
+            for (c = cs)
                 for (a = angs)
                     let(
-                        q = poly_snub(poly, angle=a, c=df, handedness=handedness),
+                        q = poly_snub(poly, angle=a, c=c, handedness=handedness),
                         edges = poly_edges(q),
                         verts = poly_verts(q),
                         lens = [for (e = edges) norm(verts[e[0]] - verts[e[1]])],
                         avg = (len(lens) == 0) ? 0 : (sum(lens) / len(lens)),
                         err = (len(lens) == 0 || avg == 0) ? undef : ((max(lens) - min(lens)) / avg)
                     )
-                    if (!is_undef(err)) [df, a, err]
+                    if (!is_undef(err)) [c, a, err]
         ],
-        _ = assert(len(cands) > 0, "snub: no valid (df, angle) candidates (full search)"),
+        _ = assert(len(cands) > 0, "snub: no valid (c, angle) candidates (full search)"),
         errs = [for (c = cands) c[2]],
         e_min = min(errs),
         idx = [for (i = [0:1:len(errs)-1]) if (abs(errs[i] - e_min) <= eps) i][0],
-        df_best = cands[idx][0],
+        c_best = cands[idx][0],
         a_best = cands[idx][1],
+        df_best = _ps_cantellate_df_from_c(poly, c_best),
         _0 = echo(str(
             "snub: default param FULL search min_err=", e_min,
+            " c=", c_best,
             " df=", df_best,
             " angle=", a_best
         ))
     )
-    [df_best, a_best];
+    [df_best, a_best, c_best, e_min];
 
 function _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, df, fi, v0, handedness, angle, poly0) =
     let(
@@ -783,6 +862,9 @@ function poly_snub(poly, angle=undef, c=undef, handedness=1, family_k=undef, eps
         params = (is_undef(c) && is_undef(angle) && is_undef(family_k))
             ? _ps_snub_default_params(poly, handedness)
             : undef,
+        _choice = !is_undef(params)
+            ? echo(str("snub: using auto defaults tier=", params[3], " c=", params[2], " df=", params[0], " angle=", params[1]))
+            : 0,
         fam = is_undef(family_k) ? ps_face_family_mode(poly)[0] : family_k,
         df_base = is_undef(c)
             ? (is_undef(params)
@@ -792,8 +874,9 @@ function poly_snub(poly, angle=undef, c=undef, handedness=1, family_k=undef, eps
         // Default to equilateral twist unless an explicit angle is provided.
         angle_eff = is_undef(angle)
             ? let(
-                a = is_undef(params) ? _ps_snub_default_angle_df(poly, df_base, handedness) : params[1],
-                _ = echo(str("snub: angle unspecified, default=", a))
+                a = !is_undef(params) ? params[1]
+                    : (!is_undef(c) ? _ps_snub_default_angle_c(poly, c, handedness) : _ps_snub_default_angle_df(poly, df_base, handedness)),
+                _ = echo(str("snub: angle unspecified, default=", a, " (df=", df_base, is_undef(c) ? ")" : str(", c=", c, ")")))
               ) a
             : angle
     )
