@@ -455,7 +455,14 @@ module test_poly_snub__cube_edge_tris_near_equilateral() {
                 max([abs(l0-avg), abs(l1-avg), abs(l2-avg)]) / avg
     ];
     err = (len(errs) == 0) ? 1 : max(errs);
-    assert(err < 0.25, "snub cube: edge triangles near equilateral");
+    assert(err < 0.01, str("snub cube: edge triangles should be near equilateral err=", err));
+}
+
+module test_poly_snub__cube_default_global_edges_near_uniform() {
+    p = hexahedron();
+    q = poly_snub(p);
+    spread = _edge_rel_spread(q);
+    assert(spread < 0.01, str("snub cube default: global edge spread <1% got=", spread));
 }
 
 module test_poly_snub__cube_default_params_reasonable() {
@@ -481,13 +488,13 @@ module test_poly_snub__fixed_c_auto_beats_zero_angle() {
 // Informational performance smoke test for default snub solving.
 // This is intentionally non-failing and opt-in to avoid slowing normal CI/dev runs.
 module perf_snub__defaults_smoke() {
-    echo("PERF_SNUB: start cube default");
-    q0 = poly_snub(hexahedron());
-    echo("PERF_SNUB: done cube default", "v/f/e", len(poly_verts(q0)), len(poly_faces(q0)), len(poly_edges(q0)), "e_over_ir", poly_e_over_ir(q0));
+    echo("PERF_SNUB: start cube default params");
+    p0 = _ps_snub_default_params(hexahedron());
+    echo("PERF_SNUB: done cube default params", p0);
 
-    echo("PERF_SNUB: start dodeca default");
-    q1 = poly_snub(dodecahedron());
-    echo("PERF_SNUB: done dodeca default", "v/f/e", len(poly_verts(q1)), len(poly_faces(q1)), len(poly_edges(q1)), "e_over_ir", poly_e_over_ir(q1));
+    echo("PERF_SNUB: start dodeca default params");
+    p1 = _ps_snub_default_params(dodecahedron());
+    echo("PERF_SNUB: done dodeca default params", p1);
 }
 
 
@@ -525,6 +532,7 @@ module run_TestTruncation() {
     test_poly_snub__dodeca_counts();
     test_poly_snub__cube_twist_moves_vertices();
     test_poly_snub__cube_edge_tris_near_equilateral();
+    test_poly_snub__cube_default_global_edges_near_uniform();
     test_poly_snub__cube_default_params_reasonable();
     test_poly_snub__fixed_c_angle_solver_nonzero();
     test_poly_snub__fixed_c_auto_beats_zero_angle();
