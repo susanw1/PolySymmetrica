@@ -602,40 +602,12 @@ function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0
     let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
     poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
 
-// Snub (chiral): twist cantellated face points within each face plane and triangulate edge cycles.
-function _ps_snub_face_pts_cache(verts0, faces0, edges, edge_faces, face_n, poly0, d_f_by_face, d_e, angle, handedness=1) =
-    [
-        for (fi = [0:1:len(faces0)-1])
-            let(
-                f = faces0[fi],
-                center = poly_face_center(poly0, fi, 1),
-                ex = poly_face_ex(poly0, fi, 1),
-                ey = poly_face_ey(poly0, fi, 1),
-                n_f = face_n[fi],
-                d_f = d_f_by_face[fi],
-                p_base = center + d_f * n_f,
-                pts2d = [
-                    for (k = [0:1:len(f)-1])
-                        let(p = verts0[f[k]] - center)
-                            [v_dot(p, ex), v_dot(p, ey)]
-                ],
-                // d_f and d_e are outward for callers.
-                inset2d = _ps_face_inset_bisector_2d(f, fi, -d_f, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
-                pts2d_rot = [for (p2 = inset2d) _ps_rot2d(p2, handedness * angle)]
-            )
-            [for (p2 = pts2d_rot) p_base + ex * p2[0] + ey * p2[1]]
-    ];
-
 function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
     let(pos = _ps_index_of(faces0[fi], v))
     face_pts[fi][pos];
 
 function _ps_snub_required_faces(edge_faces, edge_list) =
     _ps_unique_ints([for (ei = edge_list) each edge_faces[ei]]);
-
-function _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness=1, edge_reps=undef) =
-    let(ev = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness, edge_reps))
-    ev[1];
 
 // Uniformity objective for snub defaults:
 // collect all edge types induced by edge-face quads and minimize global spread.
@@ -1213,26 +1185,6 @@ function _ps_snub_default_params_family(poly, handedness=1, c_steps=12, a_steps=
         ))
     )
     [df_avg, a_best, c_best, e_min, d_f_by_family_best];
-
-function _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, fi, v0, handedness, angle, poly0) =
-    let(
-        f = faces0[fi],
-        n_f = face_n[fi],
-        center = poly_face_center(poly0, fi, 1),
-        ex = poly_face_ex(poly0, fi, 1),
-        ey = poly_face_ey(poly0, fi, 1),
-        p_base = center + d_f * n_f,
-        pts2d = [
-            for (k = [0:1:len(f)-1])
-                let(p = verts0[f[k]] - center)
-                    [v_dot(p, ex), v_dot(p, ey)]
-        ],
-        // d_f and d_e are outward for callers; _ps_face_inset_bisector_2d uses p0 = center - n_f*d_f.
-        inset2d = _ps_face_inset_bisector_2d(f, fi, -d_f, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
-        pos = _ps_index_of(f, v0),
-        p0_2d = _ps_rot2d(inset2d[pos], handedness * angle)
-    )
-    p_base + ex * p0_2d[0] + ey * p0_2d[1];
 
 function _ps_face_max_plane_err(verts, f) =
     let(
