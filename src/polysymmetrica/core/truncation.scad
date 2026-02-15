@@ -774,7 +774,7 @@ function _ps_snub_best3_regular(verts0, faces0, edges, edge_faces, face_n, poly0
     )
     cands[idx];
 
-function _ps_snub_local_search_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, state, steps, c_max, a_max, handedness=1, edge_reps=undef, iter=0, max_iter=24, eps=1e-9) =
+function _ps_snub_local_search_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, state, steps, c_max, a_max, handedness=1, edge_reps=undef, iter=0, max_iter=10, eps=1e-9) =
     let(
         c = state[0], r = state[1], a = state[2], e = state[3],
         dc = steps[0], dr = steps[1], da = steps[2],
@@ -884,7 +884,7 @@ function _ps_snub_best_ca_family(verts0, faces0, edges, edge_faces, face_n, poly
     )
     cands[idx];
 
-function _ps_snub_local_search_ca_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, state, steps, c_max, a_max, handedness=1, edge_reps=undef, iter=0, max_iter=18, eps=1e-9) =
+function _ps_snub_local_search_ca_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, state, steps, c_max, a_max, handedness=1, edge_reps=undef, iter=0, max_iter=12, eps=1e-9) =
     let(
         c = state[0], a = state[1], e = state[2],
         dc = steps[0], da = steps[1],
@@ -905,8 +905,9 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, e
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
-        cls = poly_classify(poly, 1),
-        edge_reps = [for (f = cls[1]) f[1][0]],
+        is_reg = _ps_is_regular_base(poly),
+        cls = is_reg ? undef : poly_classify(poly, 1),
+        edge_reps = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
         angs = [for (i = [0:1:steps]) a_max * i / steps],
         cands = [
             for (a = angs)
@@ -940,9 +941,10 @@ function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_m
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
-        cls = poly_classify(poly, 1),
-        edge_reps = [for (f = cls[1]) f[1][0]],
-        map = _ps_cantellate_df_map(poly),
+        is_reg = _ps_is_regular_base(poly),
+        cls = is_reg ? undef : poly_classify(poly, 1),
+        edge_reps = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
+        map = _ps_cantellate_df_map(poly, steps=6),
         df_mid = map[0],
         df_max_eff = map[1],
         de = _ps_cantellate_df_from_c_linear(c, df_mid, df_max_eff),
@@ -985,23 +987,23 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
-        cls = poly_classify(poly, 1),
-        cmap = _ps_cantellate_df_map(poly),
+        is_reg = _ps_is_regular_base(poly),
+        cls = is_reg ? undef : poly_classify(poly, 1),
+        cmap = _ps_cantellate_df_map(poly, steps=6),
         df_mid = cmap[0],
         df_max_eff = cmap[1],
-        ff = len(cls[0]),
-        ef = len(cls[1]),
-        vf = len(cls[2]),
-        is_reg = _ps_is_regular_base(poly),
+        ff = is_reg ? 1 : len(cls[0]),
+        ef = is_reg ? 1 : len(cls[1]),
+        vf = is_reg ? 1 : len(cls[2]),
         tier = is_reg ? "regular" : ((ff <= 3 && ef <= 4 && vf <= 4) ? "family" : "heuristic"),
         c_steps = (tier == "family") ? 16 : 10,
         a_steps = (tier == "family") ? 18 : 14,
         c_max = (tier == "family") ? 0.2 : 0.25,
         a_max = 35,
-        reg_c_steps = (len(edges) <= 12) ? 6 : 5,
-        reg_df_steps = (len(edges) <= 12) ? 6 : 5,
-        reg_a_steps = (len(edges) <= 12) ? 8 : 7,
-        edge_reps_all = [for (f = cls[1]) f[1][0]],
+        reg_c_steps = (len(edges) <= 12) ? 2 : 2,
+        reg_df_steps = (len(edges) <= 12) ? 2 : 2,
+        reg_a_steps = (len(edges) <= 12) ? 3 : 3,
+        edge_reps_all = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
         edge_reps = (tier == "heuristic" && len(edge_reps_all) > 12)
             ? [for (i = [0:1:11]) edge_reps_all[i]]
             : edge_reps_all,
@@ -1071,7 +1073,7 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
         poly0 = base0[5],
         cls = is_undef(edge_reps) ? poly_classify(poly, 1) : undef,
         edge_reps_eff = is_undef(edge_reps) ? [for (f = cls[1]) f[1][0]] : edge_reps,
-        map = _ps_cantellate_df_map(poly),
+        map = _ps_cantellate_df_map(poly, steps=6),
         df_mid = map[0],
         df_max_eff = map[1],
         // Coarse seed
@@ -1079,7 +1081,7 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
         rs = [for (i = [0:1:df_steps]) 0.7 + 0.6 * i / df_steps],
         angs = [for (i = [0:1:a_steps]) a_max * i / a_steps],
         seed_samples = len(cs) * len(rs) * len(angs),
-        local_samples_bound = 27 * 24,
+        local_samples_bound = 27 * 10,
         seeds = [
             for (c = cs)
                 for (r = rs)
@@ -1134,7 +1136,7 @@ function _ps_snub_default_params_family(poly, handedness=1, c_steps=12, a_steps=
         ff = len(face_fams),
         face_fid = _ps_family_ids_from_fams(len(faces0), face_fams),
         r0 = [for (k = [0:1:ff-1]) 1],
-        map = _ps_cantellate_df_map(poly),
+        map = _ps_cantellate_df_map(poly, steps=6),
         df_mid = map[0],
         df_max_eff = map[1],
         cs = [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
@@ -1177,7 +1179,7 @@ function _ps_snub_default_params_family(poly, handedness=1, c_steps=12, a_steps=
         e0 = _ps_snub_obj_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_best, df_mid, df_max_eff, c0, a0, handedness, edge_reps),
         dc0 = c_max / (c_steps + 1),
         da0 = a_max / max(1, a_steps),
-        local_samples_bound = 9 * 18,
+        local_samples_bound = 9 * 12,
         best_ca = _ps_snub_local_search_ca_family(
             verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_best, df_mid, df_max_eff,
             [c0, a0, e0], [dc0, da0], c_max, a_max, handedness, edge_reps, 0, 18, eps
