@@ -603,88 +603,76 @@ function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0
     poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
 
 // Snub (chiral): twist cantellated face points within each face plane and triangulate edge cycles.
+function _ps_snub_face_pts_cache(verts0, faces0, edges, edge_faces, face_n, poly0, d_f_by_face, d_e, angle, handedness=1) =
+    [
+        for (fi = [0:1:len(faces0)-1])
+            let(
+                f = faces0[fi],
+                center = poly_face_center(poly0, fi, 1),
+                ex = poly_face_ex(poly0, fi, 1),
+                ey = poly_face_ey(poly0, fi, 1),
+                n_f = face_n[fi],
+                d_f = d_f_by_face[fi],
+                p_base = center + d_f * n_f,
+                pts2d = [
+                    for (k = [0:1:len(f)-1])
+                        let(p = verts0[f[k]] - center)
+                            [v_dot(p, ex), v_dot(p, ey)]
+                ],
+                // d_f and d_e are outward for callers.
+                inset2d = _ps_face_inset_bisector_2d(f, fi, -d_f, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+                pts2d_rot = [for (p2 = inset2d) _ps_rot2d(p2, handedness * angle)]
+            )
+            [for (p2 = pts2d_rot) p_base + ex * p2[0] + ey * p2[1]]
+    ];
+
+function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
+    let(pos = _ps_index_of(faces0[fi], v))
+    face_pts[fi][pos];
+
+function _ps_snub_required_faces(edge_faces, edge_list) =
+    _ps_unique_ints([for (ei = edge_list) each edge_faces[ei]]);
+
 function _ps_snub_edge_spread_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness=1, edge_reps=undef) =
-    let(
-        edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
-        errs_all = [
-            for (ei = edge_list)
-                let(
-                    e = edges[ei],
-                    fpair = edge_faces[ei],
-                    f0 = fpair[0],
-                    f1 = fpair[1],
-                    v0 = e[0],
-                    v1 = e[1],
-                    p00 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f0, v0, handedness, angle, poly0),
-                    p01 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f0, v1, handedness, angle, poly0),
-                    p11 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f1, v1, handedness, angle, poly0),
-                    p10 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f1, v0, handedness, angle, poly0),
-                    tris_a = [ [p00, p01, p11], [p00, p11, p10] ],
-                    tris_b = [ [p00, p01, p10], [p01, p11, p10] ],
-                    err_a = sum([
-                        for (tri = tris_a)
-                            let(
-                                lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
-                                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                                r0 = lens[0] / avg,
-                                r1 = lens[1] / avg,
-                                r2 = lens[2] / avg
-                            )
-                                (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-                    ]) / 2,
-                    err_b = sum([
-                        for (tri = tris_b)
-                            let(
-                                lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
-                                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                                r0 = lens[0] / avg,
-                                r1 = lens[1] / avg,
-                                r2 = lens[2] / avg
-                            )
-                                (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-                    ]) / 2
-                )
-                min(err_a, err_b)
-        ]
-    )
-    (len(errs_all) == 0) ? undef : (sum(errs_all) / len(errs_all));
+    let(ev = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness, edge_reps))
+    ev[1];
 
 // Uniformity objective for snub defaults:
 // collect all edge types induced by edge-face quads and minimize global spread.
 function _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness=1, edge_reps=undef, eps=1e-12) =
-    let(
-        edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
-        lens_all = [
-            for (ei = edge_list)
-                let(
-                    e = edges[ei],
-                    fpair = edge_faces[ei],
-                    f0 = fpair[0],
-                    f1 = fpair[1],
-                    v0 = e[0],
-                    v1 = e[1],
-                    p00 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f0, v0, handedness, angle, poly0),
-                    p01 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f0, v1, handedness, angle, poly0),
-                    p11 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f1, v1, handedness, angle, poly0),
-                    p10 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f1, v0, handedness, angle, poly0),
-                    l_face0 = norm(p00 - p01),
-                    l_face1 = norm(p10 - p11),
-                    l_vert0 = norm(p00 - p10),
-                    l_vert1 = norm(p01 - p11),
-                    l_diag = min(norm(p00 - p11), norm(p01 - p10))
-                )
-                each [l_face0, l_face1, l_vert0, l_vert1, l_diag]
-        ],
-        good = (len(lens_all) > 0) && (len([for (l = lens_all) if (is_undef(l) || l <= eps) 1]) == 0),
-        avg = good ? (sum(lens_all) / len(lens_all)) : undef
-    )
-    (!good || avg <= eps) ? undef : ((max(lens_all) - min(lens_all)) / avg);
+    let(ev = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness, edge_reps, eps))
+    ev[0];
 
 // Combined snub objective terms in one pass:
 // returns [uniform_spread, edge_triangle_error].
 function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness=1, edge_reps=undef, eps=1e-12) =
     let(
+        d_f_by_face = [for (_ = [0:1:len(faces0)-1]) d_f],
         edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
+        req_faces = _ps_snub_required_faces(edge_faces, edge_list),
+        face_pts = [
+            for (fi = [0:1:len(faces0)-1])
+                if (_ps_list_contains(req_faces, fi))
+                    let(
+                        f = faces0[fi],
+                        center = poly_face_center(poly0, fi, 1),
+                        ex = poly_face_ex(poly0, fi, 1),
+                        ey = poly_face_ey(poly0, fi, 1),
+                        n_f = face_n[fi],
+                        d_fi = d_f_by_face[fi],
+                        p_base = center + d_fi * n_f,
+                        pts2d = [
+                            for (k = [0:1:len(f)-1])
+                                let(p = verts0[f[k]] - center)
+                                    [v_dot(p, ex), v_dot(p, ey)]
+                        ],
+                        inset2d = _ps_face_inset_bisector_2d(f, fi, -d_fi, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+                        pts2d_rot = [for (p2 = inset2d) _ps_rot2d(p2, handedness * angle)]
+                    )
+                    [for (p2 = pts2d_rot) p_base + ex * p2[0] + ey * p2[1]]
+                else
+                    undef
+        ],
         per_edge = [
             for (ei = edge_list)
                 let(
@@ -694,10 +682,10 @@ function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, po
                     f1 = fpair[1],
                     v0 = e[0],
                     v1 = e[1],
-                    p00 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f0, v0, handedness, angle, poly0),
-                    p01 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f0, v1, handedness, angle, poly0),
-                    p11 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f1, v1, handedness, angle, poly0),
-                    p10 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f, d_e, f1, v0, handedness, angle, poly0),
+                    p00 = _ps_snub_face_cached_point(face_pts, faces0, f0, v0),
+                    p01 = _ps_snub_face_cached_point(face_pts, faces0, f0, v1),
+                    p11 = _ps_snub_face_cached_point(face_pts, faces0, f1, v1),
+                    p10 = _ps_snub_face_cached_point(face_pts, faces0, f1, v0),
                     l_face0 = norm(p00 - p01),
                     l_face1 = norm(p10 - p11),
                     l_vert0 = norm(p00 - p10),
@@ -798,7 +786,36 @@ function _ps_replace_at(list, idx, val) =
 
 function _ps_snub_eval_errors_face_df_base(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, d_f_by_family, d_e, angle, handedness=1, edge_reps=undef, eps=1e-12) =
     let(
+        d_f_by_face = [
+            for (fi = [0:1:len(faces0)-1])
+                let(id = face_fid[fi])
+                ((id >= 0 && id < len(d_f_by_family)) ? d_f_by_family[id] : d_e)
+        ],
         edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
+        req_faces = _ps_snub_required_faces(edge_faces, edge_list),
+        face_pts = [
+            for (fi = [0:1:len(faces0)-1])
+                if (_ps_list_contains(req_faces, fi))
+                    let(
+                        f = faces0[fi],
+                        center = poly_face_center(poly0, fi, 1),
+                        ex = poly_face_ex(poly0, fi, 1),
+                        ey = poly_face_ey(poly0, fi, 1),
+                        n_f = face_n[fi],
+                        d_fi = d_f_by_face[fi],
+                        p_base = center + d_fi * n_f,
+                        pts2d = [
+                            for (k = [0:1:len(f)-1])
+                                let(p = verts0[f[k]] - center)
+                                    [v_dot(p, ex), v_dot(p, ey)]
+                        ],
+                        inset2d = _ps_face_inset_bisector_2d(f, fi, -d_fi, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
+                        pts2d_rot = [for (p2 = inset2d) _ps_rot2d(p2, handedness * angle)]
+                    )
+                    [for (p2 = pts2d_rot) p_base + ex * p2[0] + ey * p2[1]]
+                else
+                    undef
+        ],
         per_edge = [
             for (ei = edge_list)
                 let(
@@ -806,16 +823,12 @@ function _ps_snub_eval_errors_face_df_base(verts0, faces0, edges, edge_faces, fa
                     fpair = edge_faces[ei],
                     f0 = fpair[0],
                     f1 = fpair[1],
-                    id0 = face_fid[f0],
-                    id1 = face_fid[f1],
-                    d_f0 = (id0 >= 0 && id0 < len(d_f_by_family)) ? d_f_by_family[id0] : d_e,
-                    d_f1 = (id1 >= 0 && id1 < len(d_f_by_family)) ? d_f_by_family[id1] : d_e,
                     v0 = e[0],
                     v1 = e[1],
-                    p00 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f0, d_e, f0, v0, handedness, angle, poly0),
-                    p01 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f0, d_e, f0, v1, handedness, angle, poly0),
-                    p11 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f1, d_e, f1, v1, handedness, angle, poly0),
-                    p10 = _ps_snub_face_point(verts0, faces0, edges, edge_faces, face_n, d_f1, d_e, f1, v0, handedness, angle, poly0),
+                    p00 = _ps_snub_face_cached_point(face_pts, faces0, f0, v0),
+                    p01 = _ps_snub_face_cached_point(face_pts, faces0, f0, v1),
+                    p11 = _ps_snub_face_cached_point(face_pts, faces0, f1, v1),
+                    p10 = _ps_snub_face_cached_point(face_pts, faces0, f1, v0),
                     l_face0 = norm(p00 - p01),
                     l_face1 = norm(p10 - p11),
                     l_vert0 = norm(p00 - p10),
@@ -1081,7 +1094,7 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
         rs = [for (i = [0:1:df_steps]) 0.7 + 0.6 * i / df_steps],
         angs = [for (i = [0:1:a_steps]) a_max * i / a_steps],
         seed_samples = len(cs) * len(rs) * len(angs),
-        local_samples_bound = 27 * 10,
+        local_samples_bound = 27 * 24,
         seeds = [
             for (c = cs)
                 for (r = rs)
