@@ -485,6 +485,18 @@ module test_poly_snub__fixed_c_auto_beats_zero_angle() {
     assert(_edge_rel_spread(q1) < _edge_rel_spread(q0), "snub cube fixed-c auto-angle improves edge uniformity vs angle=0");
 }
 
+module test_poly_snub__cubocta_family_preference_defaults_valid() {
+    b = poly_rectify(octahedron());
+    p3 = _ps_snub_default_params(b, family_k=3);
+    p4 = _ps_snub_default_params(b, family_k=4);
+    assert(p3[3] == "heuristic_family", str("snub cubocta family=3 tier unexpected p3=", p3));
+    assert(p4[3] == "heuristic_family", str("snub cubocta family=4 tier unexpected p4=", p4));
+    assert(p3[2] > 0 && p3[2] <= 0.12, str("snub cubocta family=3 c in range p3=", p3));
+    assert(p4[2] > 0 && p4[2] <= 0.12, str("snub cubocta family=4 c in range p4=", p4));
+    assert(p3[1] >= 0 && p3[1] <= 35, str("snub cubocta family=3 angle in range p3=", p3));
+    assert(p4[1] >= 0 && p4[1] <= 35, str("snub cubocta family=4 angle in range p4=", p4));
+}
+
 // Informational performance smoke test for default snub solving.
 // This is intentionally non-failing and opt-in to avoid slowing normal CI/dev runs.
 module perf_snub__defaults_smoke() {
@@ -536,6 +548,7 @@ module run_TestTruncation() {
     test_poly_snub__cube_default_params_reasonable();
     test_poly_snub__fixed_c_angle_solver_nonzero();
     test_poly_snub__fixed_c_auto_beats_zero_angle();
+    test_poly_snub__cubocta_family_preference_defaults_valid();
     if (ENABLE_SNUB_PERF_SMOKE)
         perf_snub__defaults_smoke();
     else

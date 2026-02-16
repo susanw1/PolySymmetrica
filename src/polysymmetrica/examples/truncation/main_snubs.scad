@@ -8,7 +8,7 @@ use <../truncation/util_demo.scad>
 Quick snub demo (snub cube + snub dodecahedron).
 */
 
-spacing = 140;
+spacing = 100;
 
 //// Basic Snubs
 ////p = poly_snub(hexahedron());
@@ -22,14 +22,15 @@ spacing = 140;
 //translate([0, 0, 0]) demo(poly_snub(hexahedron()), name="snub");
 //translate([spacing, 0, 0]) demo(poly_snub(dodecahedron()), name="snub_dodecahedron");
 
-b0 = octahedron();
-b1 = poly_rectify(b0);
-translate([spacing*2, 0, 0]) demo(poly_cantellate(b1), name="cant_cuboctahedron");
-translate([spacing*3, 0, 0]) demo(poly_snub(b1, angle = undef, c = undef), name="snub_cuboctahedron");
-////
-//b2 = poly_dual(b1);
-//translate([spacing*4, 0, 0]) demo(poly_snub(b1), name="snub_rh_dod");
-////
+// Cuboctahedron (rectified octahedron): compare family preference in default solve.
+b1 = poly_rectify(octahedron());
+translate([spacing*2, 0, 0]) demo(poly_snub(b1), name="snub_cubocta (auto)");
+translate([spacing*3, 0, 0]) demo(poly_snub(b1, family_k=3), name="snub_cubocta (family 3)");
+translate([spacing*4, 0, 0]) demo(poly_snub(b1, family_k=4), name="snub_cubocta (family 4)");
+
+b2 = poly_dual(b1);
+translate([spacing*5, 0, 0]) demo(poly_snub(b2), name="snub_dual(cubocta)");
+
 
 
 
