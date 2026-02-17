@@ -639,6 +639,20 @@ function _ps_params_by_family_count_kind(params_by_family, kind) =
     is_undef(params_by_family) ? 0
         : len([for (row = params_by_family) if (is_list(row) && len(row) >= 2 && row[0] == kind) 1]);
 
+// Compile params_by_family rows into dense per-family lookup arrays:
+// [face_df_by_id, face_angle_by_id, vert_c_by_id, vert_de_by_id]
+function _ps_params_by_family_compile(params_by_family, face_fam_count, vert_fam_count) =
+    let(
+        face_df = [for (fid = [0:1:max(0, face_fam_count-1)]) _ps_params_by_family_get(params_by_family, "face", fid, "df")],
+        face_angle = [for (fid = [0:1:max(0, face_fam_count-1)]) _ps_params_by_family_get(params_by_family, "face", fid, "angle")],
+        vert_c = [for (vid = [0:1:max(0, vert_fam_count-1)]) _ps_params_by_family_get(params_by_family, "vert", vid, "c")],
+        vert_de = [for (vid = [0:1:max(0, vert_fam_count-1)]) _ps_params_by_family_get(params_by_family, "vert", vid, "de")]
+    )
+    [face_df, face_angle, vert_c, vert_de];
+
+function _ps_compiled_param_get(arr, fid) =
+    (is_undef(arr) || fid < 0 || fid >= len(arr)) ? undef : arr[fid];
+
 // Planarity error for an ordered 3D point loop.
 function _ps_pts_planarity_err(pts, eps=1e-12) =
     let(
@@ -1410,12 +1424,19 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
         cls = (need_face_fid || need_vert_fid) ? poly_classify(poly, 1) : undef,
         face_fid = need_face_fid ? _ps_family_ids_from_fams(len(faces0), cls[0]) : undef,
         vert_fid = need_vert_fid ? _ps_family_ids_from_fams(len(verts0), cls[2]) : undef,
+        fam_face_count = is_undef(cls) ? 0 : len(cls[0]),
+        fam_vert_count = is_undef(cls) ? 0 : len(cls[2]),
+        params_compiled = is_undef(params_by_family) ? undef : _ps_params_by_family_compile(params_by_family, fam_face_count, fam_vert_count),
+        face_df_by_fid = is_undef(params_compiled) ? undef : params_compiled[0],
+        face_angle_by_fid = is_undef(params_compiled) ? undef : params_compiled[1],
+        vert_c_by_fid = is_undef(params_compiled) ? undef : params_compiled[2],
+        vert_de_by_fid = is_undef(params_compiled) ? undef : params_compiled[3],
         de_by_vertex = is_undef(vert_fid) ? undef : [
             for (vi = [0:1:len(verts0)-1])
                 let(
                     vfid = vert_fid[vi],
-                    de_ov = _ps_params_by_family_get(params_by_family, "vert", vfid, "de"),
-                    c_ov = _ps_params_by_family_get(params_by_family, "vert", vfid, "c")
+                    de_ov = _ps_compiled_param_get(vert_de_by_fid, vfid),
+                    c_ov = _ps_compiled_param_get(vert_c_by_fid, vfid)
                 )
                 !is_undef(de_ov) ? de_ov
                     : !is_undef(c_ov) ? _ps_cantellate_df_from_c(poly, c_ov)
@@ -1431,8 +1452,8 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
                     ex = poly_face_ex(poly0, fi, 1),
                     ey = poly_face_ey(poly0, fi, 1),
                     f_id = is_undef(face_fid) ? -1 : face_fid[fi],
-                    df_ov = is_undef(face_fid) ? undef : _ps_params_by_family_get(params_by_family, "face", f_id, "df"),
-                    a_ov = is_undef(face_fid) ? undef : _ps_params_by_family_get(params_by_family, "face", f_id, "angle"),
+                    df_ov = _ps_compiled_param_get(face_df_by_fid, f_id),
+                    a_ov = _ps_compiled_param_get(face_angle_by_fid, f_id),
                     d_f = !is_undef(df_ov)
                         ? df_ov
                         : (is_undef(df_by_family_eff) || f_id < 0 || f_id >= len(df_by_family_eff)) ? df_base : df_by_family_eff[f_id],
