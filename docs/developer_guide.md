@@ -55,6 +55,7 @@ PolySymmetrica/
 │   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
 │   │   │   ├─ placement.scad       # face/edge/vertex placement
 │   │   │   ├─ truncation.scad      # truncate/rectify/chamfer/cantellate/cantitruncate
+│   │   │   ├─ params.scad          # shared params-by-family helpers
 │   │   │   ├─ solvers.scad         # parameter solvers (cantitruncate, etc.)
 │   │   │   ├─ transform.scad       # site-based mesh assembly
 │   │   │   ├─ transform_util.scad  # shared transform helpers
@@ -80,6 +81,7 @@ PolySymmetrica/
 │
 └─ docs/
     ├─ developer_guide.md
+    ├─ params_overrides.md
     ├─ cantitruncation.md
     ├─ cantellation.md
     └─ images/
@@ -208,6 +210,20 @@ See `docs/cantitruncation.md` for current parameterization, trig solver, and dom
 ### **3.5 Cantellation Notes**
 
 See `docs/cantellation.md` for current parameterization, helpers, and planarity notes.
+
+### **3.6 Shared Params-By-Family**
+
+PolySymmetrica supports family-targeted parameter overrides using a shared row format:
+
+```scad
+["face"|"vert"|"edge", family_id, ["key", value], ...]
+```
+
+This is implemented in `core/params.scad` and designed to be operator-agnostic.
+
+For schema details, compile-spec format, and examples, see:
+
+- `docs/params_overrides.md`
 
 #### Naming conventions for `$ps_*` variables
 
