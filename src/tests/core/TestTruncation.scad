@@ -43,6 +43,14 @@ function _face_max_plane_err(verts, face) =
     )
     (len(errs) == 0) ? 0 : max(errs);
 
+function _max_vertex_diff(p1, p2) =
+    let(
+        v1 = poly_verts(p1),
+        v2 = poly_verts(p2),
+        n = min(len(v1), len(v2))
+    )
+    (n == 0) ? 0 : max([for (i = [0:1:n-1]) norm(v1[i] - v2[i])]);
+
 function _skew_quad_prism() =
     let(
         v = [
@@ -497,6 +505,29 @@ module test_poly_snub__cubocta_family_preference_defaults_valid() {
     assert(p4[1] >= 0 && p4[1] <= 35, str("snub cubocta family=4 angle in range p4=", p4));
 }
 
+module test_poly_snub__params_by_family_face_angle_overrides_scalar() {
+    p = hexahedron();
+    q0 = poly_snub(p, angle=0, c=0.07, df=0.05);
+    q1 = poly_snub(p, angle=0, c=0.07, df=0.05, params_by_family=[["face", 0, ["angle", 18]]]);
+    qx = poly_snub(p, angle=18, c=0.07, df=0.05);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "snub params_by_family face angle should match explicit angle");
+    assert(_max_vertex_diff(q1, q0) > 1e-4, "snub params_by_family face angle should override scalar angle");
+}
+
+module test_poly_snub__params_by_family_face_df_overrides_scalar() {
+    p = hexahedron();
+    q1 = poly_snub(p, angle=15, c=0.07, df=0.02, params_by_family=[["face", 0, ["df", 0.06]]]);
+    qx = poly_snub(p, angle=15, c=0.07, df=0.06);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "snub params_by_family face df should match explicit df");
+}
+
+module test_poly_snub__params_by_family_vert_c_overrides_scalar() {
+    p = hexahedron();
+    q1 = poly_snub(p, angle=15, c=0.02, df=0.05, params_by_family=[["vert", 0, ["c", 0.08]]]);
+    qx = poly_snub(p, angle=15, c=0.08, df=0.05);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "snub params_by_family vert c should match explicit c");
+}
+
 // Informational performance smoke test for default snub solving.
 // This is intentionally non-failing and opt-in to avoid slowing normal CI/dev runs.
 module perf_snub__defaults_smoke() {
@@ -549,6 +580,9 @@ module run_TestTruncation() {
     test_poly_snub__fixed_c_angle_solver_nonzero();
     test_poly_snub__fixed_c_auto_beats_zero_angle();
     test_poly_snub__cubocta_family_preference_defaults_valid();
+    test_poly_snub__params_by_family_face_angle_overrides_scalar();
+    test_poly_snub__params_by_family_face_df_overrides_scalar();
+    test_poly_snub__params_by_family_vert_c_overrides_scalar();
     if (ENABLE_SNUB_PERF_SMOKE)
         perf_snub__defaults_smoke();
     else
