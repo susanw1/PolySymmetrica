@@ -24,6 +24,18 @@ Rows can target all elements, families, or explicit element indices.
 - `kind` is usually `"face"`, `"vert"`, `"edge"` (operators may define others)
 - `id_or_ids` can be a single index or a list of indices
 - keys are operator-defined (e.g. `df`, `angle`, `c`, `de`, `t`)
+- each row can set **multiple keys** for the same target
+
+Example with multiple params per row:
+
+```scad
+params_overrides = [
+    ["face", "all",    ["angle", 15], ["df", 0.03]],
+    ["face", "family", 1, ["angle", 20], ["df", 0.04]],
+    ["vert", "family", 0, ["c", 0.06], ["de", 0.05]],
+    ["face", "id", [2, 7], ["angle", 19]]
+];
+```
 
 ## Override Precedence
 
@@ -56,6 +68,11 @@ Spec row formats:
 [kind, key, count, family_ids]  // optional parallel array of family ids by element idx
 ```
 
+Important:
+- Family-scoped rows require a known family id at lookup time.
+- In compile mode, that means you must provide `family_ids` for that spec if you expect family rows to match.
+- If `family_ids` is omitted, family rows do not match compiled lookups (only `all` and `id` rows apply).
+
 Example (per-element compile with family-aware matching):
 
 ```scad
@@ -78,6 +95,8 @@ Then lookup by element idx in O(1):
 df_ov = ps_compiled_param_get(face_df_by_idx, face_idx);
 ```
 
+If you are not compiling and call `ps_params_get(...)` directly, family matching still works if you pass `family_id` explicitly.
+
 ## Usage Pattern
 
 1. Classify once (`poly_classify`) if family selectors are used.
@@ -88,3 +107,28 @@ df_ov = ps_compiled_param_get(face_df_by_idx, face_idx);
    - derived auto/default values
 
 This keeps operator code fast and keeps parameterization semantics consistent across operators.
+
+## Example File
+
+Runnable example:
+
+- [`src/polysymmetrica/examples/basics/main_params.scad`](../src/polysymmetrica/examples/basics/main_params.scad)
+
+It demonstrates:
+- `face_fid` as family-id-by-face-index
+- compiled dense arrays for `df` and `angle`
+- `ps_params_print(...)` output
+
+## Snub Defaults As Structured Params
+
+Snub now has a structured default solver output:
+
+- `ps_snub_default_params_overrides(poly, handedness=1, eps=1e-9)`
+
+This returns override rows directly (face/vert scopes), so it can be passed
+straight into `poly_snub`:
+
+```scad
+rows = ps_snub_default_params_overrides(hexahedron());
+q = poly_snub(hexahedron(), params_overrides=rows);
+```

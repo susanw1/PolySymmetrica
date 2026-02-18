@@ -787,208 +787,7 @@ function _ps_family_id_for_index(idx, fams) =
 function _ps_family_ids_from_fams(n, fams) =
     [for (i = [0:1:n-1]) _ps_family_id_for_index(i, fams)];
 
-function _ps_replace_at(list, idx, val) =
-    [for (i = [0:1:len(list)-1]) (i == idx) ? val : list[i]];
-
-// Resolve preferred face families from either:
-// - face size k (e.g. 3,4,5), or
-// - explicit family id.
-function _ps_snub_family_pref_ids(face_fams, family_k) =
-    let(
-        ids_by_size = [
-            for (fi = [0:1:len(face_fams)-1])
-                if (face_fams[fi][0][0] == family_k) fi
-        ]
-    )
-    is_undef(family_k) ? [] :
-    (len(ids_by_size) > 0) ? ids_by_size :
-    ((family_k >= 0 && family_k < len(face_fams)) ? [family_k] : []);
-
-// Restrict representative edges to those adjacent to any preferred face family.
-// If none match, fall back to all representative edges.
-function _ps_snub_edge_reps_for_family(reps_all, edge_faces, face_fid, pref_ids) =
-    let(
-        valid = len(pref_ids) > 0,
-        reps_sel = valid
-            ? [
-                for (ei = reps_all)
-                    let(fpair = edge_faces[ei], f0 = fpair[0], f1 = fpair[1])
-                    if (_ps_list_contains(pref_ids, face_fid[f0]) || _ps_list_contains(pref_ids, face_fid[f1]))
-                        ei
-              ]
-            : reps_all
-    )
-    (len(reps_sel) > 0) ? reps_sel : reps_all;
-
-function _ps_snub_eval_errors_face_df_base(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, d_f_by_family, d_e, angle, handedness=1, edge_reps=undef, eps=1e-12, pref_ids=[]) =
-    let(
-        d_f_by_face = [
-            for (fi = [0:1:len(faces0)-1])
-                let(id = face_fid[fi])
-                ((id >= 0 && id < len(d_f_by_family)) ? d_f_by_family[id] : d_e)
-        ],
-        edge_list = is_undef(edge_reps) ? [for (ei = [0:1:len(edges)-1]) ei] : edge_reps,
-        req_faces = _ps_snub_required_faces(edge_faces, edge_list),
-        face_pts = [
-            for (fi = [0:1:len(faces0)-1])
-                if (_ps_list_contains(req_faces, fi))
-                    let(
-                        f = faces0[fi],
-                        center = poly_face_center(poly0, fi, 1),
-                        ex = poly_face_ex(poly0, fi, 1),
-                        ey = poly_face_ey(poly0, fi, 1),
-                        n_f = face_n[fi],
-                        d_fi = d_f_by_face[fi],
-                        p_base = center + d_fi * n_f,
-                        pts2d = [
-                            for (k = [0:1:len(f)-1])
-                                let(p = verts0[f[k]] - center)
-                                    [v_dot(p, ex), v_dot(p, ey)]
-                        ],
-                        inset2d = _ps_face_inset_bisector_2d(f, fi, -d_fi, -d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
-                        pts2d_rot = [for (p2 = inset2d) _ps_rot2d(p2, handedness * angle)]
-                    )
-                    [for (p2 = pts2d_rot) p_base + ex * p2[0] + ey * p2[1]]
-                else
-                    undef
-        ],
-        per_edge = [
-            for (ei = edge_list)
-                let(
-                    e = edges[ei],
-                    fpair = edge_faces[ei],
-                    f0 = fpair[0],
-                    f1 = fpair[1],
-                    v0 = e[0],
-                    v1 = e[1],
-                    p00 = _ps_snub_face_cached_point(face_pts, faces0, f0, v0),
-                    p01 = _ps_snub_face_cached_point(face_pts, faces0, f0, v1),
-                    p11 = _ps_snub_face_cached_point(face_pts, faces0, f1, v1),
-                    p10 = _ps_snub_face_cached_point(face_pts, faces0, f1, v0),
-                    l_face0 = norm(p00 - p01),
-                    l_face1 = norm(p10 - p11),
-                    l_vert0 = norm(p00 - p10),
-                    l_vert1 = norm(p01 - p11),
-                    l_diag = min(norm(p00 - p11), norm(p01 - p10)),
-                    tris_a = [ [p00, p01, p11], [p00, p11, p10] ],
-                    tris_b = [ [p00, p01, p10], [p01, p11, p10] ],
-                    err_a = sum([
-                        for (tri = tris_a)
-                            let(
-                                lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
-                                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                                r0 = lens[0] / avg,
-                                r1 = lens[1] / avg,
-                                r2 = lens[2] / avg
-                            )
-                                (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-                    ]) / 2,
-                    err_b = sum([
-                        for (tri = tris_b)
-                            let(
-                                lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
-                                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                                r0 = lens[0] / avg,
-                                r1 = lens[1] / avg,
-                                r2 = lens[2] / avg
-                            )
-                                (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-                    ]) / 2
-                )
-                [ [l_face0, l_face1, l_vert0, l_vert1, l_diag], min(err_a, err_b) ]
-        ],
-        lens_all = [for (x = per_edge) each x[0]],
-        tri_errs = [for (x = per_edge) x[1]],
-        pref_edge_errs = [
-            for (ei = edge_list)
-                let(
-                    e = edges[ei],
-                    fpair = edge_faces[ei],
-                    f0 = fpair[0],
-                    f1 = fpair[1],
-                    v0 = e[0],
-                    v1 = e[1],
-                    p00 = _ps_snub_face_cached_point(face_pts, faces0, f0, v0),
-                    p01 = _ps_snub_face_cached_point(face_pts, faces0, f0, v1),
-                    p11 = _ps_snub_face_cached_point(face_pts, faces0, f1, v1),
-                    p10 = _ps_snub_face_cached_point(face_pts, faces0, f1, v0),
-                    f0_pref = _ps_list_contains(pref_ids, face_fid[f0]),
-                    f1_pref = _ps_list_contains(pref_ids, face_fid[f1]),
-                    err_f0 = min(_ps_tri_equilateral_err([p00, p01, p11]), _ps_tri_equilateral_err([p00, p01, p10])),
-                    err_f1 = min(_ps_tri_equilateral_err([p10, p11, p00]), _ps_tri_equilateral_err([p10, p11, p01]))
-                )
-                each [
-                    if (f0_pref) err_f0,
-                    if (f1_pref) err_f1
-                ]
-        ],
-        pref_face_spreads = [
-            for (fi = req_faces)
-                if (_ps_list_contains(pref_ids, face_fid[fi]))
-                    let(
-                        pts = face_pts[fi],
-                        n = len(pts),
-                        lens = [for (k = [0:1:n-1]) norm(pts[k] - pts[(k+1)%n])],
-                        avg = sum(lens) / n
-                    )
-                    ((avg <= eps) ? undef : ((max(lens) - min(lens)) / avg))
-        ],
-        good = (len(lens_all) > 0) && (len([for (l = lens_all) if (is_undef(l) || l <= eps) 1]) == 0),
-        avg = good ? (sum(lens_all) / len(lens_all)) : undef,
-        err_u = (!good || avg <= eps) ? undef : ((max(lens_all) - min(lens_all)) / avg),
-        err_t = (len(tri_errs) == 0) ? undef : (sum(tri_errs) / len(tri_errs)),
-        err_pref_tri = (len(pref_edge_errs) == 0) ? undef : (sum(pref_edge_errs) / len(pref_edge_errs)),
-        good_pref_spreads = [for (x = pref_face_spreads) if (!is_undef(x)) x],
-        err_pref_face = (len(good_pref_spreads) == 0) ? undef : (sum(good_pref_spreads) / len(good_pref_spreads))
-    )
-    [err_u, err_t, err_pref_tri, err_pref_face];
-
-function _ps_snub_obj_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, c, a, handedness=1, edge_reps=undef, pref_ids=[]) =
-    let(
-        c0 = _ps_clamp(c, 0, 1),
-        de = _ps_cantellate_df_from_c_linear(c0, df_mid, df_max_eff),
-        d_f_by_family = [for (k = [0:1:len(r_by_family)-1]) r_by_family[k] * de],
-        ev = _ps_snub_eval_errors_face_df_base(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, d_f_by_family, de, a, handedness, edge_reps, 1e-12, pref_ids),
-        e_base = _ps_snub_obj_from_errors(ev),
-        e_pref_tri = (is_undef(ev[2])) ? 0 : sqrt(ev[2]),
-        e_pref_face = is_undef(ev[3]) ? 0 : ev[3],
-        e_pref = max([e_pref_tri, e_pref_face])
-    )
-    // Preference objective must not accept globally bad geometry.
-    // Use the worse of preferred-family and global errors.
-    (len(pref_ids) > 0) ? max([e_pref, e_base]) : e_base;
-
-function _ps_snub_best_ca_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, c, a, dc, da, c_max, a_max, handedness=1, edge_reps=undef, pref_ids=[]) =
-    let(
-        cands = [
-            for (ic = [-1:1:1])
-                for (ia = [-1:1:1])
-                    let(
-                        c1 = _ps_clamp(c + ic * dc, 0, c_max),
-                        a1 = _ps_clamp(a + ia * da, 0, a_max),
-                        e1 = _ps_snub_obj_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, c1, a1, handedness, edge_reps, pref_ids)
-                    )
-                    [c1, a1, e1]
-        ],
-        vals = [for (x = cands) x[2]],
-        e_min = min(vals),
-        idx = [for (i = [0:1:len(vals)-1]) if (abs(vals[i] - e_min) <= 1e-12) i][0]
-    )
-    cands[idx];
-
-function _ps_snub_local_search_ca_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, state, steps, c_max, a_max, handedness=1, edge_reps=undef, iter=0, max_iter=12, eps=1e-9, pref_ids=[]) =
-    let(
-        c = state[0], a = state[1], e = state[2],
-        dc = steps[0], da = steps[1],
-        done = (iter >= max_iter) || (max([dc, da]) <= 1e-4),
-        best = _ps_snub_best_ca_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, c, a, dc, da, c_max, a_max, handedness, edge_reps, pref_ids),
-        improved = best[2] + eps < e,
-        next_state = improved ? best : state,
-        next_steps = improved ? steps : [dc * 0.6, da * 0.6]
-    )
-    done ? state : _ps_snub_local_search_ca_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_by_family, df_mid, df_max_eff, next_state, next_steps, c_max, a_max, handedness, edge_reps, iter + 1, max_iter, eps, pref_ids);
-
-function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, eps=1e-9, family_k=undef) =
+function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, eps=1e-9) =
     let(
         base = _ps_poly_base(poly),
         verts0 = base[0],
@@ -999,10 +798,7 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, e
         poly0 = base[5],
         is_reg = _ps_is_regular_base(poly),
         cls = is_reg ? undef : poly_classify(poly, 1),
-        face_fid = is_reg ? undef : _ps_family_ids_from_fams(len(faces0), cls[0]),
-        pref_ids = is_reg ? [] : _ps_snub_family_pref_ids(cls[0], family_k),
-        edge_reps_all = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
-        edge_reps = is_reg ? edge_reps_all : _ps_snub_edge_reps_for_family(edge_reps_all, edge_faces, face_fid, pref_ids),
+        edge_reps = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
         angs = [for (i = [0:1:steps]) a_max * i / steps],
         cands = [
             for (a = angs)
@@ -1020,8 +816,6 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, e
             "snub: angle solve (fixed df) min_err=", e_min,
             " at angle=", cands[idx][0],
             " (df=", df, ")",
-            is_undef(family_k) ? "" : str(" family_k=", family_k),
-            (len(pref_ids) == 0) ? "" : str(" pref_ids=", pref_ids),
             " reps=", len(edge_reps),
             " err@angle0=", a0,
             is_undef(a20) ? "" : str(" err@angle20=", a20)
@@ -1030,7 +824,7 @@ function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, e
     cands[idx][0];
 
 // Solve angle for fixed c using representative-edge objective.
-function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_max=30, eps=1e-9, family_k=undef) =
+function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_max=30, eps=1e-9) =
     let(
         base = _ps_poly_base(poly),
         verts0 = base[0],
@@ -1041,10 +835,7 @@ function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_m
         poly0 = base[5],
         is_reg = _ps_is_regular_base(poly),
         cls = is_reg ? undef : poly_classify(poly, 1),
-        face_fid = is_reg ? undef : _ps_family_ids_from_fams(len(faces0), cls[0]),
-        pref_ids = is_reg ? [] : _ps_snub_family_pref_ids(cls[0], family_k),
-        edge_reps_all = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
-        edge_reps = is_reg ? edge_reps_all : _ps_snub_edge_reps_for_family(edge_reps_all, edge_faces, face_fid, pref_ids),
+        edge_reps = is_reg ? [0] : [for (f = cls[1]) f[1][0]],
         map = _ps_cantellate_df_map(poly, steps=6),
         df_mid = map[0],
         df_max_eff = map[1],
@@ -1070,8 +861,6 @@ function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_m
             "snub: angle solve (fixed c) min_err=", e_min,
             " at angle=", cands[idx][0],
             " (c=", c, ")",
-            is_undef(family_k) ? "" : str(" family_k=", family_k),
-            (len(pref_ids) == 0) ? "" : str(" pref_ids=", pref_ids),
             " reps=", len(edge_reps),
             " err@angle0=", a0,
             is_undef(a20) ? "" : str(" err@angle20=", a20)
@@ -1082,7 +871,7 @@ function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_m
 // Solve for default snub parameters with a tiered strategy:
 // regular -> family representative -> bounded heuristic.
 // Returns [df, angle, c, tier].
-function _ps_snub_default_params(poly, handedness=1, eps=1e-9, family_k=undef) =
+function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
     let(
         base = _ps_poly_base(poly),
         verts0 = base[0],
@@ -1093,20 +882,15 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9, family_k=undef) =
         poly0 = base[5],
         is_reg = _ps_is_regular_base(poly),
         cls = is_reg ? undef : poly_classify(poly, 1),
-        family_pref = is_reg ? undef : family_k,
-        face_fid = is_reg ? undef : _ps_family_ids_from_fams(len(faces0), cls[0]),
-        pref_ids = (is_reg || is_undef(family_pref)) ? [] : _ps_snub_family_pref_ids(cls[0], family_pref),
         cmap = _ps_cantellate_df_map(poly, steps=6),
         df_mid = cmap[0],
         df_max_eff = cmap[1],
         ff = is_reg ? 1 : len(cls[0]),
         ef = is_reg ? 1 : len(cls[1]),
         vf = is_reg ? 1 : len(cls[2]),
-        // For now, keep non-regular default solve in one robust heuristic path.
-        // `family_k` biases the sampled edge set but does not switch to per-family df.
-        tier = is_reg ? "regular" : (is_undef(family_pref) ? "heuristic" : "heuristic_family"),
-        c_steps = (!is_reg && !is_undef(family_pref)) ? 12 : 10,
-        a_steps = (!is_reg && !is_undef(family_pref)) ? 16 : 14,
+        tier = is_reg ? "regular" : "heuristic",
+        c_steps = 10,
+        a_steps = 14,
         // Non-regular seeds become unstable quickly for large c.
         // Keep the automatic search in a conservative regime.
         c_max = is_reg ? 0.25 : 0.12,
@@ -1115,12 +899,9 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9, family_k=undef) =
         reg_df_steps = (len(edges) <= 12) ? 2 : 2,
         reg_a_steps = (len(edges) <= 12) ? 3 : 3,
         edge_reps_all = is_reg ? [0] : [for (ei = [0:1:len(edges)-1]) ei],
-        edge_reps_pref = (is_reg || len(pref_ids) == 0)
-            ? edge_reps_all
-            : _ps_snub_edge_reps_for_family(edge_reps_all, edge_faces, face_fid, pref_ids),
-        edge_reps = (!is_reg && len(edge_reps_pref) > 48)
-            ? [for (i = [0:1:47]) edge_reps_pref[i]]
-            : edge_reps_pref,
+        edge_reps = (!is_reg && len(edge_reps_all) > 48)
+            ? [for (i = [0:1:47]) edge_reps_all[i]]
+            : edge_reps_all,
         reg_best = is_reg ? _ps_snub_default_params_full(poly, handedness, c_steps=reg_c_steps, df_steps=reg_df_steps, a_steps=reg_a_steps, c_max=0.15, a_max=25, eps=eps, base=base, edge_reps=edge_reps_all) : undef,
         c_vals = is_reg ? [] : [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
         angs = is_reg ? [] : [for (i = [0:1:a_steps]) a_max * i / a_steps],
@@ -1164,11 +945,9 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9, family_k=undef) =
         _0 = echo(str(
             "snub: default auto tier=", tier,
             " families(f/e/v)=", ff, "/", ef, "/", vf,
-            is_undef(family_pref) ? "" : str(" family_pref=", family_pref),
             " min_err=", e_min,
             " c=", c_best,
             " df=", df_best,
-            (len(pref_ids) == 0) ? "" : str(" pref_ids=", pref_ids),
             " reps=", len(edge_reps),
             " angle=", a_best,
             " err@angle0=", err_a0,
@@ -1236,93 +1015,26 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
     )
     [df_best, a_best, c_best, e_min2];
 
-// Family-tier default solve: global c/angle with per-face-family df scaling.
-// Returns [df_avg, angle, c, err, df_by_family].
-function _ps_snub_default_params_family(poly, handedness=1, c_steps=12, a_steps=14, c_max=0.2, a_max=30, eps=1e-9, base=undef, cls=undef, family_k=undef) =
+function _ps_snub_params_rows(df, angle, c, df_by_family=undef) =
+    is_undef(df_by_family)
+        ? [
+            ["face", "all", ["df", df], ["angle", angle]],
+            ["vert", "all", ["c", c]]
+        ]
+        : concat(
+            [
+                ["face", "all", ["angle", angle]],
+                ["vert", "all", ["c", c]]
+            ],
+            [for (fid = [0:1:len(df_by_family)-1]) ["face", "family", fid, ["df", df_by_family[fid]]]]
+        );
+
+function ps_snub_default_params_overrides(poly, handedness=1, eps=1e-9) =
     let(
-        base0 = is_undef(base) ? _ps_poly_base(poly) : base,
-        verts0 = base0[0],
-        faces0 = base0[1],
-        edges = base0[2],
-        edge_faces = base0[3],
-        face_n = base0[4],
-        poly0 = base0[5],
-        cls0 = is_undef(cls) ? poly_classify(poly, 1) : cls,
-        face_fams = cls0[0],
-        ff = len(face_fams),
-        face_fid = _ps_family_ids_from_fams(len(faces0), face_fams),
-        pref_ids = _ps_snub_family_pref_ids(face_fams, family_k),
-        // Family-tier solve needs a broad edge sample; one representative edge
-        // overfits badly on mixed-face seeds such as cuboctahedron.
-        edge_reps_all = [for (ei = [0:1:len(edges)-1]) ei],
-        edge_reps = _ps_snub_edge_reps_for_family(edge_reps_all, edge_faces, face_fid, pref_ids),
-        r0 = [for (k = [0:1:ff-1]) 1],
-        map = _ps_cantellate_df_map(poly, steps=6),
-        df_mid = map[0],
-        df_max_eff = map[1],
-        cs = [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
-        angs = [for (i = [0:1:a_steps]) a_max * i / a_steps],
-        seed_samples = len(cs) * len(angs),
-        cands = [
-            for (c = cs)
-                for (a = angs)
-                    let(err = _ps_snub_obj_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r0, df_mid, df_max_eff, c, a, handedness, edge_reps, pref_ids))
-                    [c, a, err]
-        ],
-        _ = assert(len(cands) > 0, "snub: family tier no valid (c, angle) candidates"),
-        vals0 = [for (x = cands) x[2]],
-        idx0 = [for (i = [0:1:len(vals0)-1]) if (abs(vals0[i] - min(vals0)) <= eps) i][0],
-        c0 = cands[idx0][0],
-        a0 = cands[idx0][1],
-        de0 = _ps_cantellate_df_from_c_linear(c0, df_mid, df_max_eff),
-        r_vals = [0.8, 0.9, 1.0, 1.1, 1.2],
-        family_r_samples = ff * len(r_vals),
-        r_best = [
-            for (k = [0:1:ff-1])
-                let(
-                    candsk = [
-                        for (r = r_vals)
-                            let(
-                                r_try = _ps_replace_at(r0, k, r),
-                                d_f_try = [for (j = [0:1:ff-1]) r_try[j] * de0],
-                                ev = _ps_snub_eval_errors_face_df_base(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, d_f_try, de0, a0, handedness, edge_reps, 1e-12, pref_ids),
-                                e0 = ev[0],
-                                e1 = ev[1],
-                                err = (is_undef(e0) || is_undef(e1)) ? undef : max([e0, sqrt(e1)])
-                            )
-                            if (!is_undef(err)) [r, err]
-                    ],
-                    valsk = [for (x = candsk) x[1]],
-                    idxk = [for (i = [0:1:len(valsk)-1]) if (abs(valsk[i] - min(valsk)) <= eps) i][0]
-                )
-                candsk[idxk][0]
-        ],
-        e0 = _ps_snub_obj_family(verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_best, df_mid, df_max_eff, c0, a0, handedness, edge_reps, pref_ids),
-        dc0 = c_max / (c_steps + 1),
-        da0 = a_max / max(1, a_steps),
-        local_samples_bound = 9 * 12,
-        best_ca = _ps_snub_local_search_ca_family(
-            verts0, faces0, edges, edge_faces, face_n, poly0, face_fid, r_best, df_mid, df_max_eff,
-            [c0, a0, e0], [dc0, da0], c_max, a_max, handedness, edge_reps, 0, 18, eps, pref_ids
-        ),
-        c_best = best_ca[0],
-        a_best = best_ca[1],
-        e_min = best_ca[2],
-        de_best = _ps_cantellate_df_from_c_linear(c_best, df_mid, df_max_eff),
-        d_f_by_family_best = [for (k = [0:1:ff-1]) r_best[k] * de_best],
-        df_avg = sum(d_f_by_family_best) / max(1, len(d_f_by_family_best)),
-        _0 = echo(str(
-            "snub: family-tier solve min_err=", e_min,
-            " c=", c_best,
-            " angle=", a_best,
-            is_undef(family_k) ? "" : str(" family_k=", family_k),
-            (len(pref_ids) == 0) ? "" : str(" pref_ids=", pref_ids),
-            " df_by_family=", d_f_by_family_best,
-            " reps=", len(edge_reps),
-            " samples(seed/r/local<=)=", seed_samples, "/", family_r_samples, "/", local_samples_bound
-        ))
+        params = _ps_snub_default_params(poly, handedness, eps),
+        df_by_family = (len(params) > 4) ? params[4] : undef
     )
-    [df_avg, a_best, c_best, e_min, d_f_by_family_best];
+    _ps_snub_params_rows(params[0], params[1], params[2], df_by_family);
 
 function _ps_face_max_plane_err(verts, f) =
     let(
@@ -1332,39 +1044,36 @@ function _ps_face_max_plane_err(verts, f) =
     )
     (len(errs) == 0) ? 0 : max(errs);
 
-function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1, family_k=undef, eps=1e-8, len_eps=1e-6, df_by_family=undef, params_overrides=undef) =
+function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(
         _ = assert(poly_valid(poly, "struct"), "snub: requires structurally valid poly"),
-        params = (is_undef(c) && is_undef(df) && is_undef(angle))
-            ? _ps_snub_default_params(poly, handedness, 1e-9, family_k)
+        auto_params = (is_undef(c) && is_undef(df) && is_undef(angle))
+            ? _ps_snub_default_params(poly, handedness, 1e-9)
             : undef,
-        _choice = !is_undef(params)
-            ? echo(str("snub: using auto defaults tier=", params[3], " c=", params[2], " df=", params[0], " angle=", params[1], is_undef(family_k) ? "" : str(" family_k=", family_k)))
+        auto_rows = is_undef(auto_params) ? [] : _ps_snub_params_rows(auto_params[0], auto_params[1], auto_params[2], (len(auto_params) > 4) ? auto_params[4] : undef),
+        params_rows = is_undef(params_overrides) ? auto_rows : concat(auto_rows, params_overrides),
+        _choice = !is_undef(auto_params)
+            ? echo(str("snub: using auto defaults tier=", auto_params[3], " c=", auto_params[2], " df=", auto_params[0], " angle=", auto_params[1]))
             : 0,
-        _pf = is_undef(params_overrides) ? 0
-            : echo(str("snub: params_overrides face_rows=", ps_params_count_kind(params_overrides, "face"), " vert_rows=", ps_params_count_kind(params_overrides, "vert"))),
-        fam = is_undef(family_k) ? ps_face_family_mode(poly)[0] : family_k,
-        df_by_family_auto = (!is_undef(params) && len(params) > 4) ? params[4] : undef,
-        df_by_family_eff = is_undef(df_by_family) ? df_by_family_auto : df_by_family,
+        _pf = (len(params_rows) == 0) ? 0
+            : echo(str("snub: params_overrides face_rows=", ps_params_count_kind(params_rows, "face"), " vert_rows=", ps_params_count_kind(params_rows, "vert"))),
         df_base = !is_undef(df)
             ? df
-            : is_undef(c)
-            ? (is_undef(params)
-                ? (is_undef(family_k) ? _ps_cantellate_df_from_c(poly, 0.5) : (0.5 * ps_face_radius_stat(poly, fam)))
-                : params[0])
-            : _ps_cantellate_df_from_c(poly, c),
+            : !is_undef(c)
+            ? _ps_cantellate_df_from_c(poly, c)
+            : !is_undef(auto_params) ? auto_params[0] : _ps_cantellate_df_from_c(poly, 0.5),
         // c controls edge/vertex inset (de). If unspecified, keep de coupled to df.
         de_base = !is_undef(de)
             ? de
             : !is_undef(c)
             ? _ps_cantellate_df_from_c(poly, c)
-            : (!is_undef(params) ? _ps_cantellate_df_from_c(poly, params[2]) : df_base),
+            : (!is_undef(auto_params) ? _ps_cantellate_df_from_c(poly, auto_params[2]) : df_base),
         // Default to equilateral twist unless an explicit angle is provided.
         angle_eff = is_undef(angle)
             ? let(
-                a = !is_undef(params) ? params[1]
-                    : (!is_undef(c) ? _ps_snub_default_angle_c(poly, c, df_base, handedness, family_k=family_k) : _ps_snub_default_angle_df(poly, df_base, handedness, family_k=family_k)),
-                _ = echo(str("snub: angle unspecified, default=", a, " (df=", df_base, is_undef(c) ? ")" : str(", c=", c, ")"), is_undef(family_k) ? "" : str(" family_k=", family_k)))
+                a = !is_undef(auto_params) ? auto_params[1]
+                    : (!is_undef(c) ? _ps_snub_default_angle_c(poly, c, df_base, handedness) : _ps_snub_default_angle_df(poly, df_base, handedness)),
+                _ = echo(str("snub: angle unspecified, default=", a, " (df=", df_base, is_undef(c) ? ")" : str(", c=", c, ")")))
               ) a
             : angle
     )
@@ -1376,12 +1085,12 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
-        need_face_fid = !is_undef(df_by_family_eff) || !is_undef(params_overrides),
-        need_vert_fid = !is_undef(params_overrides),
+        need_face_fid = len(params_rows) > 0,
+        need_vert_fid = len(params_rows) > 0,
         cls = (need_face_fid || need_vert_fid) ? poly_classify(poly, 1) : undef,
         face_fid = need_face_fid ? _ps_family_ids_from_fams(len(faces0), cls[0]) : undef,
         vert_fid = need_vert_fid ? _ps_family_ids_from_fams(len(verts0), cls[2]) : undef,
-        params_compiled = is_undef(params_overrides) ? undef : ps_params_compile_specs(params_overrides, [
+        params_compiled = (len(params_rows) == 0) ? undef : ps_params_compile_specs(params_rows, [
             ["face", "df", len(faces0), face_fid],
             ["face", "angle", len(faces0), face_fid],
             ["vert", "c", len(verts0), vert_fid],
@@ -1410,12 +1119,9 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
                     center = poly_face_center(poly0, fi, 1),
                     ex = poly_face_ex(poly0, fi, 1),
                     ey = poly_face_ey(poly0, fi, 1),
-                    f_id = is_undef(face_fid) ? -1 : face_fid[fi],
                     df_ov = ps_compiled_param_get(face_df_by_idx, fi),
                     a_ov = ps_compiled_param_get(face_angle_by_idx, fi),
-                    d_f = !is_undef(df_ov)
-                        ? df_ov
-                        : (is_undef(df_by_family_eff) || f_id < 0 || f_id >= len(df_by_family_eff)) ? df_base : df_by_family_eff[f_id],
+                    d_f = is_undef(df_ov) ? df_base : df_ov,
                     a_f = is_undef(a_ov) ? angle_eff : a_ov,
                     d_e = is_undef(de_by_vertex) ? de_base : [for (v = f) de_by_vertex[v]],
                     pts2d = [

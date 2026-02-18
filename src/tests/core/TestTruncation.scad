@@ -493,16 +493,13 @@ module test_poly_snub__fixed_c_auto_beats_zero_angle() {
     assert(_edge_rel_spread(q1) < _edge_rel_spread(q0), "snub cube fixed-c auto-angle improves edge uniformity vs angle=0");
 }
 
-module test_poly_snub__cubocta_family_preference_defaults_valid() {
-    b = poly_rectify(octahedron());
-    p3 = _ps_snub_default_params(b, family_k=3);
-    p4 = _ps_snub_default_params(b, family_k=4);
-    assert(p3[3] == "heuristic_family", str("snub cubocta family=3 tier unexpected p3=", p3));
-    assert(p4[3] == "heuristic_family", str("snub cubocta family=4 tier unexpected p4=", p4));
-    assert(p3[2] > 0 && p3[2] <= 0.12, str("snub cubocta family=3 c in range p3=", p3));
-    assert(p4[2] > 0 && p4[2] <= 0.12, str("snub cubocta family=4 c in range p4=", p4));
-    assert(p3[1] >= 0 && p3[1] <= 35, str("snub cubocta family=3 angle in range p3=", p3));
-    assert(p4[1] >= 0 && p4[1] <= 35, str("snub cubocta family=4 angle in range p4=", p4));
+module test_poly_snub__default_solver_returns_structured_overrides() {
+    p = hexahedron();
+    rows = ps_snub_default_params_overrides(p);
+    q0 = poly_snub(p);
+    q1 = poly_snub(p, params_overrides=rows);
+    assert(len(rows) > 0, "snub structured defaults should return rows");
+    assert(_max_vertex_diff(q0, q1) < 1e-7, "snub structured defaults should recreate auto result");
 }
 
 module test_poly_snub__params_overrides_face_angle_overrides_scalar() {
@@ -579,7 +576,7 @@ module run_TestTruncation() {
     test_poly_snub__cube_default_params_reasonable();
     test_poly_snub__fixed_c_angle_solver_nonzero();
     test_poly_snub__fixed_c_auto_beats_zero_angle();
-    test_poly_snub__cubocta_family_preference_defaults_valid();
+    test_poly_snub__default_solver_returns_structured_overrides();
     test_poly_snub__params_overrides_face_angle_overrides_scalar();
     test_poly_snub__params_overrides_face_df_overrides_scalar();
     test_poly_snub__params_overrides_vert_c_overrides_scalar();

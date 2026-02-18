@@ -1,4 +1,5 @@
 use <../../core/truncation.scad>
+use <../../core/params.scad>
 use <../../core/duals.scad>
 use <../../core/render.scad>
 use <../../models/platonics_all.scad>
@@ -22,11 +23,9 @@ spacing = 100;
 //translate([0, 0, 0]) demo(poly_snub(hexahedron()), name="snub");
 //translate([spacing, 0, 0]) demo(poly_snub(dodecahedron()), name="snub_dodecahedron");
 
-//// Cuboctahedron (rectified octahedron): compare family preference in default solve.
+//// Cuboctahedron (rectified octahedron): baseline and overrides.
 //b1 = poly_rectify(octahedron());
 //translate([spacing*2, 0, 0]) demo(poly_snub(b1), name="snub_cubocta (auto)");
-//translate([spacing*3, 0, 0]) demo(poly_snub(b1, family_k=3), name="snub_cubocta (family 3)");
-//translate([spacing*4, 0, 0]) demo(poly_snub(b1, family_k=4), name="snub_cubocta (family 4)");
 //
 //b2 = poly_dual(b1);
 //translate([spacing*5, 0, 0]) demo(poly_snub(b2), name="snub_dual(cubocta)");
@@ -41,18 +40,15 @@ spacing = 100;
 //// params_overrides examples
 //// Format:
 //// [
-////   ["face", <face_family_id>, ["angle", deg], ["df", value]],
-////   ["vert", <vert_family_id>, ["c", value]]   // or ["de", value]
+////   ["face", "family", <face_family_id>, ["angle", deg], ["df", value]],
+////   ["vert", "family", <vert_family_id>, ["c", value]]   // or ["de", value]
 //// ]
 ////
 //// Family ids come from poly_classify(poly, detail=1). For cuboctahedron there
 //// are two face families (triangles/squares) and typically one vertex family.
 //
 //p0 = poly_rectify(octahedron()); // cuboctahedron
-//seed = _ps_snub_default_params(p0, family_k=3);
-//seed_df = seed[0];
-//seed_angle = seed[1];
-//seed_c = seed[2];
+//seed_rows = ps_snub_default_params_overrides(p0);
 //
 ////// Baseline (fully automatic defaults).
 //translate([0, 0, 0]) demo(
@@ -93,14 +89,13 @@ spacing = 100;
 //translate([spacing*3, 0, 0]) demo(
 //    poly_snub(
 //        p0,
-//        angle=seed_angle,
-//        c=seed_c,
-//        df=seed_df,
-//        params_overrides=[
-//            ["face", "family", 0, ["df", seed_df * 0.9], ["angle", seed_angle + 2]],
-//            ["face", "family", 1, ["df", seed_df * 1.1], ["angle", seed_angle - 2]],
-//            ["vert", "family", 0, ["c", seed_c]]
-//        ]
+//        params_overrides=concat(
+//            seed_rows,
+//            [
+//                ["face", "family", 0, ["df", ps_params_get(seed_rows, "face", "df", 0, 0) * 0.9], ["angle", ps_params_get(seed_rows, "face", "angle", 0, 0) + 2]],
+//                ["face", "family", 1, ["df", ps_params_get(seed_rows, "face", "df", 0, 1) * 1.1], ["angle", ps_params_get(seed_rows, "face", "angle", 0, 1) - 2]]
+//            ]
+//        )
 //    ),
 //    name="snub cubocta (solver-seeded overrides)"
 //);
