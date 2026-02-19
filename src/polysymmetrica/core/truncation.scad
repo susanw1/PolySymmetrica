@@ -1054,7 +1054,7 @@ function _ps_face_max_plane_err(verts, f) =
 //   overrides can replace them per face/vertex.
 function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(
-        _ = assert(poly_valid(poly, "struct"), "snub: requires structurally valid poly"),
+        _ = assert(poly_valid(poly, "star_ok"), "snub: requires manifold poly (star_ok)"),
         auto_params = (is_undef(c) && is_undef(df) && is_undef(angle))
             ? _ps_snub_default_params(poly, handedness, 1e-9)
             : undef,
