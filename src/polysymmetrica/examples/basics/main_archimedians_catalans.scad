@@ -14,9 +14,12 @@ rows = [
             name = a[0],
             p = a[1](),
             d_map = archimedean_to_catalan_name(name),
-            d_idx = [for (i = [0:1:len(cats)-1]) if (cats[i][0] == d_map) i][0],
-            d_name = is_undef(d_idx) ? str(name, "_dual") : cats[d_idx][0],
-            d = is_undef(d_idx) ? undef : cats[d_idx][1]()
+            d_idxs = [for (i = [0:1:len(cats)-1]) if (cats[i][0] == d_map) i],
+            _ = assert(!is_undef(d_map), str("Missing Archimedean->Catalan mapping for ", name)),
+            _ = assert(len(d_idxs) > 0, str("Missing Catalan model for ", d_map)),
+            d_idx = d_idxs[0],
+            d_name = cats[d_idx][0],
+            d = cats[d_idx][1]()
         )
         [name, p, d_name, d]
 ];
@@ -36,28 +39,19 @@ for (r = with_index(rows)) {
     d = r[1][3];
 
     // Archimedean
-    if (!is_undef(p)) {
-        translate([spacing_x * i, 0, 0]) demo(p, name = poly_name);
-        translate([spacing_x * i + label_x, 0, label_z])
-            rotate([0, 0, -90])
-                linear_extrude(height=label_height)
-                    text(poly_name, size=label_size, halign="center", valign="center");
-    } else {
-        echo(str("archimedians: ", poly_name, " is TODO"));
-    }
+    translate([spacing_x * i, 0, 0]) demo(p, name = poly_name);
+    translate([spacing_x * i + label_x, 0, label_z])
+        rotate([0, 0, -90])
+            linear_extrude(height=label_height)
+                text(poly_name, size=label_size, halign="center", valign="center");
 
     // Combo (archimedean + dual)
-    if (!is_undef(p) && !is_undef(d))
-        translate([spacing_x * i, spacing_y, 0]) combo(p);
+    translate([spacing_x * i, spacing_y, 0]) combo(p);
 
     // Catalan
-    if (!is_undef(d)) {
-        translate([spacing_x * i, 2 * spacing_y, 0]) demo(d, name = d_name);
-        translate([spacing_x * i + label_x, 2 * spacing_y, label_z])
-            rotate([0, 0, -90])
-                linear_extrude(height=label_height)
-                    text(d_name, size=label_size, halign="center", valign="center");
-    } else {
-        echo(str("catalans: ", d_name, " is TODO"));
-    }
+    translate([spacing_x * i, 2 * spacing_y, 0]) demo(d, name = d_name);
+    translate([spacing_x * i + label_x, 2 * spacing_y, label_z])
+        rotate([0, 0, -90])
+            linear_extrude(height=label_height)
+                text(d_name, size=label_size, halign="center", valign="center");
 }

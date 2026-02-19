@@ -3,7 +3,6 @@ use <../models/archimedians_all.scad>
 
 /**
 Catalan solids derived as duals of Archimedean solids.
-Snub duals are left as stubs for now.
 */
 
 // ---- Duals of truncations ----
@@ -29,10 +28,10 @@ function deltoidal_hexecontahedron() = poly_dual(rhombicosidodecahedron());
 function disdyakis_dodecahedron() = poly_dual(great_rhombicuboctahedron());
 function disdyakis_triacontahedron() = poly_dual(great_rhombicosidodecahedron());
 
-// ---- Snub duals (stubs) ----
+// ---- Snub duals ----
 
-function pentagonal_icositetrahedron() = undef; // TODO (dual of snub cube)
-function pentagonal_hexecontahedron() = undef; // TODO (dual of snub dodecahedron)
+function pentagonal_icositetrahedron() = poly_dual(snub_cube());
+function pentagonal_hexecontahedron() = poly_dual(snub_dodecahedron());
 
 // Archimedean -> Catalan name mapping (for pairing in demos)
 function archimedean_catalan_name_pairs() = [
@@ -61,7 +60,6 @@ function archimedean_to_catalan_name(n) =
 /**
 Return all Catalan solids as [[name, fn], ...],
 where fn is a zero-arg function returning the poly.
-Snub duals return undef.
 */
 function catalans_all() = [
     ["triakis_tetrahedron", function() triakis_tetrahedron()],
