@@ -702,7 +702,8 @@ function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, po
                                 (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
                     ]) / 2
                 )
-                [ [l_face0, l_face1, l_vert0, l_vert1, l_diag], min(err_a, err_b) ]
+                // Score the same diagonal split that poly_snub() will emit.
+                [ [l_face0, l_face1, l_vert0, l_vert1, l_diag], (handedness >= 0) ? err_a : err_b ]
         ],
         vert_face_errs = [
             for (vi = [0:1:len(verts0)-1])
