@@ -18,10 +18,10 @@ spacing = 100;
 //poly_describe(p, detail = 3);
 
 
-//// Regular default snubs
-//translate([-spacing, 0, 0]) demo(poly_snub(tetrahedron()), name="snub_tet");
-//translate([0, 0, 0]) demo(poly_snub(hexahedron()), name="snub");
-//translate([spacing, 0, 0]) demo(poly_snub(dodecahedron()), name="snub_dodecahedron");
+// Regular default snubs
+translate([-spacing, 0, 0]) demo(poly_snub(tetrahedron()), name="snub_tet");
+translate([0, 0, 0]) demo(poly_snub(hexahedron()), name="snub");
+translate([spacing, 0, 0]) demo(poly_snub(dodecahedron()), name="snub_dodecahedron");
 
 //// Cuboctahedron (rectified octahedron): baseline and overrides.
 //b1 = poly_rectify(octahedron());
@@ -100,7 +100,7 @@ spacing = 100;
 //    name="snub cubocta (solver-seeded overrides)"
 //);
 
-// Experiment: snub a rhombicosidodecahedron
-b4 = poly_cantellate(icosahedron());
-translate([0, 0, 0]) poly_render(b4,40);
-translate([spacing, 0, 0]) demo(poly_snub(b4, angle=20, c=0.01, df = 0.01), ir = 40, name="snub_rhombicosidodecahedron");
+//// Experiment: snub a rhombicosidodecahedron
+//b4 = poly_cantellate(icosahedron());
+//translate([0, 0, 0]) poly_render(b4,40);
+//translate([spacing, 0, 0]) demo(poly_snub(b4, angle=20, c=0.01, df = 0.01), ir = 40, name="snub_rhombicosidodecahedron");
