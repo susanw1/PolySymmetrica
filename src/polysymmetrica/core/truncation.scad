@@ -727,6 +727,9 @@ function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, po
 function _ps_snub_obj_from_errors(ev, bad=1e9) =
     (is_undef(ev) || len(ev) < 2 || is_undef(ev[0]) || is_undef(ev[1])) ? bad : max([ev[0], sqrt(ev[1])]);
 
+function _ps_snub_obj_regular_from_errors(ev, bad=1e9) =
+    (is_undef(ev) || len(ev) < 2 || is_undef(ev[0]) || is_undef(ev[1])) ? bad : (sqrt(ev[1]) + 0.5 * ev[0]);
+
 function _ps_clamp(x, lo, hi) = min(max(x, lo), hi);
 
 function _ps_tri_equilateral_err(tri) =
@@ -747,7 +750,7 @@ function _ps_snub_obj_regular(verts0, faces0, edges, edge_faces, face_n, poly0, 
         df = rr * de,
         ev = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, df, de, a, handedness, edge_reps)
     )
-    _ps_snub_obj_from_errors(ev);
+    _ps_snub_obj_regular_from_errors(ev);
 
 function _ps_snub_best3_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, c, r, a, dc, dr, da, c_max, a_max, handedness=1, edge_reps=undef, bad=1e9) =
     let(
@@ -847,7 +850,7 @@ function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_m
             for (a = angs)
                 let(
                     ev = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, de, a, handedness, edge_reps),
-                    err = _ps_snub_obj_from_errors(ev)
+                    err = is_reg ? _ps_snub_obj_regular_from_errors(ev) : _ps_snub_obj_from_errors(ev)
                 )
                 [a, err]
         ],
