@@ -1015,8 +1015,8 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
     )
     [df_best, a_best, c_best, e_min2];
 
-function _ps_snub_params_rows(df, angle, c, df_by_family=undef) =
-    is_undef(df_by_family)
+function _ps_snub_params_rows(df, angle, c, face_df_by_family=undef) =
+    is_undef(face_df_by_family)
         ? [
             ["face", "all", ["df", df], ["angle", angle]],
             ["vert", "all", ["c", c]]
@@ -1026,15 +1026,15 @@ function _ps_snub_params_rows(df, angle, c, df_by_family=undef) =
                 ["face", "all", ["angle", angle]],
                 ["vert", "all", ["c", c]]
             ],
-            [for (fid = [0:1:len(df_by_family)-1]) ["face", "family", fid, ["df", df_by_family[fid]]]]
+            [for (fid = [0:1:len(face_df_by_family)-1]) ["face", "family", fid, ["df", face_df_by_family[fid]]]]
         );
 
 function ps_snub_default_params_overrides(poly, handedness=1, eps=1e-9) =
     let(
         params = _ps_snub_default_params(poly, handedness, eps),
-        df_by_family = (len(params) > 4) ? params[4] : undef
+        face_df_by_family = (len(params) > 4) ? params[4] : undef
     )
-    _ps_snub_params_rows(params[0], params[1], params[2], df_by_family);
+    _ps_snub_params_rows(params[0], params[1], params[2], face_df_by_family);
 
 function _ps_face_max_plane_err(verts, f) =
     let(
@@ -1044,6 +1044,14 @@ function _ps_face_max_plane_err(verts, f) =
     )
     (len(errs) == 0) ? 0 : max(errs);
 
+// Snub with optional scalar controls and/or structured per-element overrides.
+//
+// Fallback strategy:
+// - If `angle`, `c`, and `df` are all `undef`, auto defaults are solved.
+// - Auto defaults are converted to `params_overrides` rows, then concatenated
+//   before explicit `params_overrides` rows so explicit rows win by precedence.
+// - Scalar args (`angle`, `c`, `df`, `de`) remain convenient globals; compiled
+//   overrides can replace them per face/vertex.
 function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(
         _ = assert(poly_valid(poly, "struct"), "snub: requires structurally valid poly"),

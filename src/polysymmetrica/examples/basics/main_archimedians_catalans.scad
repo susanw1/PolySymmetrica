@@ -15,8 +15,8 @@ rows = [
             p = a[1](),
             d_map = archimedean_to_catalan_name(name),
             d_idxs = [for (i = [0:1:len(cats)-1]) if (cats[i][0] == d_map) i],
-            _ = assert(!is_undef(d_map), str("Missing Archimedean->Catalan mapping for ", name)),
-            _ = assert(len(d_idxs) > 0, str("Missing Catalan model for ", d_map)),
+            _0 = assert(!is_undef(d_map), str("Missing Archimedean->Catalan mapping for ", name)),
+            _1 = assert(len(d_idxs) > 0, str("Missing Catalan model for ", d_map)),
             d_idx = d_idxs[0],
             d_name = cats[d_idx][0],
             d = cats[d_idx][1]()

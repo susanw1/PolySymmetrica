@@ -103,4 +103,4 @@ spacing = 100;
 // Experiment: snub a rhombicosidodecahedron
 b4 = poly_cantellate(icosahedron());
 translate([0, 0, 0]) poly_render(b4,40);
-translate([spacing, 0, 0]) demo(poly_snub(b4, angle=20, c=0.01, df = 0.01), ir = 40, name="canttrunc_cuboctahedron");
+translate([spacing, 0, 0]) demo(poly_snub(b4, angle=20, c=0.01, df = 0.01), ir = 40, name="snub_rhombicosidodecahedron");
