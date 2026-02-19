@@ -1047,7 +1047,7 @@ function _ps_face_max_plane_err(verts, f) =
 // Snub with optional scalar controls and/or structured per-element overrides.
 //
 // Fallback strategy:
-// - If `angle`, `c`, and `df` are all `undef`, auto defaults are solved.
+// - If `angle`, `c`, `df`, and `de` are all `undef`, auto defaults are solved.
 // - Auto defaults are converted to `params_overrides` rows, then concatenated
 //   before explicit `params_overrides` rows so explicit rows win by precedence.
 // - Scalar args (`angle`, `c`, `df`, `de`) remain convenient globals; compiled
@@ -1055,7 +1055,7 @@ function _ps_face_max_plane_err(verts, f) =
 function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(
         _ = assert(poly_valid(poly, "star_ok"), "snub: requires manifold poly (star_ok)"),
-        auto_params = (is_undef(c) && is_undef(df) && is_undef(angle))
+        auto_params = (is_undef(c) && is_undef(df) && is_undef(angle) && is_undef(de))
             ? _ps_snub_default_params(poly, handedness, 1e-9)
             : undef,
         auto_rows = is_undef(auto_params) ? [] : _ps_snub_params_rows(auto_params[0], auto_params[1], auto_params[2], (len(auto_params) > 4) ? auto_params[4] : undef),
