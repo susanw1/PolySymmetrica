@@ -470,11 +470,6 @@ function _ps_cantellate_df_from_c_linear(c, df_mid, df_max_eff) =
         ? (2 * c * df_mid)
         : (df_mid + (c - 0.5) * 2 * (df_max_eff - df_mid));
 
-function _ps_cantellate_c_from_df_linear(df, df_mid, df_max_eff, eps=1e-12) =
-    (df <= df_mid)
-        ? (((2 * df_mid) <= eps) ? 0 : (df / (2 * df_mid)))
-        : (((2 * (df_max_eff - df_mid)) <= eps) ? 0.5 : (0.5 + (df - df_mid) / (2 * (df_max_eff - df_mid))));
-
 function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_idx=0) =
     let(
         map = _ps_cantellate_df_map(poly, df_max, steps, family_edge_idx),
@@ -775,10 +770,6 @@ function _ps_tri_equilateral_err(tri) =
     )
     (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2));
 
-function _ps_snub_tri_eq_err(base, x, y, eps=1e-12) =
-    let(den = max([eps, base * base]))
-    ((pow(x - base, 2) + pow(y - base, 2)) / den);
-
 function _ps_snub_tri_iso_err(base, x, y, eps=1e-12) =
     let(den = max([eps, base * base]))
     (pow(x - y, 2) / den);
@@ -793,7 +784,7 @@ function _ps_snub_obj_regular(verts0, faces0, edges, edge_faces, face_n, poly0, 
     )
     _ps_snub_obj_regular_from_errors(ev);
 
-function _ps_snub_best3_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, c, r, a, dc, dr, da, c_max, a_max, handedness=1, edge_reps=undef, bad=1e9) =
+function _ps_snub_best3_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, c, r, a, dc, dr, da, c_max, a_max, handedness=1, edge_reps=undef) =
     let(
         cands = [
             for (ic = [-1:1:1])
@@ -870,9 +861,6 @@ function _ps_snub_default_angle_df_de(poly, d_f, d_e, handedness=1, steps=60, a_
         ))
     )
     cands[idx][0];
-
-function _ps_snub_default_angle_df(poly, df, handedness=1, steps=60, a_max=35, eps=1e-9) =
-    _ps_snub_default_angle_df_de(poly, df, df, handedness, steps, a_max, eps);
 
 // Solve angle for fixed c using representative-edge objective.
 function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_max=30, eps=1e-9) =
@@ -1115,7 +1103,7 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
                         ? _ps_snub_default_angle_df_de(poly, df_base, de_base, handedness)
                         : (!is_undef(c)
                             ? _ps_snub_default_angle_c(poly, c, df_base, handedness)
-                            : _ps_snub_default_angle_df(poly, df_base, handedness))),
+                            : _ps_snub_default_angle_df_de(poly, df_base, df_base, handedness))),
                 _ = echo(str("snub: angle unspecified, default=", a, " (df=", df_base, ", de=", de_base, is_undef(c) ? ")" : str(", c=", c, ")")))
               ) a
             : angle
@@ -1128,11 +1116,10 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
-        need_face_fid = len(params_rows) > 0,
-        need_vert_fid = len(params_rows) > 0,
-        cls = (need_face_fid || need_vert_fid) ? poly_classify(poly, 1) : undef,
-        face_fid = need_face_fid ? _ps_family_ids_from_fams(len(faces0), cls[0]) : undef,
-        vert_fid = need_vert_fid ? _ps_family_ids_from_fams(len(verts0), cls[2]) : undef,
+        need_family_ids = len(params_rows) > 0,
+        cls = need_family_ids ? poly_classify(poly, 1) : undef,
+        face_fid = need_family_ids ? _ps_family_ids_from_fams(len(faces0), cls[0]) : undef,
+        vert_fid = need_family_ids ? _ps_family_ids_from_fams(len(verts0), cls[2]) : undef,
         params_compiled = (len(params_rows) == 0) ? undef : ps_params_compile_specs(params_rows, [
             ["face", "df", len(faces0), face_fid],
             ["face", "angle", len(faces0), face_fid],
