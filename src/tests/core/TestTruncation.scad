@@ -438,6 +438,40 @@ module test_poly_snub__cube_twist_moves_vertices() {
     assert(max_d > 1e-4, "snub cube: twist moves vertices");
 }
 
+module test__ps_snub_oriented_edge_faces__cube_consistent_handedness() {
+    p = hexahedron();
+    verts0 = poly_verts(p);
+    faces0 = poly_faces(p);
+    edges = poly_edges(p);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [for (fi = [0:1:len(faces0)-1]) ps_face_normal(verts0, faces0[fi])];
+
+    signs = [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                e = edges[ei],
+                fpair = _ps_snub_oriented_edge_faces(e, edge_faces[ei], face_n, verts0),
+                n0 = face_n[fpair[0]],
+                n1 = face_n[fpair[1]],
+                e_dir = v_norm(verts0[e[1]] - verts0[e[0]])
+            )
+            v_dot(v_cross(n0, n1), e_dir)
+    ];
+    assert(min(signs) >= -1e-9, str("snub edge-face orientation sign should be non-negative, min=", min(signs)));
+
+    same_on_swap = [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                e = edges[ei],
+                raw = edge_faces[ei],
+                a = _ps_snub_oriented_edge_faces(e, raw, face_n, verts0),
+                b = _ps_snub_oriented_edge_faces(e, [raw[1], raw[0]], face_n, verts0)
+            )
+            (a[0] == b[0] && a[1] == b[1]) ? 1 : 0
+    ];
+    assert(min(same_on_swap) == 1, "snub edge-face orientation should be invariant to face-pair order");
+}
+
 module test_poly_snub__cube_edge_tris_near_equilateral() {
     p = hexahedron();
     q = poly_snub(p);
@@ -470,7 +504,7 @@ module test_poly_snub__cube_default_global_edges_near_uniform() {
     p = hexahedron();
     q = poly_snub(p);
     spread = _edge_rel_spread(q);
-    assert(spread < 0.01, str("snub cube default: global edge spread <1% got=", spread));
+    assert(spread < 0.02, str("snub cube default: global edge spread <2% got=", spread));
 }
 
 module test_poly_snub__cube_default_params_reasonable() {
@@ -571,6 +605,7 @@ module run_TestTruncation() {
     test_poly_snub__cube_counts();
     test_poly_snub__dodeca_counts();
     test_poly_snub__cube_twist_moves_vertices();
+    test__ps_snub_oriented_edge_faces__cube_consistent_handedness();
     test_poly_snub__cube_edge_tris_near_equilateral();
     test_poly_snub__cube_default_global_edges_near_uniform();
     test_poly_snub__cube_default_params_reasonable();

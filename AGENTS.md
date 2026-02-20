@@ -15,6 +15,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - Negative test (expects a failure):
   `openscad -o /tmp/ps-neg.stl src/tests/run_negative.scad`
+- Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
+- Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
 
 ## Coding Style & Naming Conventions
 - Indentation: 4 spaces; keep blank lines between logical blocks.

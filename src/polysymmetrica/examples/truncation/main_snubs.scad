@@ -18,24 +18,25 @@ spacing = 100;
 //poly_describe(p, detail = 3);
 
 
-// Regular default snubs
-translate([-spacing, 0, 0]) demo(poly_snub(tetrahedron()), name="snub_tet");
-translate([0, 0, 0]) demo(poly_snub(hexahedron()), name="snub");
-translate([spacing, 0, 0]) demo(poly_snub(dodecahedron()), name="snub_dodecahedron");
+for (h = [1, -1]) {
+    // Regular default snubs
+    translate([-spacing, h*spacing, 0]) demo(poly_snub(tetrahedron(), handedness = h), name="snub_tet");
+    translate([0, h*spacing, 0]) demo(poly_snub(hexahedron(), handedness = h), name="snub_cube");
+    translate([spacing, h*spacing, 0]) demo(poly_snub(dodecahedron(), handedness = h), name="snub_dodecahedron");
 
-//// Cuboctahedron (rectified octahedron): baseline and overrides.
-//b1 = poly_rectify(octahedron());
-//translate([spacing*2, 0, 0]) demo(poly_snub(b1), name="snub_cubocta (auto)");
-//
-//b2 = poly_dual(b1);
-//translate([spacing*5, 0, 0]) demo(poly_snub(b2), name="snub_dual(cubocta)");
+    // Cuboctahedron (rectified octahedron): baseline and overrides.
+    b1 = poly_rectify(octahedron());
+    translate([spacing*2, h*spacing, 0]) demo(poly_snub(b1, handedness = h), name="snub_cubocta (auto)");
 
+    b2 = poly_dual(b1);
+    translate([spacing*3, h*spacing, 0]) demo(poly_snub(b2, handedness = h), name="snub_rh_dod");
 
+    b3 = (poly_rectify(icosahedron()));
+    translate([spacing*4, h*spacing, 0]) demo(poly_snub(b3, handedness = h), name="snub_icosidod");
 
-
-//b3 = poly_dual(poly_rectify(icosahedron()));
-//translate([spacing*5, 0, 0]) demo(poly_snub(b3, angle=20, c=0.01, df = 0.01), name="snub_rh_triac");
-
+    b4 = poly_dual(b3);
+    translate([spacing*5, h*spacing, 0]) demo(poly_snub(b4, handedness = h), name="snub_rh_triaconta");
+}
 
 //// params_overrides examples
 //// Format:

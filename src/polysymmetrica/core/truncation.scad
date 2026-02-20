@@ -610,6 +610,29 @@ function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
 function _ps_snub_required_faces(edge_faces, edge_list) =
     _ps_unique_ints([for (ei = edge_list) each edge_faces[ei]]);
 
+// Canonicalize the two adjacent faces around an edge so handedness mapping
+// is consistent regardless of edge_faces table ordering.
+function _ps_snub_oriented_edge_faces(edge, fpair, face_n, verts0) =
+    let(
+        f0 = fpair[0],
+        f1 = fpair[1]
+    )
+    (is_undef(f0) || is_undef(f1) || f0 < 0 || f1 < 0)
+        ? fpair
+        : let(
+            n0 = face_n[f0],
+            n1 = face_n[f1],
+            e_raw = verts0[edge[1]] - verts0[edge[0]],
+            e_len = norm(e_raw)
+        )
+        (e_len <= 1e-12)
+            ? fpair
+            : let(
+                e = e_raw / e_len,
+                s = v_dot(v_cross(n0, n1), e)
+            )
+            (s >= 0) ? [f0, f1] : [f1, f0];
+
 // Planarity error for an ordered 3D point loop.
 function _ps_pts_planarity_err(pts, eps=1e-12) =
     let(
@@ -630,7 +653,7 @@ function _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, 
     ev[0];
 
 // Combined snub objective terms in one pass:
-// returns [uniform_spread, edge_triangle_error].
+// returns [uniform_spread, edge_triangle_equilateral_error, vert_face_planarity_error, edge_triangle_isosceles_error].
 function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness=1, edge_reps=undef, eps=1e-12) =
     let(
         d_f_by_face = [for (_ = [0:1:len(faces0)-1]) d_f],
@@ -663,7 +686,7 @@ function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, po
             for (ei = edge_list)
                 let(
                     e = edges[ei],
-                    fpair = edge_faces[ei],
+                    fpair = _ps_snub_oriented_edge_faces(e, edge_faces[ei], face_n, verts0),
                     f0 = fpair[0],
                     f1 = fpair[1],
                     v0 = e[0],
@@ -676,34 +699,35 @@ function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, po
                     l_face1 = norm(p10 - p11),
                     l_vert0 = norm(p00 - p10),
                     l_vert1 = norm(p01 - p11),
-                    l_diag = min(norm(p00 - p11), norm(p01 - p10)),
+                    l_diag_a = norm(p00 - p11),
+                    l_diag_b = norm(p01 - p10),
                     tris_a = [ [p00, p01, p11], [p00, p11, p10] ],
                     tris_b = [ [p00, p01, p10], [p01, p11, p10] ],
-                    err_a = sum([
-                        for (tri = tris_a)
-                            let(
-                                lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
-                                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                                r0 = lens[0] / avg,
-                                r1 = lens[1] / avg,
-                                r2 = lens[2] / avg
-                            )
-                                (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-                    ]) / 2,
-                    err_b = sum([
-                        for (tri = tris_b)
-                            let(
-                                lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
-                                avg = (lens[0] + lens[1] + lens[2]) / 3,
-                                r0 = lens[0] / avg,
-                                r1 = lens[1] / avg,
-                                r2 = lens[2] / avg
-                            )
-                                (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2))
-                    ]) / 2
+                    // Use full triangle-shape equilateral error (all 3 sides)
+                    // for the actual split triangles.
+                    err_a_eq = (
+                        _ps_tri_equilateral_err(tris_a[0]) +
+                        _ps_tri_equilateral_err(tris_a[1])
+                    ) / 2,
+                    err_b_eq = (
+                        _ps_tri_equilateral_err(tris_b[0]) +
+                        _ps_tri_equilateral_err(tris_b[1])
+                    ) / 2,
+                    err_a_iso = (
+                        _ps_snub_tri_iso_err(l_face0, l_vert1, l_diag_a, eps) +
+                        _ps_snub_tri_iso_err(l_face1, l_vert0, l_diag_a, eps)
+                    ) / 2,
+                    err_b_iso = (
+                        _ps_snub_tri_iso_err(l_face0, l_vert0, l_diag_b, eps) +
+                        _ps_snub_tri_iso_err(l_face1, l_vert1, l_diag_b, eps)
+                    ) / 2
                 )
                 // Score the same diagonal split that poly_snub() will emit.
-                [ [l_face0, l_face1, l_vert0, l_vert1, l_diag], (handedness >= 0) ? err_a : err_b ]
+                [
+                    [l_face0, l_face1, l_vert0, l_vert1, min(l_diag_a, l_diag_b)],
+                    (handedness >= 0) ? err_a_eq : err_b_eq,
+                    (handedness >= 0) ? err_a_iso : err_b_iso
+                ]
         ],
         vert_face_errs = [
             for (vi = [0:1:len(verts0)-1])
@@ -715,20 +739,29 @@ function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, po
                     _ps_pts_planarity_err(pts, eps)
         ],
         lens_all = [for (x = per_edge) each x[0]],
-        tri_errs = [for (x = per_edge) x[1]],
+        tri_eq_errs = [for (x = per_edge) x[1]],
+        tri_iso_errs = [for (x = per_edge) x[2]],
         good = (len(lens_all) > 0) && (len([for (l = lens_all) if (is_undef(l) || l <= eps) 1]) == 0),
         avg = good ? (sum(lens_all) / len(lens_all)) : undef,
         err_u = (!good || avg <= eps) ? undef : ((max(lens_all) - min(lens_all)) / avg),
-        err_t = (len(tri_errs) == 0) ? undef : (sum(tri_errs) / len(tri_errs)),
+        err_eq = (len(tri_eq_errs) == 0) ? undef : (sum(tri_eq_errs) / len(tri_eq_errs)),
+        err_iso = (len(tri_iso_errs) == 0) ? undef : (sum(tri_iso_errs) / len(tri_iso_errs)),
         err_p = (len(vert_face_errs) == 0) ? undef : max(vert_face_errs)
     )
-    [err_u, err_t, err_p];
+    [err_u, err_eq, err_p, err_iso];
 
 function _ps_snub_obj_from_errors(ev, bad=1e9) =
     (is_undef(ev) || len(ev) < 2 || is_undef(ev[0]) || is_undef(ev[1])) ? bad : max([ev[0], sqrt(ev[1])]);
 
 function _ps_snub_obj_regular_from_errors(ev, bad=1e9) =
-    (is_undef(ev) || len(ev) < 2 || is_undef(ev[0]) || is_undef(ev[1])) ? bad : (sqrt(ev[1]) + 0.5 * ev[0]);
+    (is_undef(ev) || len(ev) < 2 || is_undef(ev[1])) ? bad :
+    let(
+        eq = sqrt(ev[1]),
+        spread = is_undef(ev[0]) ? 0 : ev[0],
+        iso = sqrt(is_undef(ev[3]) ? 0 : ev[3]),
+        plan = is_undef(ev[2]) ? 0 : ev[2]
+    )
+    (eq + 0.2 * spread + 0.2 * iso + 8 * plan);
 
 function _ps_clamp(x, lo, hi) = min(max(x, lo), hi);
 
@@ -741,6 +774,14 @@ function _ps_tri_equilateral_err(tri) =
         r2 = lens[2] / avg
     )
     (pow(r0 - 1, 2) + pow(r1 - 1, 2) + pow(r2 - 1, 2));
+
+function _ps_snub_tri_eq_err(base, x, y, eps=1e-12) =
+    let(den = max([eps, base * base]))
+    ((pow(x - base, 2) + pow(y - base, 2)) / den);
+
+function _ps_snub_tri_iso_err(base, x, y, eps=1e-12) =
+    let(den = max([eps, base * base]))
+    (pow(x - y, 2) / den);
 
 function _ps_snub_obj_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, c, r, a, handedness=1, edge_reps=undef) =
     let(
@@ -871,14 +912,15 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
         // Keep the automatic search in a conservative regime.
         c_max = is_reg ? 0.25 : 0.12,
         a_max = 35,
-        reg_c_steps = (len(edges) <= 12) ? 2 : 2,
+        reg_c_steps = (len(edges) <= 12) ? 8 : 6,
         reg_df_steps = (len(edges) <= 12) ? 2 : 2,
-        reg_a_steps = (len(edges) <= 12) ? 3 : 3,
-        edge_reps_all = is_reg ? [0] : [for (ei = [0:1:len(edges)-1]) ei],
+        reg_a_steps = (len(edges) <= 12) ? 24 : 16,
+        edge_reps_all = [for (ei = [0:1:len(edges)-1]) ei],
         edge_reps = (!is_reg && len(edge_reps_all) > 48)
             ? [for (i = [0:1:47]) edge_reps_all[i]]
             : edge_reps_all,
-        reg_best = is_reg ? _ps_snub_default_params_full(poly, handedness, c_steps=reg_c_steps, df_steps=reg_df_steps, a_steps=reg_a_steps, c_max=0.15, a_max=25, eps=eps, base=base, edge_reps=edge_reps_all) : undef,
+        edge_reps_reg = [for (ei = [0:1:len(edges)-1]) ei],
+        reg_best = is_reg ? _ps_snub_default_params_full(poly, handedness, c_steps=reg_c_steps, df_steps=reg_df_steps, a_steps=reg_a_steps, c_max=0.15, a_max=25, eps=eps, base=base, edge_reps=edge_reps_reg) : undef,
         c_vals = is_reg ? [] : [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
         angs = is_reg ? [] : [for (i = [0:1:a_steps]) a_max * i / a_steps],
         cands = is_reg ? [] : [
@@ -895,6 +937,7 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
                                 err = (is_undef(ev) || is_undef(ev[1]))
                                     ? undef
                                     : (sqrt(ev[1])
+                                        + 0.25 * sqrt(is_undef(ev[3]) ? 0 : ev[3])
                                         + 0.1 * (is_undef(ev[0]) ? 0 : ev[0])
                                         + 4 * (is_undef(ev[2]) ? 0 : ev[2]))
                             )
@@ -916,8 +959,12 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
         a_best = is_reg ? reg_best[1] : cands[idx][1],
         c_best = is_reg ? reg_best[2] : cands[idx][2],
         de_best = _ps_cantellate_df_from_c_linear(c_best, df_mid, df_max_eff),
+        ev_a0 = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, de_best, 0, handedness, edge_reps),
+        ev_a20 = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, de_best, 20, handedness, edge_reps),
         err_a0 = _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, de_best, 0, handedness, edge_reps),
         err_a20 = _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, poly0, df_best, de_best, 20, handedness, edge_reps),
+        obj_a0 = is_reg ? _ps_snub_obj_regular_from_errors(ev_a0) : _ps_snub_obj_from_errors(ev_a0),
+        obj_a20 = is_reg ? _ps_snub_obj_regular_from_errors(ev_a20) : _ps_snub_obj_from_errors(ev_a20),
         _0 = echo(str(
             "snub: default auto tier=", tier,
             " families(f/e/v)=", ff, "/", ef, "/", vf,
@@ -927,7 +974,11 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
             " reps=", len(edge_reps),
             " angle=", a_best,
             " err@angle0=", err_a0,
-            is_undef(err_a20) ? "" : str(" err@angle20=", err_a20)
+            is_undef(err_a20) ? "" : str(" err@angle20=", err_a20),
+            " obj@angle0=", obj_a0,
+            is_undef(obj_a20) ? "" : str(" obj@angle20=", obj_a20),
+            " ev@angle0=", is_undef(ev_a0) ? "undef" : str(ev_a0),
+            " ev@angle20=", is_undef(ev_a20) ? "undef" : str(ev_a20)
         ))
     )
     [df_best, a_best, c_best, tier];
@@ -950,7 +1001,8 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
         df_max_eff = map[1],
         // Coarse seed
         cs = [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
-        rs = [for (i = [0:1:df_steps]) 0.7 + 0.6 * i / df_steps],
+        // Regular default: keep df coupled to de (r = 1) for stable near-uniform snubs.
+        rs = [1],
         angs = [for (i = [0:1:a_steps]) a_max * i / a_steps],
         seed_samples = len(cs) * len(rs) * len(angs),
         local_samples_bound = 27 * 24,
@@ -967,11 +1019,11 @@ function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8
         seed = seeds[seed_idx],
         // Adaptive local solve
         dc0 = c_max / (c_steps + 1),
-        dr0 = 0.6 / max(1, df_steps),
+        dr0 = 0,
         da0 = a_max / max(1, a_steps),
         best = _ps_snub_local_search_regular(
             verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff,
-            seed, [dc0, dr0, da0], c_max, a_max, handedness, edge_reps_eff, 0, 24, eps
+            seed, [dc0, dr0, da0], c_max, a_max, handedness, edge_reps_eff, 0, 10, eps
         ),
         c_best = best[0],
         r_best = best[1],
@@ -1041,22 +1093,31 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
             : 0,
         _pf = (len(params_rows) == 0) ? 0
             : echo(str("snub: params_overrides face_rows=", ps_params_count_kind(params_rows, "face"), " vert_rows=", ps_params_count_kind(params_rows, "vert"))),
+        cmap = _ps_cantellate_df_map(poly, steps=6),
+        df_mid = cmap[0],
+        df_max_eff = cmap[1],
         df_base = !is_undef(df)
             ? df
             : !is_undef(c)
-            ? _ps_cantellate_df_from_c(poly, c)
-            : !is_undef(auto_params) ? auto_params[0] : _ps_cantellate_df_from_c(poly, 0.5),
+            ? _ps_cantellate_df_from_c_linear(c, df_mid, df_max_eff)
+            : !is_undef(auto_params) ? auto_params[0] : _ps_cantellate_df_from_c_linear(0.5, df_mid, df_max_eff),
         // c controls edge/vertex inset (de). If unspecified, keep de coupled to df.
         de_base = !is_undef(de)
             ? de
             : !is_undef(c)
-            ? _ps_cantellate_df_from_c(poly, c)
-            : (!is_undef(auto_params) ? _ps_cantellate_df_from_c(poly, auto_params[2]) : df_base),
+            ? _ps_cantellate_df_from_c_linear(c, df_mid, df_max_eff)
+            : (!is_undef(auto_params) ? _ps_cantellate_df_from_c_linear(auto_params[2], df_mid, df_max_eff) : df_base),
         // Default to equilateral twist unless an explicit angle is provided.
         angle_eff = is_undef(angle)
             ? let(
                 a = !is_undef(auto_params) ? auto_params[1]
-                    : _ps_snub_default_angle_df_de(poly, df_base, de_base, handedness),
+                    // Keep the fast legacy paths unless de is explicitly provided.
+                    // When de is explicit, solve against [df,de] so angle matches built geometry.
+                    : (!is_undef(de)
+                        ? _ps_snub_default_angle_df_de(poly, df_base, de_base, handedness)
+                        : (!is_undef(c)
+                            ? _ps_snub_default_angle_c(poly, c, df_base, handedness)
+                            : _ps_snub_default_angle_df(poly, df_base, handedness))),
                 _ = echo(str("snub: angle unspecified, default=", a, " (df=", df_base, ", de=", de_base, is_undef(c) ? ")" : str(", c=", c, ")")))
               ) a
             : angle
@@ -1091,7 +1152,7 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
                     c_ov = ps_compiled_param_get(vert_c_by_idx, vi)
                 )
                 !is_undef(de_ov) ? de_ov
-                    : !is_undef(c_ov) ? _ps_cantellate_df_from_c(poly, c_ov)
+                    : !is_undef(c_ov) ? _ps_cantellate_df_from_c_linear(c_ov, df_mid, df_max_eff)
                     : de_base
         ],
         face_pts = [
@@ -1147,7 +1208,7 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
             for (ei = [0:1:len(edges)-1])
                 let(
                     e = edges[ei],
-                    fpair = edge_faces[ei],
+                    fpair = _ps_snub_oriented_edge_faces(e, edge_faces[ei], face_n, verts0),
                     f0 = fpair[0],
                     f1 = fpair[1],
                     v0 = e[0],
