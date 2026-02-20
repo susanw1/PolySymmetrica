@@ -913,14 +913,12 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
         c_max = is_reg ? 0.25 : 0.12,
         a_max = 35,
         reg_c_steps = (len(edges) <= 12) ? 8 : 6,
-        reg_df_steps = (len(edges) <= 12) ? 2 : 2,
         reg_a_steps = (len(edges) <= 12) ? 24 : 16,
         edge_reps_all = [for (ei = [0:1:len(edges)-1]) ei],
         edge_reps = (!is_reg && len(edge_reps_all) > 48)
             ? [for (i = [0:1:47]) edge_reps_all[i]]
             : edge_reps_all,
-        edge_reps_reg = [for (ei = [0:1:len(edges)-1]) ei],
-        reg_best = is_reg ? _ps_snub_default_params_full(poly, handedness, c_steps=reg_c_steps, df_steps=reg_df_steps, a_steps=reg_a_steps, c_max=0.15, a_max=25, eps=eps, base=base, edge_reps=edge_reps_reg) : undef,
+        reg_best = is_reg ? _ps_snub_default_params_full(poly, handedness, c_steps=reg_c_steps, a_steps=reg_a_steps, c_max=0.15, a_max=25, eps=eps, base=base, edge_reps=edge_reps_all) : undef,
         c_vals = is_reg ? [] : [for (i = [1:1:c_steps]) c_max * i / (c_steps + 1)],
         angs = is_reg ? [] : [for (i = [0:1:a_steps]) a_max * i / a_steps],
         cands = is_reg ? [] : [
@@ -985,7 +983,7 @@ function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
 
 // Solve for a c/angle pair by minimizing representative-edge snub uniformity.
 // This avoids full-poly rebuilds in the default path.
-function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, df_steps=8, a_steps=12, c_max=0.2, a_max=30, eps=1e-9, base=undef, edge_reps=undef) =
+function _ps_snub_default_params_full(poly, handedness=1, c_steps=10, a_steps=12, c_max=0.2, a_max=30, eps=1e-9, base=undef, edge_reps=undef) =
     let(
         base0 = is_undef(base) ? _ps_poly_base(poly) : base,
         verts0 = base0[0],

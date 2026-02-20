@@ -11,32 +11,32 @@ Quick snub demo (snub cube + snub dodecahedron).
 
 spacing = 100;
 
-//// Basic Snubs
-//p = poly_snub(hexahedron());
-////p = poly_snub(dodecahedron());
-//demo(p, name="snub");
+// Basic Snubs
+p = poly_snub(hexahedron(), df = 0.05, angle = 15, c = undef, de = 0.1, handedness = 1);
+//p = poly_snub(dodecahedron());
+demo(p, name="snub");
 //poly_describe(p, detail = 3);
 
 
-for (h = [1, -1]) {
-    // Regular default snubs
-    translate([-spacing, h*spacing, 0]) demo(poly_snub(tetrahedron(), handedness = h), name="snub_tet");
-    translate([0, h*spacing, 0]) demo(poly_snub(hexahedron(), handedness = h), name="snub_cube");
-    translate([spacing, h*spacing, 0]) demo(poly_snub(dodecahedron(), handedness = h), name="snub_dodecahedron");
-
-    // Cuboctahedron (rectified octahedron): baseline and overrides.
-    b1 = poly_rectify(octahedron());
-    translate([spacing*2, h*spacing, 0]) demo(poly_snub(b1, handedness = h), name="snub_cubocta (auto)");
-
-    b2 = poly_dual(b1);
-    translate([spacing*3, h*spacing, 0]) demo(poly_snub(b2, handedness = h), name="snub_rh_dod");
-
-    b3 = (poly_rectify(icosahedron()));
-    translate([spacing*4, h*spacing, 0]) demo(poly_snub(b3, handedness = h), name="snub_icosidod");
-
-    b4 = poly_dual(b3);
-    translate([spacing*5, h*spacing, 0]) demo(poly_snub(b4, handedness = h), name="snub_rh_triaconta");
-}
+//for (h = [1, -1]) {
+//    // Regular default snubs
+//    translate([-spacing, h*spacing, 0]) demo(poly_snub(tetrahedron(), handedness = h), name="snub_tet");
+//    translate([0, h*spacing, 0]) demo(poly_snub(hexahedron(), handedness = h), name="snub_cube");
+//    translate([spacing, h*spacing, 0]) demo(poly_snub(dodecahedron(), handedness = h), name="snub_dodecahedron");
+//
+//    // Cuboctahedron (rectified octahedron): baseline and overrides.
+//    b1 = poly_rectify(octahedron());
+//    translate([spacing*2, h*spacing, 0]) demo(poly_snub(b1, handedness = h), name="snub_cubocta (auto)");
+//
+//    b2 = poly_dual(b1);
+//    translate([spacing*3, h*spacing, 0]) demo(poly_snub(b2, handedness = h), name="snub_rh_dod");
+//
+//    b3 = (poly_rectify(icosahedron()));
+//    translate([spacing*4, h*spacing, 0]) demo(poly_snub(b3, handedness = h), name="snub_icosidod");
+//
+//    b4 = poly_dual(b3);
+//    translate([spacing*5, h*spacing, 0]) demo(poly_snub(b4, handedness = h), name="snub_rh_triaconta");
+//}
 
 //// params_overrides examples
 //// Format:
