@@ -10,6 +10,9 @@
 function poly_verts(poly)      = poly[0];
 function poly_faces(poly)      = poly[1];
 function poly_e_over_ir(poly)  = poly[2];
+// Derive edge list from a poly's faces.
+// Derived, O(F); prefer _ps_edges_from_faces(faces) when faces already available.
+function poly_edges(poly)      = _ps_edges_from_faces(poly_faces(poly));
 
 // Constructor with full validation and optional auto-computation
 function make_poly(verts, faces, e_over_ir=undef) =
@@ -182,6 +185,18 @@ function v_sum(list) =
     (len(list) == 0) ? [] :
     let(n = len(list[0]))
     [ for (i = [0:1:n-1]) sum([for (v = list) v[i]]) ];
+
+// Rotate vector v around axis by ang (degrees).
+function ps_rot_axis(v, axis, ang) =
+    let(
+        a = v_norm(axis),
+        c = cos(ang),
+        s = sin(ang),
+        term1 = v_scale(v, c),
+        term2 = v_scale(v_cross(a, v), s),
+        term3 = v_scale(a, v_dot(a, v) * (1 - c))
+    )
+    v_add(v_add(term1, term2), term3);
 
 
 function ps_find_edge_index(edges, a, b) =

@@ -10,6 +10,7 @@ use <../testing_util.scad>
 
 EPS = 1e-7;
 ENABLE_CANTITRUNC_PLANARITY_TEST = false;
+ENABLE_SNUB_PERF_SMOKE = false;
 
 module assert_near(a, b, eps=EPS, msg="") {
     assert(abs(a-b) <= eps, str(msg, " expected=", b, " got=", a));
@@ -20,6 +21,15 @@ module assert_int_eq(a, b, msg="") {
 
 function _count_faces_of_size(poly, k) =
     sum([ for (f = poly_faces(poly)) (len(f)==k) ? 1 : 0 ]);
+
+function _edge_rel_spread(poly) =
+    let(
+        verts = poly_verts(poly),
+        edges = poly_edges(poly),
+        lens = [for (e = edges) norm(verts[e[0]] - verts[e[1]])],
+        avg = (len(lens) == 0) ? 0 : (sum(lens) / len(lens))
+    )
+    (len(lens) == 0 || avg == 0) ? 0 : ((max(lens) - min(lens)) / avg);
 
 function _map_face_c(size, c_by_size, default=0) =
     let(idxs = [for (i = [0:1:len(c_by_size)-1]) if (c_by_size[i][0] == size) i])
@@ -32,6 +42,14 @@ function _face_max_plane_err(verts, face) =
         errs = [for (vi = face) abs(v_dot(n, verts[vi]) - d)]
     )
     (len(errs) == 0) ? 0 : max(errs);
+
+function _max_vertex_diff(p1, p2) =
+    let(
+        v1 = poly_verts(p1),
+        v2 = poly_verts(p2),
+        n = min(len(v1), len(v2))
+    )
+    (n == 0) ? 0 : max([for (i = [0:1:n-1]) norm(v1[i] - v2[i])]);
 
 function _skew_quad_prism() =
     let(
@@ -384,6 +402,175 @@ module test__ps_is_regular_base__detects_regular() {
     assert(!_ps_is_regular_base(cuboctahedron()), "irregular base: cuboctahedron");
 }
 
+module test_poly_snub__cube_counts() {
+    p = hexahedron();
+    q = poly_snub(p);
+    assert_poly_valid(q);
+
+    assert_int_eq(len(poly_verts(q)), 24, "snub cube verts count");
+    assert_int_eq(len(poly_edges(q)), 60, "snub cube edges count");
+    assert_int_eq(len(poly_faces(q)), 38, "snub cube faces count");
+    assert_int_eq(_count_faces_of_size(q, 3), 32, "snub cube: 32 triangles");
+    assert_int_eq(_count_faces_of_size(q, 4), 6, "snub cube: 6 squares");
+}
+
+module test_poly_snub__dodeca_counts() {
+    p = dodecahedron();
+    // Use explicit parameters here to keep test runtime bounded;
+    // default-solving behavior is covered by cube default tests.
+    q = poly_snub(p, c=0.07, angle=15);
+    assert_poly_valid(q);
+
+    assert_int_eq(len(poly_verts(q)), 60, "snub dodeca verts count");
+    assert_int_eq(len(poly_edges(q)), 150, "snub dodeca edges count");
+    assert_int_eq(len(poly_faces(q)), 92, "snub dodeca faces count");
+    assert_int_eq(_count_faces_of_size(q, 3), 80, "snub dodeca: 80 triangles");
+    assert_int_eq(_count_faces_of_size(q, 5), 12, "snub dodeca: 12 pentagons");
+}
+
+module test_poly_snub__cube_twist_moves_vertices() {
+    p = hexahedron();
+    q0 = poly_snub(p, angle=0, c=0.2);
+    q1 = poly_snub(p, angle=20, c=0.2);
+    verts0 = poly_verts(q0);
+    verts1 = poly_verts(q1);
+    max_d = max([for (i = [0:1:len(verts0)-1]) norm(verts1[i] - verts0[i])]);
+    assert(max_d > 1e-4, "snub cube: twist moves vertices");
+}
+
+module test__ps_snub_oriented_edge_faces__cube_consistent_handedness() {
+    p = hexahedron();
+    verts0 = poly_verts(p);
+    faces0 = poly_faces(p);
+    edges = poly_edges(p);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [for (fi = [0:1:len(faces0)-1]) ps_face_normal(verts0, faces0[fi])];
+
+    signs = [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                e = edges[ei],
+                fpair = _ps_snub_oriented_edge_faces(e, edge_faces[ei], face_n, verts0),
+                n0 = face_n[fpair[0]],
+                n1 = face_n[fpair[1]],
+                e_dir = v_norm(verts0[e[1]] - verts0[e[0]])
+            )
+            v_dot(v_cross(n0, n1), e_dir)
+    ];
+    assert(min(signs) >= -1e-9, str("snub edge-face orientation sign should be non-negative, min=", min(signs)));
+
+    same_on_swap = [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                e = edges[ei],
+                raw = edge_faces[ei],
+                a = _ps_snub_oriented_edge_faces(e, raw, face_n, verts0),
+                b = _ps_snub_oriented_edge_faces(e, [raw[1], raw[0]], face_n, verts0)
+            )
+            (a[0] == b[0] && a[1] == b[1]) ? 1 : 0
+    ];
+    assert(min(same_on_swap) == 1, "snub edge-face orientation should be invariant to face-pair order");
+}
+
+module test_poly_snub__cube_edge_tris_near_equilateral() {
+    p = hexahedron();
+    q = poly_snub(p);
+    verts = poly_verts(q);
+    faces = poly_faces(q);
+    edges = poly_edges(q);
+    edge_faces = ps_edge_faces_table(faces, edges);
+    tri_faces = [for (fi = [0:1:len(faces)-1]) if (len(faces[fi]) == 3) fi];
+    tri_sq = [
+        for (fi = tri_faces)
+            let(nbrs = [for (ei = [0:1:len(edges)-1]) if (edge_faces[ei][0] == fi || edge_faces[ei][1] == fi) (edge_faces[ei][0] == fi ? edge_faces[ei][1] : edge_faces[ei][0])])
+            if (len([for (n = nbrs) if (n >= 0 && len(faces[n]) == 4) n]) > 0) fi
+    ];
+    errs = [
+        for (fi = tri_sq)
+            let(f = faces[fi])
+                let(
+                    l0 = norm(verts[f[0]] - verts[f[1]]),
+                    l1 = norm(verts[f[1]] - verts[f[2]]),
+                    l2 = norm(verts[f[2]] - verts[f[0]]),
+                    avg = (l0 + l1 + l2) / 3
+                )
+                max([abs(l0-avg), abs(l1-avg), abs(l2-avg)]) / avg
+    ];
+    err = (len(errs) == 0) ? 1 : max(errs);
+    assert(err < 0.01, str("snub cube: edge triangles should be near equilateral err=", err));
+}
+
+module test_poly_snub__cube_default_global_edges_near_uniform() {
+    p = hexahedron();
+    q = poly_snub(p);
+    spread = _edge_rel_spread(q);
+    assert(spread < 0.02, str("snub cube default: global edge spread <2% got=", spread));
+}
+
+module test_poly_snub__cube_default_params_reasonable() {
+    p = hexahedron();
+    params = _ps_snub_default_params(p);
+    assert(params[3] == "regular", "snub cube: regular-tier default");
+    assert(params[2] > 0.03 && params[2] < 0.12, str("snub cube: c in expected range got=", params[2]));
+    assert(params[1] > 8 && params[1] < 25, str("snub cube: angle in expected range got=", params[1]));
+}
+
+module test_poly_snub__fixed_c_angle_solver_nonzero() {
+    a = _ps_snub_default_angle_c(hexahedron(), 0.07, steps=8, a_max=30);
+    assert(a > 8 && a < 25, str("snub cube fixed-c angle should be nonzero got=", a));
+}
+
+module test_poly_snub__fixed_c_auto_beats_zero_angle() {
+    p = hexahedron();
+    q0 = poly_snub(p, c=0.07, angle=0);
+    q1 = poly_snub(p, c=0.07);
+    assert(_edge_rel_spread(q1) < _edge_rel_spread(q0), "snub cube fixed-c auto-angle improves edge uniformity vs angle=0");
+}
+
+module test_poly_snub__default_solver_returns_structured_overrides() {
+    p = hexahedron();
+    rows = ps_snub_default_params_overrides(p);
+    q0 = poly_snub(p);
+    q1 = poly_snub(p, params_overrides=rows);
+    assert(len(rows) > 0, "snub structured defaults should return rows");
+    assert(_max_vertex_diff(q0, q1) < 1e-7, "snub structured defaults should recreate auto result");
+}
+
+module test_poly_snub__params_overrides_face_angle_overrides_scalar() {
+    p = hexahedron();
+    q0 = poly_snub(p, angle=0, c=0.07, df=0.05);
+    q1 = poly_snub(p, angle=0, c=0.07, df=0.05, params_overrides=[["face", "family", 0, ["angle", 18]]]);
+    qx = poly_snub(p, angle=18, c=0.07, df=0.05);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "snub params_overrides face angle should match explicit angle");
+    assert(_max_vertex_diff(q1, q0) > 1e-4, "snub params_overrides face angle should override scalar angle");
+}
+
+module test_poly_snub__params_overrides_face_df_overrides_scalar() {
+    p = hexahedron();
+    q1 = poly_snub(p, angle=15, c=0.07, df=0.02, params_overrides=[["face", "family", 0, ["df", 0.06]]]);
+    qx = poly_snub(p, angle=15, c=0.07, df=0.06);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "snub params_overrides face df should match explicit df");
+}
+
+module test_poly_snub__params_overrides_vert_c_overrides_scalar() {
+    p = hexahedron();
+    q1 = poly_snub(p, angle=15, c=0.02, df=0.05, params_overrides=[["vert", "family", 0, ["c", 0.08]]]);
+    qx = poly_snub(p, angle=15, c=0.08, df=0.05);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "snub params_overrides vert c should match explicit c");
+}
+
+// Informational performance smoke test for default snub solving.
+// This is intentionally non-failing and opt-in to avoid slowing normal CI/dev runs.
+module perf_snub__defaults_smoke() {
+    echo("PERF_SNUB: start cube default params");
+    p0 = _ps_snub_default_params(hexahedron());
+    echo("PERF_SNUB: done cube default params", p0);
+
+    echo("PERF_SNUB: start dodeca default params");
+    p1 = _ps_snub_default_params(dodecahedron());
+    echo("PERF_SNUB: done dodeca default params", p1);
+}
+
 
 
 // suite
@@ -415,6 +602,23 @@ module run_TestTruncation() {
     test_poly_chamfer__skew_prism_shrinks_all_faces();
     test__ps_face_inset_bisector_2d__list_matches_scalar();
     test__ps_is_regular_base__detects_regular();
+    test_poly_snub__cube_counts();
+    test_poly_snub__dodeca_counts();
+    test_poly_snub__cube_twist_moves_vertices();
+    test__ps_snub_oriented_edge_faces__cube_consistent_handedness();
+    test_poly_snub__cube_edge_tris_near_equilateral();
+    test_poly_snub__cube_default_global_edges_near_uniform();
+    test_poly_snub__cube_default_params_reasonable();
+    test_poly_snub__fixed_c_angle_solver_nonzero();
+    test_poly_snub__fixed_c_auto_beats_zero_angle();
+    test_poly_snub__default_solver_returns_structured_overrides();
+    test_poly_snub__params_overrides_face_angle_overrides_scalar();
+    test_poly_snub__params_overrides_face_df_overrides_scalar();
+    test_poly_snub__params_overrides_vert_c_overrides_scalar();
+    if (ENABLE_SNUB_PERF_SMOKE)
+        perf_snub__defaults_smoke();
+    else
+        echo("NOTE: snub perf smoke test disabled");
 }
 
 run_TestTruncation();

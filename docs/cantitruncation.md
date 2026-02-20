@@ -112,3 +112,5 @@ p = poly_cantitruncate_families(base, sol[0], sol[1], c_edge_by_pair=sol[2]);
 ```
 poly_describe(p, detail=3); // shows max_plane_err per face
 ```
+
+See also `docs/params_overrides.md` for the shared family-parameter schema used across operators.

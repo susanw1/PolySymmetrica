@@ -1,4 +1,5 @@
 use <../../polysymmetrica/core/funcs.scad>
+use <../../polysymmetrica/core/params.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../testing_util.scad>
 
@@ -345,6 +346,113 @@ module test_ps_frame_matrix__basic_layout() {
     assert_near(m[2][3], 3, EPS, "row2 w");
 }
 
+// --- params-overrides helpers ---
+module test_params_overrides__lookup_and_count() {
+    pbf = [
+        ["face", "family", 0, ["df", 0.1], ["angle", 5], ["df", 0.2]],
+        ["face", "family", 0, ["df", undef], ["angle", 7]],
+        ["face", "family", 1, ["df", 0.3]],
+        ["vert", "family", 0, ["c", 0.4], ["de", 0.5]],
+        ["vert", "family", 0, ["c", 0.6]]
+    ];
+
+    assert_int_eq(ps_params_count_kind(pbf, "face"), 3, "params count face rows");
+    assert_int_eq(ps_params_count_kind(pbf, "vert"), 2, "params count vert rows");
+    assert_int_eq(ps_params_count_kind(undef, "face"), 0, "params count undef");
+
+    assert_near(ps_params_get(pbf, "face", "df", 0, 0), 0.2, EPS, "params get face0 df");
+    assert_near(ps_params_get(pbf, "face", "angle", 0, 0), 7, EPS, "params get face0 angle");
+    assert_near(ps_params_get(pbf, "face", "df", 1, 1), 0.3, EPS, "params get face1 df");
+    assert_near(ps_params_get(pbf, "vert", "c", 0, 0), 0.6, EPS, "params get vert0 c");
+    assert_near(ps_params_get(pbf, "vert", "de", 0, 0), 0.5, EPS, "params get vert0 de");
+    assert(is_undef(ps_params_get(pbf, "face", "df", 2, 2)), "params get missing family -> undef");
+    assert(is_undef(ps_params_get(pbf, "face", "missing", 0, 0)), "params get missing key -> undef");
+}
+
+module test_params_overrides__compile_dense_arrays() {
+    pbf = [
+        ["face", "family", 0, ["df", 0.2], ["angle", 7]],
+        ["face", "family", 2, ["angle", 9]],
+        ["vert", "family", 1, ["c", 0.6], ["de", 0.7]]
+    ];
+    compiled = ps_params_compile_specs(pbf, [
+        ["face", "df", 4, [0,1,2,3]],
+        ["face", "angle", 4, [0,1,2,3]],
+        ["vert", "c", 3, [0,1,2]],
+        ["vert", "de", 3, [0,1,2]]
+    ]);
+    face_df = compiled[0];
+    face_angle = compiled[1];
+    vert_c = compiled[2];
+    vert_de = compiled[3];
+
+    assert_int_eq(len(face_df), 4, "compiled face_df len");
+    assert_int_eq(len(face_angle), 4, "compiled face_angle len");
+    assert_int_eq(len(vert_c), 3, "compiled vert_c len");
+    assert_int_eq(len(vert_de), 3, "compiled vert_de len");
+
+    assert_near(face_df[0], 0.2, EPS, "compiled face_df[0]");
+    assert(is_undef(face_df[1]), "compiled face_df[1] undef");
+    assert(is_undef(face_df[2]), "compiled face_df[2] undef");
+    assert(is_undef(face_df[3]), "compiled face_df[3] undef");
+
+    assert_near(face_angle[0], 7, EPS, "compiled face_angle[0]");
+    assert(is_undef(face_angle[1]), "compiled face_angle[1] undef");
+    assert_near(face_angle[2], 9, EPS, "compiled face_angle[2]");
+    assert(is_undef(face_angle[3]), "compiled face_angle[3] undef");
+
+    assert(is_undef(vert_c[0]), "compiled vert_c[0] undef");
+    assert_near(vert_c[1], 0.6, EPS, "compiled vert_c[1]");
+    assert(is_undef(vert_c[2]), "compiled vert_c[2] undef");
+
+    assert(is_undef(vert_de[0]), "compiled vert_de[0] undef");
+    assert_near(vert_de[1], 0.7, EPS, "compiled vert_de[1]");
+    assert(is_undef(vert_de[2]), "compiled vert_de[2] undef");
+
+    assert_near(ps_compiled_param_get(face_angle, 2), 9, EPS, "compiled get in-bounds");
+    assert(is_undef(ps_compiled_param_get(face_angle, -1)), "compiled get negative -> undef");
+    assert(is_undef(ps_compiled_param_get(face_angle, 4)), "compiled get out-of-bounds -> undef");
+    assert(is_undef(ps_compiled_param_get(undef, 0)), "compiled get undef arr -> undef");
+}
+
+module test_params_overrides__compile_single_key() {
+    pbf = [
+        ["face", "family", 0, ["df", 0.2]],
+        ["face", "family", 2, ["df", 0.9]]
+    ];
+    arr = ps_params_compile_key(pbf, "face", "df", 4, [0,1,2,3]);
+    assert_int_eq(len(arr), 4, "compile key len");
+    assert_near(arr[0], 0.2, EPS, "compile key face0");
+    assert(is_undef(arr[1]), "compile key face1 undef");
+    assert_near(arr[2], 0.9, EPS, "compile key face2");
+    assert(is_undef(arr[3]), "compile key face3 undef");
+}
+
+module test_params__selector_precedence_and_compile() {
+    p = [
+        ["face", "all", ["df", 0.1], ["angle", 5]],
+        ["face", "family", 1, ["df", 0.2]],
+        ["face", "id", [3, 4], ["df", 0.4]],
+        ["face", "id", 4, ["angle", 11]]
+    ];
+
+    // id > family > all
+    assert_near(ps_params_get(p, "face", "df", 2, 1), 0.2, EPS, "params precedence family");
+    assert_near(ps_params_get(p, "face", "df", 3, 1), 0.4, EPS, "params precedence id over family");
+    assert_near(ps_params_get(p, "face", "df", 9, 0), 0.1, EPS, "params precedence all fallback");
+    assert_near(ps_params_get(p, "face", "angle", 4, 1), 11, EPS, "params id scalar selector");
+    assert_near(ps_params_get(p, "face", "angle", 1, 1), 5, EPS, "params all fallback angle");
+
+    fam_ids = [1, 1, 1, 1, 0];
+    arr = ps_params_compile_key(p, "face", "df", 5, fam_ids);
+    assert_int_eq(len(arr), 5, "compile key element len");
+    assert_near(arr[0], 0.2, EPS, "compile key elem0");
+    assert_near(arr[1], 0.2, EPS, "compile key elem1");
+    assert_near(arr[2], 0.2, EPS, "compile key elem2");
+    assert_near(arr[3], 0.4, EPS, "compile key elem3 id override");
+    assert_near(arr[4], 0.4, EPS, "compile key elem4 id override");
+}
+
 
 // ---- suite ----
 module run_TestFuncs() {
@@ -389,6 +497,10 @@ module run_TestFuncs() {
     test_ps_sort__empty();
     test_ps_solve3__identity_and_scale();
     test_ps_frame_matrix__basic_layout();
+    test_params_overrides__lookup_and_count();
+    test_params_overrides__compile_dense_arrays();
+    test_params_overrides__compile_single_key();
+    test_params__selector_precedence_and_compile();
 }
 
 run_TestFuncs();

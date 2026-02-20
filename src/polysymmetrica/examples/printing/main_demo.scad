@@ -16,10 +16,10 @@ IR = 20 * SC;
 //p = (tetrahedron());
 //p = poly_truncate(octahedron());
 //p = (dodecahedron());
-base = icosahedron();
+//base = icosahedron();
 //sol = solve_cantitruncate_trig(base);
 //s = poly_cantellate_norm(base, 0.5);
-p = poly_dual(poly_cantellate_norm(base, 0.5));
+p = poly_dual(great_rhombicuboctahedron());
 
 EDGE_T = 3.5 * SC;
 FACE_T = 1.6 * SC;

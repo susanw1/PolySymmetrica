@@ -4,7 +4,6 @@ use <../models/platonics_all.scad>
 
 /**
 Archimedean solids derived from Platonic bases.
-Snubs are left as stubs for now.
 */
 
 // ---- Truncations ----
@@ -52,15 +51,14 @@ function great_rhombicosidodecahedron() =
     )
     poly_cantitruncate(base, sol[0], sol[1]);
 
-// ---- Snubs (stubs) ----
+// ---- Snubs ----
 
-function snub_cube() = undef; // TODO
-function snub_dodecahedron() = undef; // TODO
+function snub_cube() = poly_snub(hexahedron());
+function snub_dodecahedron() = poly_snub(dodecahedron());
 
 /**
 Return all Archimedean solids as [[name, fn], ...],
 where fn is a zero-arg function returning the poly.
-Snubs return undef.
 */
 function archimedians_all() = [
     ["truncated_tetrahedron", function() truncated_tetrahedron()],
