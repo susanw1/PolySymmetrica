@@ -55,7 +55,7 @@ PolySymmetrica/
 │   │   │   ├─ funcs.scad           # math, vector, centroid, helpers
 │   │   │   ├─ placement.scad       # face/edge/vertex placement
 │   │   │   ├─ truncation.scad      # truncate/rectify/chamfer/cantellate/cantitruncate
-│   │   │   ├─ params.scad          # shared params-by-family helpers
+│   │   │   ├─ params.scad          # shared params_overrides helpers
 │   │   │   ├─ solvers.scad         # parameter solvers (cantitruncate, etc.)
 │   │   │   ├─ transform.scad       # site-based mesh assembly
 │   │   │   ├─ transform_util.scad  # shared transform helpers
@@ -84,10 +84,18 @@ PolySymmetrica/
     ├─ params_overrides.md
     ├─ cantitruncation.md
     ├─ cantellation.md
+    ├─ snubs.md
     └─ images/
 ```
 
 Each module is deliberately small so that users can take only what they need.
+
+Related deep-dive notes:
+
+- [Cantellation notes](cantellation.md)
+- [Cantitruncation notes](cantitruncation.md)
+- [Snub notes](snubs.md)
+- [Params overrides](params_overrides.md)
 
 ---
 
@@ -205,25 +213,41 @@ These make the system extremely expressive.
 
 ### **3.4 Cantitruncation Notes**
 
-See `docs/cantitruncation.md` for current parameterization, trig solver, and dominant‑family notes.
+See [cantitruncation.md](cantitruncation.md) for current parameterization, trig solver, and dominant‑family notes.
 
 ### **3.5 Cantellation Notes**
 
-See `docs/cantellation.md` for current parameterization, helpers, and planarity notes.
+See [cantellation.md](cantellation.md) for current parameterization, helpers, and planarity notes.
 
-### **3.6 Shared Params-By-Family**
+### **3.6 Snub Notes**
 
-PolySymmetrica supports family-targeted parameter overrides using a shared row format:
+See [snubs.md](snubs.md) for snub usage, default solving, helper notes, and current caveats.
+
+### **3.7 Shared Params Overrides**
+
+PolySymmetrica supports operator-agnostic structured overrides using shared row formats:
 
 ```scad
-["face"|"vert"|"edge", family_id, ["key", value], ...]
+["face"|"vert"|"edge", "all", ["key", value], ...]
+["face"|"vert"|"edge", "family", family_id, ["key", value], ...]
+["face"|"vert"|"edge", "id", id_or_ids, ["key", value], ...]
 ```
 
-This is implemented in `core/params.scad` and designed to be operator-agnostic.
+Implemented in `core/params.scad` and used by operators such as `poly_snub(...)`.
+Rows can set multiple keys, and precedence is `id > family > all`.
+For hot paths, compile rows once with:
+
+- `ps_params_compile_key(...)`
+- `ps_params_compile_specs(...)`
+
+and read in O(1) with:
+
+- `ps_compiled_param_get(...)`
 
 For schema details, compile-spec format, and examples, see:
 
-- `docs/params_overrides.md`
+- [params_overrides.md](params_overrides.md)
+- [`src/polysymmetrica/examples/basics/main_params.scad`](../src/polysymmetrica/examples/basics/main_params.scad)
 
 #### Naming conventions for `$ps_*` variables
 
@@ -283,7 +307,7 @@ These conventions aim to:
 
 ---
 
-### **3.4 Dual Operator**
+### **3.8 Dual Operator**
 
 PolySymmetrica implements a **fully correct convex dual construction**:
 
@@ -335,8 +359,8 @@ Tetrahedron is self-dual.
 
 ```scad
 platonics_all();      // [["tetrahedron", fn], ...]
-archimedians_all();   // 13 Archimedeans as [name, fn] (snubs are stubs)
-catalans_all();       // Catalan duals as [name, fn] (snubs are stubs)
+archimedians_all();   // 13 Archimedeans as [name, fn]
+catalans_all();       // Catalan duals as [name, fn]
 johnsons_all();       // early previews (approx / WIP)
 ```
 
@@ -438,7 +462,8 @@ Operator parameters follow their construction, so the sign may differ by operato
 
 * **Chamfer**: positive `t` offsets face planes **inward** (toward the poly center); negative `t` produces an anti‑chamfer.
 * **Cantellate/expand**: positive offsets typically push new edge/vertex features **outward** from the original poly.
-* **Cantitruncate**: `t` is a truncation-style edge fraction; `c` offsets face/edge planes by `±c * ir` (see `docs/cantitruncation.md`).
+* **Cantitruncate**: `t` is a truncation-style edge fraction; `c` offsets face/edge planes by `±c * ir` (see [cantitruncation.md](cantitruncation.md)).
+* **Snub**: `angle` controls in-face twist, with `df/de/c` controlling offsets; defaults are solver-derived (see [snubs.md](snubs.md)).
 
 ### **6.3 Custom placement modes**
 
@@ -486,7 +511,7 @@ Confirm:
 * ✔ Primitive Platonic descriptors
 * ✔ Dual-generated cube and dodecahedron
 * ✔ Convex dual operator
-* ✔ Truncation/rectification/chamfer/cantellate/cantitruncation (`core/truncation.scad`)
+* ✔ Truncation/rectification/chamfer/cantellate/cantitruncation/snub (`core/truncation.scad`)
 * ✔ Solver helpers (`core/solvers.scad`)
 * ✔ Archimedean generation via truncation/cantellation
 * ✔ Catalan generation via duals
