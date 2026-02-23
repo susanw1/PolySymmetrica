@@ -4,9 +4,6 @@
 
 use <funcs.scad>
 use <duals.scad>
-use <transform_util.scad>
-
-function _ps_clamp(x, lo, hi) = (x < lo) ? lo : (x > hi) ? hi : x;
 
 function _ps_unique_ints(a) =
     let(
@@ -45,7 +42,6 @@ function solve_cantitruncate_dominant(poly, dominant_size, edge_idx=undef) =
         edges = _ps_edges_from_faces(faces0),
         face_sizes = [for (f = faces0) len(f)],
         size_set = _ps_unique_ints(face_sizes),
-        base_idx = [for (i = [0:1:len(size_set)-1]) if (size_set[i] == dominant_size) i][0],
         f_idx = [for (i = [0:1:len(face_sizes)-1]) if (face_sizes[i] == dominant_size) i][0],
         sol = solve_cantitruncate_trig(poly0, f_idx, edge_idx),
         t = sol[0],
@@ -59,15 +55,6 @@ function solve_cantitruncate_dominant(poly, dominant_size, edge_idx=undef) =
         ]
     )
     [t, c_by_size];
-
-// Build unique [a,b] pairs from a list of pairs (order is preserved).
-function _ps_unique_pairs(pairs, i=0, acc=[]) =
-    (i >= len(pairs)) ? acc
-  : let(
-        p = pairs[i],
-        has = (len([for (u = acc) if (u[0] == p[0] && u[1] == p[1]) 1]) > 0)
-    )
-    _ps_unique_pairs(pairs, i+1, has ? acc : concat(acc, [p]));
 
 // Solve per-face-family c values and per-edge-family overrides.
 function solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx=undef) =
@@ -100,7 +87,7 @@ function solve_cantitruncate_trig(poly, face_idx=0, edge_idx=undef) =
         v_next = f[1],
         a0 = v_norm(verts[v_prev] - verts[v0]),
         a1 = v_norm(verts[v_next] - verts[v0]),
-        phi = acos(_ps_clamp(v_dot(a0, a1), -1, 1)),
+        phi = acos(ps_clamp(v_dot(a0, a1), -1, 1)),
         t = 1 / (2 * (1 + sin(phi/2))),
         edges = _ps_edges_from_faces(faces),
         ei = is_undef(edge_idx) ? ps_find_edge_index(edges, v0, v_next) : edge_idx,
@@ -110,7 +97,7 @@ function solve_cantitruncate_trig(poly, face_idx=0, edge_idx=undef) =
         n0 = ps_face_normal(verts, faces[f0]),
         n1 = ps_face_normal(verts, faces[f1]),
         // alpha is angle between outward normals
-        alpha = acos(_ps_clamp(v_dot(n0, n1), -1, 1)),
+        alpha = acos(ps_clamp(v_dot(n0, n1), -1, 1)),
         a = norm(verts[v_next] - verts[v0]),
         ir = min([for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)]),
         // across-face distance uses sin(alpha/2); for cube alpha=90 so sin=cos

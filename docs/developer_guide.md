@@ -456,7 +456,7 @@ Planned:
 
 * **Stellation frameworks**
 
-### **6.4 Transform parameter sign conventions**
+### **6.3 Transform parameter sign conventions**
 
 Operator parameters follow their construction, so the sign may differ by operator.
 
@@ -465,7 +465,7 @@ Operator parameters follow their construction, so the sign may differ by operato
 * **Cantitruncate**: `t` is a truncation-style edge fraction; `c` offsets face/edge planes by `±c * ir` (see [cantitruncation.md](cantitruncation.md)).
 * **Snub**: `angle` controls in-face twist, with `df/de/c` controlling offsets; defaults are solver-derived (see [snubs.md](snubs.md)).
 
-### **6.3 Custom placement modes**
+### **6.4 Custom placement modes**
 
 Just follow the structure of `place_on_faces`:
 

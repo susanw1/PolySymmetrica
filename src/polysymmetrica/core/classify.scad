@@ -3,7 +3,7 @@ use <duals.scad>
 
 // Polyhedral element classification by families (faces / edges / vertices).
 // detail=0: topology only
-// detail=1: adds length-based info (rounded by eps)
+// detail>=1: adds neighbour refinement; geometry is controlled by include_geom.
 
 function _ps_round(v, eps) =
     (eps <= 0) ? v : (round(v / eps) * eps);
@@ -95,9 +95,6 @@ function _ps_face_keys_from(verts, faces, detail, eps) =
                 : [n, _ps_round(avg_len, eps)]
     ];
 
-function _ps_face_keys(poly, detail, eps) =
-    _ps_face_keys_from(poly_verts(poly), poly_faces(poly), detail, eps);
-
 function _ps_edge_keys_from(verts, faces, edges, edge_faces, detail, eps) =
     [
         for (ei = [0:1:len(edges)-1])
@@ -113,15 +110,6 @@ function _ps_edge_keys_from(verts, faces, edges, edge_faces, detail, eps) =
                 ? [ks[0], ks[1]]
                 : [ks[0], ks[1], _ps_round(el, eps)]
     ];
-
-function _ps_edge_keys(poly, detail, eps) =
-    let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges)
-    )
-    _ps_edge_keys_from(verts, faces, edges, edge_faces, detail, eps);
 
 function _ps_edge_keys_list(edges, nv) =
     [for (e = edges) min(e[0], e[1]) * nv + max(e[0], e[1])];
@@ -153,15 +141,6 @@ function _ps_vert_keys_from(verts, faces, edges, edge_faces, detail, eps) =
                 ? concat([valences[vi]], ks)
                 : concat([valences[vi]], ks, [_ps_round(avg_len, eps)])
     ];
-
-function _ps_vert_keys(poly, detail, eps) =
-    let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly),
-        edges = _ps_edges_from_faces(faces),
-        edge_faces = ps_edge_faces_table(faces, edges)
-    )
-    _ps_vert_keys_from(verts, faces, edges, edge_faces, detail, eps);
 
 // Refine face keys using neighboring face topology (by face_nbr_keys).
 function _ps_refine_face_keys(poly, face_keys, face_nbr_keys, vert_ids, edges, edge_faces, edge_keys, nv) =
