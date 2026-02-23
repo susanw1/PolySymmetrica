@@ -1,5 +1,4 @@
 use <funcs.scad>
-use <duals.scad>
 
 // Polyhedral element classification by families (faces / edges / vertices).
 // detail=0: topology only

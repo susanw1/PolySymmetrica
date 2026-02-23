@@ -60,6 +60,7 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `place_on_faces/edges/vertices(..., classify=cls, classify_opts=[detail,eps,radius,include_geom])`
   - New `$ps_*` family vars are exposed per element (`*_family_id`) plus global family counts.
   - To avoid family-id drift between placement and overrides/solvers, classify once and reuse the same `cls`.
+- Dependency hygiene: `faces_around_vertex` helpers now live in `core/funcs.scad` (shared primitive). Avoid pulling them from `duals.scad` to prevent `placement -> classify -> duals -> placement` style use-cycles.
 
 ## Session Notes (Recent Cleanup Insights)
 - Prefer shared scalar helpers in `funcs.scad` when used across core files (for example `ps_clamp(...)`), rather than duplicating private variants per file.

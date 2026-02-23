@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>
-use <duals.scad>  // for faces_around_vertex helpers
 use <classify.scad>
 use <transform.scad>
 use <transform_util.scad>
