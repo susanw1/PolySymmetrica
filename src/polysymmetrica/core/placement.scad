@@ -5,9 +5,26 @@
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>
+use <classify.scad>
+
+function _ps_cls_opt(classify_opts, i, def) =
+    (is_undef(classify_opts) || !is_list(classify_opts) || i >= len(classify_opts) || is_undef(classify_opts[i]))
+        ? def
+        : classify_opts[i];
+
+function _ps_resolve_classify(poly, classify=undef, classify_opts=undef) =
+    !is_undef(classify)
+        ? classify
+        : poly_classify(
+            poly,
+            _ps_cls_opt(classify_opts, 0, 1),
+            _ps_cls_opt(classify_opts, 1, 1e-6),
+            _ps_cls_opt(classify_opts, 2, 1),
+            _ps_cls_opt(classify_opts, 3, false)
+        );
 
 // ---- Generic face-placement driver ----
-module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
+module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
     exp_edge_len = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     scale = exp_edge_len;
 
@@ -17,6 +34,11 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
     edges = _ps_edges_from_faces(faces0);
     edge_faces = ps_edge_faces_table(faces0, edges);
     face_n = [ for (f = faces0) ps_face_normal(verts, f) ];
+    cls = _ps_resolve_classify(poly, classify, classify_opts);
+    family_counts = ps_classify_counts(cls);
+    face_family_ids = ps_classify_face_ids(cls, len(faces));
+    edge_family_count = family_counts[1];
+    vert_family_count = family_counts[2];
 
     for (fi = [0 : 1 : len(faces)-1]) {
         f      = faces[fi];
@@ -57,6 +79,10 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
         $ps_face_radius       = face_radius;        // (mean) distance from face centre to vertices
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
+        $ps_face_family_id    = face_family_ids[fi];
+        $ps_face_family_count = family_counts[0];
+        $ps_edge_family_count = edge_family_count;
+        $ps_vertex_family_count = vert_family_count;
         
         // Adjacent faces per edge (aligned with face vertex order)
         $ps_face_neighbors_idx = [
@@ -91,13 +117,18 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef) {
 }
 
 // ---- Place children on all vertices of a polyhedron ----
-module place_on_vertices(poly, inter_radius = 1, edge_len = undef) {
+module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
     target_edge_len = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     scale = target_edge_len;
 
     verts = poly_verts(poly);
     faces = poly_faces(poly);
     edges = _ps_edges_from_faces(faces);
+    cls = _ps_resolve_classify(poly, classify, classify_opts);
+    family_counts = ps_classify_counts(cls);
+    vert_family_ids = ps_classify_vert_ids(cls, len(verts));
+    face_family_count = family_counts[0];
+    edge_family_count = family_counts[1];
 
     for (vi = [0 : 1 : len(verts)-1]) {
 
@@ -142,6 +173,10 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef) {
         $ps_edge_len                = target_edge_len;      // (target edge length parameter)
         $ps_vert_radius             = vert_radius;
         $ps_poly_center_local       = [0, 0, -vert_radius];  // by construction
+        $ps_vertex_family_id        = vert_family_ids[vi];
+        $ps_face_family_count       = face_family_count;
+        $ps_edge_family_count       = edge_family_count;
+        $ps_vertex_family_count     = family_counts[2];
 
         multmatrix(ps_frame_matrix(center, ex, ey, ez))
             children();
@@ -150,11 +185,16 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef) {
 
 
 // ---- Place children on all edges of a polyhedron ----
-module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
+module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
     scale = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     verts = poly_verts(poly);
     faces = poly_faces(poly);
     edges = _ps_edges_from_faces(faces);
+    cls = _ps_resolve_classify(poly, classify, classify_opts);
+    family_counts = ps_classify_counts(cls);
+    edge_family_ids = ps_classify_edge_ids(cls, len(edges));
+    face_family_count = family_counts[0];
+    vert_family_count = family_counts[2];
 
     for (ei = [0 :  1 : len(edges)-1]) {
 
@@ -195,6 +235,10 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef) {
         $ps_edge_pts_local      = edge_pts_local;
         $ps_edge_verts_idx      = e;
         $ps_edge_adj_faces_idx  = adj_faces_idx;
+        $ps_edge_family_id      = edge_family_ids[ei];
+        $ps_face_family_count   = face_family_count;
+        $ps_edge_family_count   = family_counts[1];
+        $ps_vertex_family_count = vert_family_count;
 
         multmatrix(ps_frame_matrix(center, ex, ey, ez))
             children();
