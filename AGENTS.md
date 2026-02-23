@@ -56,3 +56,11 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `face_plate` expects LHR/CW 2D input order for `pts` and aligned `diheds`; bevel sign must match LHR.
 - `poly_chamfer` now builds hex edge faces (true chamfer): edge faces include original vertices; vertex faces are omitted.
 - Shared mesh build helper: `_ps_poly_from_face_points(...)` dedups points, orients faces, and rescales to unit edge.
+
+## Session Notes (Recent Cleanup Insights)
+- Prefer shared scalar helpers in `funcs.scad` when used across core files (for example `ps_clamp(...)`), rather than duplicating private variants per file.
+- Remove thin pass-through wrappers when they add no semantic value; call the canonical helper directly.
+- For inert cleanup passes, include comment-only/doc-only normalization together with dead-local/dead-helper removal, then always run:
+  `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
+- `classify.scad` now uses `_ps_*_keys_from(...)` forms directly; legacy wrapper variants were removed as dead code.
+- Keep debug/probe and generated artifacts in `/tmp`; do not leave temporary `.scad` probes in repo root.
