@@ -76,7 +76,6 @@ function _ps_rot2d(p, ang) =
 // d_f shifts the face plane outward (along face normal) in caller space; note the
 // internal p0 uses center - n_f*d_f so positive d_f still means outward overall.
 // d_e shifts the edge-bisector planes along their normals.
-// Inset polygon vertices using bisector-plane intersection lines per edge.
 // d_e may be a single value or a per-edge list (length n). Per-edge values
 // allow mixed-family cantitruncation to bias individual edge planes.
 function _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0) =
@@ -191,11 +190,15 @@ function _ps_index_of_min(list) =
     )
     (len(idxs) == 0) ? 0 : idxs[0];
 
-// --- main truncation ---
+// --- Core operators ---
 
 function _ps_truncate_norm_to_t(poly, c) =
     _ps_truncate_default_t(poly) * c;
 
+// Truncation:
+// - replaces each original vertex with a vertex-face
+// - replaces each original edge with two edge points
+// - `t` is the edge fraction from each endpoint; `c` maps to `t` via default normalization
 function poly_truncate(poly, t=undef, c=undef, eps = 1e-8) =
     let(
         t_eff = !is_undef(t)
@@ -271,7 +274,8 @@ function poly_truncate(poly, t=undef, c=undef, eps = 1e-8) =
     )
     ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
 
-// Rectification: replace each vertex with the midpoint of each incident edge.
+// Rectification:
+// replaces each original vertex by the cycle of incident edge midpoints.
 function poly_rectify(poly) =
     let(
         base = _ps_poly_base(poly),
@@ -332,9 +336,11 @@ function poly_rectify(poly) =
     )
     ps_poly_transform_from_sites(verts, [for (i = [0:1:len(edge_mid)-1]) [i]], edge_mid, cycles_all);
 
-// Chamfer: face faces + edge faces (no vertex faces).
-// t is a signed face-plane offset as a fraction of each face's collapse distance.
-// Positive t = inward chamfer; negative t = anti-chamfer.
+// Chamfer:
+// - keeps original vertices in edge faces (hex-like around each old edge)
+// - omits vertex faces
+// - `t` is a signed face-plane offset as a fraction of each face's collapse distance
+//   (positive = inward chamfer, negative = anti-chamfer)
 function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
     let(
         t_eff = !is_undef(t)
@@ -433,7 +439,9 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
-// Cantellation/expansion:
+// --- Cantellation helpers ---
+//
+// Cantellation / expansion:
 // - face faces remain n-gons (one point per original vertex)
 // - edge faces are quads (rectangles/squares)
 // - vertex faces are valence-gons
@@ -478,6 +486,10 @@ function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_i
     )
     _ps_cantellate_df_from_c_linear(c, df_mid, df_max_eff);
 
+// Cantellation operator.
+// If `df` is omitted:
+// - use `c` if provided, else default `c=0.5`
+// - map `c` to `df` using the square-edge calibration map.
 function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6) =
     let(
         df_eff = !is_undef(df)
@@ -598,6 +610,7 @@ function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0
     let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
     poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
 
+// --- Snub helpers ---
 function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
     let(pos = _ps_index_of(faces0[fi], v))
     face_pts[fi][pos];
@@ -647,8 +660,9 @@ function _ps_snub_uniform_error_base(verts0, faces0, edges, edge_faces, face_n, 
     let(ev = _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness, edge_reps, eps))
     ev[0];
 
-// Combined snub objective terms in one pass:
-// returns [uniform_spread, edge_triangle_equilateral_error, vert_face_planarity_error, edge_triangle_isosceles_error].
+// Combined snub objective terms in one pass.
+// Returns:
+// [uniform_spread, edge_triangle_equilateral_error, vert_face_planarity_error, edge_triangle_isosceles_error].
 function _ps_snub_eval_errors_base(verts0, faces0, edges, edge_faces, face_n, poly0, d_f, d_e, angle, handedness=1, edge_reps=undef, eps=1e-12) =
     let(
         d_f_by_face = [for (_ = [0:1:len(faces0)-1]) d_f],
@@ -758,8 +772,6 @@ function _ps_snub_obj_regular_from_errors(ev, bad=1e9) =
     )
     (eq + 0.2 * spread + 0.2 * iso + 8 * plan);
 
-function _ps_clamp(x, lo, hi) = min(max(x, lo), hi);
-
 function _ps_tri_equilateral_err(tri) =
     let(
         lens = [ norm(tri[0]-tri[1]), norm(tri[1]-tri[2]), norm(tri[2]-tri[0]) ],
@@ -776,7 +788,7 @@ function _ps_snub_tri_iso_err(base, x, y, eps=1e-12) =
 
 function _ps_snub_obj_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, c, r, a, handedness=1, edge_reps=undef) =
     let(
-        c0 = _ps_clamp(c, 0, 1),
+        c0 = ps_clamp(c, 0, 1),
         de = _ps_cantellate_df_from_c_linear(c0, df_mid, df_max_eff),
         rr = max(0.01, r),
         df = rr * de,
@@ -791,9 +803,9 @@ function _ps_snub_best3_regular(verts0, faces0, edges, edge_faces, face_n, poly0
                 for (ir = [-1:1:1])
                     for (ia = [-1:1:1])
                         let(
-                            c1 = _ps_clamp(c + ic * dc, 0, c_max),
-                            r1 = _ps_clamp(r + ir * dr, 0.5, 1.5),
-                            a1 = _ps_clamp(a + ia * da, 0, a_max),
+                            c1 = ps_clamp(c + ic * dc, 0, c_max),
+                            r1 = ps_clamp(r + ir * dr, 0.5, 1.5),
+                            a1 = ps_clamp(a + ia * da, 0, a_max),
                             e1 = _ps_snub_obj_regular(verts0, faces0, edges, edge_faces, face_n, poly0, df_mid, df_max_eff, c1, r1, a1, handedness, edge_reps)
                         )
                         [c1, r1, a1, e1]
@@ -873,7 +885,7 @@ function _ps_snub_default_angle_c(poly, c, df=undef, handedness=1, steps=16, a_m
     )
     _ps_snub_default_angle_df_de(poly, d_f, de, handedness, steps, a_max, eps);
 
-// Solve for default snub parameters with a tiered strategy:
+// Solve default snub parameters with a tiered strategy:
 // regular -> family representative -> bounded heuristic.
 // Returns [df, angle, c, tier].
 function _ps_snub_default_params(poly, handedness=1, eps=1e-9) =
@@ -1058,7 +1070,7 @@ function _ps_face_max_plane_err(verts, f) =
     )
     (len(errs) == 0) ? 0 : max(errs);
 
-// Snub with optional scalar controls and/or structured per-element overrides.
+// Snub operator with optional scalar controls and/or structured per-element overrides.
 //
 // Fallback strategy:
 // - If `angle`, `c`, `df`, and `de` are all `undef`, auto defaults are solved.
@@ -1097,7 +1109,7 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
         angle_eff = is_undef(angle)
             ? let(
                 a = !is_undef(auto_params) ? auto_params[1]
-                    // Keep the fast legacy paths unless de is explicitly provided.
+                    // Keep the fast scalar paths unless de is explicitly provided.
                     // When de is explicit, solve against [df,de] so angle matches built geometry.
                     : (!is_undef(de)
                         ? _ps_snub_default_angle_df_de(poly, df_base, de_base, handedness)
@@ -1247,6 +1259,8 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
     )
     make_poly(verts, faces_oriented, poly_e_over_ir(q));
 
+// --- Cantitruncation operators ---
+//
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
 function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =

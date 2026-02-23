@@ -14,6 +14,9 @@ function poly_e_over_ir(poly)  = poly[2];
 // Derived, O(F); prefer _ps_edges_from_faces(faces) when faces already available.
 function poly_edges(poly)      = _ps_edges_from_faces(poly_faces(poly));
 
+// Clamp scalar to [lo, hi].
+function ps_clamp(x, lo, hi) = min(max(x, lo), hi);
+
 // Constructor with full validation and optional auto-computation
 function make_poly(verts, faces, e_over_ir=undef) =
     let(
