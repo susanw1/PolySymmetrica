@@ -370,14 +370,8 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                             let(p = verts0[f[k]] - center)
                                 [v_dot(p, ex), v_dot(p, ey)]
                     ],
-                    edge_lens = [
-                        for (k = [0:1:n-1])
-                            let(p0 = pts2d[k], p1 = pts2d[(k+1)%n])
-                                norm([p1[0]-p0[0], p1[1]-p0[1]])
-                    ],
                     face_collapse = abs(_ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)),
-                    d_f0 = -t_eff * face_collapse,
-                    d_f = d_f0,
+                    d_f = -t_eff * face_collapse,
                     inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
                     p0 = center - n_f * d_f
                 )

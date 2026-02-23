@@ -3,7 +3,7 @@ use <duals.scad>
 
 // Polyhedral element classification by families (faces / edges / vertices).
 // detail=0: topology only
-// detail=1: adds length-based info (rounded by eps)
+// detail>=1: adds neighbour refinement; geometry is controlled by include_geom.
 
 function _ps_round(v, eps) =
     (eps <= 0) ? v : (round(v / eps) * eps);
