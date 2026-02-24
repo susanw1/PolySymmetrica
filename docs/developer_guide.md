@@ -179,8 +179,8 @@ Or calculate it based on edge length:
 Classification controls:
 
 * `classify`: optional precomputed value from `poly_classify(...)`; preferred for consistency and speed.
-* `classify_opts`: optional `[detail, eps, radius, include_geom]` used only when `classify` is not passed.
-* default classify mode when not provided: `detail=1, eps=1e-6, radius=1, include_geom=false`.
+* `classify_opts`: optional `[detail, eps, radius, include_geom]`; used only when `classify` is not passed.
+* if both are omitted, placement remains geometry-only (no classification is performed and family vars are `undef`).
 
 
 Each operator:

@@ -88,10 +88,21 @@ module test_place_on_all__cube_single_family() {
     }
 }
 
+module test_place_on_edges__no_auto_classify_by_default() {
+    p = hexahedron();
+    place_on_edges(p) {
+        assert(is_undef($ps_edge_family_id), "default placement: edge family id should be undef without classify");
+        assert(is_undef($ps_face_family_count), "default placement: face family count should be undef without classify");
+        assert(is_undef($ps_edge_family_count), "default placement: edge family count should be undef without classify");
+        assert(is_undef($ps_vertex_family_count), "default placement: vertex family count should be undef without classify");
+    }
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
     test_place_on_vertices__family_ids_and_counts_from_classify();
     test_place_on_faces__auto_classify_matches_precomputed();
     test_place_on_all__cube_single_family();
+    test_place_on_edges__no_auto_classify_by_default();
 }
