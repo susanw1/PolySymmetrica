@@ -132,6 +132,19 @@ function ps_params_count_kind(params_overrides, kind) =
     is_undef(params_overrides) ? 0
         : len([for (row = params_overrides) if (_ps_params_row_kind(row) == kind) 1]);
 
+function ps_params_row_count(params_overrides) =
+    is_undef(params_overrides) ? 0 : len(params_overrides);
+
+function ps_params_has_scope(params_overrides, kind, scope) =
+    is_undef(params_overrides) ? false
+        : (len([
+            for (row = params_overrides)
+                if (_ps_params_row_kind(row) == kind && _ps_params_row_scope(row) == scope) 1
+        ]) > 0);
+
+function ps_params_uses_family(params_overrides, kind) =
+    ps_params_has_scope(params_overrides, kind, "family");
+
 // Compile one kind/key into a dense lookup array, optionally using a parallel
 // family-id array for family-scoped matches.
 function ps_params_compile_key(params_overrides, kind, key, count, family_ids=undef) =

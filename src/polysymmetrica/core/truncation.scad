@@ -30,6 +30,43 @@ function _ps_face_has_dir(f, v0, v1) =
 function _ps_all_near(vals, eps) =
     (len(vals) == 0) ? true : (max(vals) - min(vals) <= eps);
 
+function _ps_override_allowed_keys_for_kind(allowed_specs, kind) =
+    let(rows = [for (a = allowed_specs) if (a[0] == kind) a[1]])
+    (len(rows) == 0) ? [] : rows[0];
+
+function _ps_override_key_in(keys, k) =
+    len([for (x = keys) if (x == k) 1]) > 0;
+
+function _ps_override_row_keys(row) =
+    let(
+        start = _ps_params_row_kv_start(row)
+    )
+    (!is_list(row) || is_undef(start) || start > len(row)-1) ? []
+        : [
+            for (i = [start:1:len(row)-1])
+                let(p = row[i])
+                if (is_list(p) && len(p) >= 1 && is_string(p[0])) p[0]
+        ];
+
+function _ps_override_row_is_unsupported(row, allowed_specs) =
+    let(
+        kind = _ps_params_row_kind(row),
+        scope = _ps_params_row_scope(row),
+        keys = _ps_override_row_keys(row),
+        allowed_keys = _ps_override_allowed_keys_for_kind(allowed_specs, kind),
+        bad_keys = [for (k = keys) if (!_ps_override_key_in(allowed_keys, k)) k]
+    )
+    (is_undef(scope)) || (len(allowed_keys) == 0) || (len(bad_keys) > 0);
+
+function _ps_override_warn_unsupported(rows, op_name, allowed_specs) =
+    let(
+        bad_rows = [for (ri = [0:1:len(rows)-1]) if (_ps_override_row_is_unsupported(rows[ri], allowed_specs)) ri],
+        _ = (len(bad_rows) > 0)
+            ? echo(str(op_name, ": params_overrides ignored rows=", bad_rows))
+            : 0
+    )
+    0;
+
 // True if poly has a single face size and single edge length (within eps).
 function _ps_is_regular_base(poly, eps=1e-6) =
     let(
@@ -198,84 +235,101 @@ function _ps_truncate_norm_to_t(poly, c) =
 // - replaces each original vertex with a vertex-face
 // - replaces each original edge with two edge points
 // - `t` is the edge fraction from each endpoint; `c` maps to `t` via default normalization
-function poly_truncate(poly, t=undef, c=undef, eps = 1e-8) =
+function poly_truncate(poly, t=undef, c=undef, eps = 1e-8, params_overrides=undef) =
     let(
-        t_eff = !is_undef(t)
+        t_base = !is_undef(t)
             ? t
-            : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly))
+            : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly)),
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_truncate", [["vert", ["t", "c"]]])
     )
-    // should this assert? Or should we allow, or silently call rectify?
-    assert(t_eff != 0.5, "'t' cannot be 0.5 as this produces degenerate vertices - use poly_rectify() instead")
-    (t_eff == 0) 
-        ? poly
-        :
-    let(
-        base = _ps_poly_base(poly),
-        verts = base[0],
-        faces = base[1],
-        edges = base[2],
-
-        // edge points: aligned with edges[ei]=[a,b]
-        edge_pts = _ps_edge_points(verts, edges, t_eff),
-
-        edge_faces = ps_edge_faces_table(faces, edges),
-
-        // sites: two per edge (near each endpoint)
-        sites = [
-            for (ei = [0:1:len(edges)-1])
-                each [[ei, edges[ei][0]], [ei, edges[ei][1]]]
-        ],
-        site_points = [
-            for (ei = [0:1:len(edges)-1])
-                each [edge_pts[ei][0], edge_pts[ei][1]]
-        ],
-
-        // truncated original faces -> 2n-gons
-        face_cycles = [
-            for (f = faces)
-                let(n = len(f))
-                [
-                    for (k = [0:1:n-1])
+    (!is_undef(t_base) && t_base == 0.5)
+        ? assert(false, "'t' cannot be 0.5 as this produces degenerate vertices - use poly_rectify() instead")
+        : let(
+            base = _ps_poly_base(poly),
+            verts = base[0],
+            faces = base[1],
+            edges = base[2],
+            edge_faces = base[3],
+            vert_fid = (len(rows) > 0 && ps_params_uses_family(rows, "vert"))
+                ? ps_classify_vert_ids(poly_classify(poly, 1, 1e-6, 1, false), len(verts))
+                : undef,
+            params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+                ["vert", "t", len(verts), vert_fid],
+                ["vert", "c", len(verts), vert_fid]
+            ]),
+            vert_t_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+            vert_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+            t_by_vert = [
+                for (vi = [0:1:len(verts)-1])
+                    let(
+                        t_ov = ps_compiled_param_get(vert_t_by_idx, vi),
+                        c_ov = ps_compiled_param_get(vert_c_by_idx, vi)
+                    )
+                    !is_undef(t_ov) ? t_ov
+                        : !is_undef(c_ov) ? _ps_truncate_norm_to_t(poly, c_ov)
+                        : t_base
+            ],
+            _t_ok = assert(min([for (tv = t_by_vert) (tv != 0.5) ? 1 : 0]) == 1, "poly_truncate: t=0.5 is not allowed"),
+            all_zero = max([for (tv = t_by_vert) abs(tv)]) <= eps
+        )
+        all_zero
+            ? poly
+            : let(
+                edge_pts = _ps_edge_points_by_vert_t(verts, edges, t_by_vert),
+                sites = [
+                    for (ei = [0:1:len(edges)-1])
+                        each [[ei, edges[ei][0]], [ei, edges[ei][1]]]
+                ],
+                site_points = [
+                    for (ei = [0:1:len(edges)-1])
+                        each [edge_pts[ei][0], edge_pts[ei][1]]
+                ],
+                face_cycles = [
+                    for (f = faces)
+                        let(n = len(f))
+                        [
+                            for (k = [0:1:n-1])
+                                let(
+                                    v      = f[k],
+                                    v_next = f[(k+1)%n],
+                                    v_prev = f[(k-1+n)%n],
+                                    idx_prev = _ps_edge_site_index(edges, v_prev, v, v),
+                                    idx_next = _ps_edge_site_index(edges, v, v_next, v)
+                                )
+                                each [[1, idx_prev], [1, idx_next]]
+                        ]
+                ],
+                vert_cycles = [
+                    for (vi = [0:1:len(verts)-1])
                         let(
-                            v      = f[k],
-                            v_next = f[(k+1)%n],
-                            v_prev = f[(k-1+n)%n],
-                            idx_prev = _ps_edge_site_index(edges, v_prev, v, v),
-                            idx_next = _ps_edge_site_index(edges, v, v_next, v)
+                            fc = faces_around_vertex(poly, vi, edges, edge_faces),
+                            neigh = [
+                                for (idx = [0:1:len(fc)-1])
+                                    let(
+                                        f = faces[ fc[idx] ],
+                                        m = len(f),
+                                        pos = _ps_index_of(f, vi),
+                                        v_next = f[(pos+1)%m]
+                                    )
+                                    v_next
+                            ]
                         )
-                        each [[1, idx_prev], [1, idx_next]]
-                ]
-        ],
-
-        // vertex faces: one per original vertex
-        vert_cycles = [
-            for (vi = [0:1:len(verts)-1])
-                let(
-                    fc = faces_around_vertex(poly, vi, edges, edge_faces),
-                    neigh = [
-                        for (idx = [0:1:len(fc)-1])
-                            let(
-                                f = faces[ fc[idx] ],
-                                m = len(f),
-                                pos = _ps_index_of(f, vi),
-                                v_next = f[(pos+1)%m]
-                            )
-                            v_next
-                    ]
-                )
-                [
-                    for (vn = neigh)
-                        [1, _ps_edge_site_index(edges, vi, vn, vi)]
-                ]
-        ],
-
-        cycles_all = concat(face_cycles, vert_cycles)
-    )
-    ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
+                        [
+                            for (vn = neigh)
+                                [1, _ps_edge_site_index(edges, vi, vn, vi)]
+                        ]
+                ],
+                cycles_all = concat(face_cycles, vert_cycles)
+            )
+            ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
 
 // Rectification:
 // replaces each original vertex by the cycle of incident edge midpoints.
-function poly_rectify(poly) =
+function poly_rectify(poly, params_overrides=undef) =
+    let(
+        _p_ok = assert(ps_params_row_count(params_overrides) == 0, "poly_rectify: params_overrides not supported")
+    )
     let(
         base = _ps_poly_base(poly),
         verts = base[0],
@@ -340,21 +394,41 @@ function poly_rectify(poly) =
 // - omits vertex faces
 // - `t` is a signed face-plane offset as a fraction of each face's collapse distance
 //   (positive = inward chamfer, negative = anti-chamfer)
-function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
+function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
     let(
-        t_eff = !is_undef(t)
+        t_base = !is_undef(t)
             ? t
             : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly)),
-        _t_ok = assert(abs(t_eff) != 1, "poly_chamfer: |t| must not be 1 (t=±1 collapses faces; use cleanup/hyper mode)"),
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_chamfer", [["face", ["t", "c"]]]),
         base = _ps_poly_base(poly),
         verts0 = base[0],
         faces0 = base[1],
         edges = base[2],
         edge_faces = base[3],
         face_n = base[4],
-
+        face_fid = (len(rows) > 0 && ps_params_uses_family(rows, "face"))
+            ? ps_classify_face_ids(poly_classify(poly, 1, 1e-6, 1, false), len(faces0))
+            : undef,
+        params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+            ["face", "t", len(faces0), face_fid],
+            ["face", "c", len(faces0), face_fid]
+        ]),
+        face_t_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+        face_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+        t_by_face = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    t_ov = ps_compiled_param_get(face_t_by_idx, fi),
+                    c_ov = ps_compiled_param_get(face_c_by_idx, fi)
+                )
+                !is_undef(t_ov) ? t_ov
+                    : !is_undef(c_ov) ? _ps_truncate_norm_to_t(poly, c_ov)
+                    : t_base
+        ],
+        _t_ok = assert(min([for (tv = t_by_face) (abs(tv) != 1) ? 1 : 0]) == 1, "poly_chamfer: |t| must not be 1 (t=±1 collapses faces; use cleanup/hyper mode)"),
+        all_zero = max([for (tv = t_by_face) abs(tv)]) <= eps,
         face_offsets = _ps_face_offsets(faces0),
-
         face_pts3d = [
             for (fi = [0:1:len(faces0)-1])
                 let(
@@ -370,7 +444,7 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                                 [v_dot(p, ex), v_dot(p, ey)]
                     ],
                     face_collapse = abs(_ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)),
-                    d_f = -t_eff * face_collapse,
+                    d_f = -t_by_face[fi] * face_collapse,
                     inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
                     p0 = center - n_f * d_f
                 )
@@ -379,14 +453,12 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                         p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
                 ]
         ],
-
         sites = [
             for (fi = [0:1:len(faces0)-1])
                 let(f = faces0[fi], n = len(f))
                 for (k = [0:1:n-1])
                     [fi, f[k]]
         ],
-
         site_points = [
             for (fi = [0:1:len(faces0)-1])
                 for (p = face_pts3d[fi])
@@ -397,7 +469,6 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                 let(f = faces0[fi], n = len(f))
                 [ for (k = [0:1:n-1]) [1, face_offsets[fi] + k] ]
         ],
-
         edge_cycles = [
             for (ei = [0:1:len(edges)-1])
                 let(
@@ -427,10 +498,11 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                     [1, s_opp_v0]
                 ]
         ],
-
         cycles_all = concat(face_cycles, edge_cycles)
     )
-    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+    all_zero
+        ? poly
+        : ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
 // --- Cantellation helpers ---
 //
@@ -440,17 +512,19 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
 // - vertex faces are valence-gons
 // df offsets faces along their normals; edge/vertex faces are derived from those offsets.
 function _ps_face_offset_pts(verts0, faces0, face_n, df) =
+    let(df_by_face = is_list(df) ? df : [for (_ = [0:1:len(faces0)-1]) df])
     [
         for (fi = [0:1:len(faces0)-1])
             let(
                 f = faces0[fi],
                 n = len(f),
-                n_f = face_n[fi]
+                n_f = face_n[fi],
+                dfi = df_by_face[fi]
             )
             [
                 for (k = [0:1:n-1])
                     let(v = f[k])
-                    verts0[v] + df * n_f
+                    verts0[v] + dfi * n_f
             ]
     ];
 
@@ -1079,6 +1153,7 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
             : undef,
         auto_rows = is_undef(auto_params) ? [] : _ps_snub_params_rows(auto_params[0], auto_params[1], auto_params[2], (len(auto_params) > 4) ? auto_params[4] : undef),
         params_rows = is_undef(params_overrides) ? auto_rows : concat(auto_rows, params_overrides),
+        _pwarn = _ps_override_warn_unsupported(params_rows, "poly_snub", [["face", ["df", "angle"]], ["vert", ["c", "de"]]]),
         _choice = !is_undef(auto_params)
             ? echo(str("snub: using auto defaults tier=", auto_params[3], " c=", auto_params[2], " df=", auto_params[0], " angle=", auto_params[1]))
             : 0,
