@@ -76,6 +76,13 @@ For bases with multiple face families (e.g. cuboctahedron), one global `c` canno
   - `c_edge_by_pair` is a list of `[a, b, c]` for edge pairs between face sizes `a` and `b`
   - improves planarity when a single `c_by_size` still warps vertex faces.
 
+- `solve_cantitruncate_dominant_edges_params(poly, dominant_size)`
+  - returns `params_overrides` rows (no tuple), including:
+    - one global vertex row for `"t"`
+    - face rows for family `"c"`
+    - edge rows for pair-family `"c"`
+  - use with `poly_cantitruncate(..., t=0, c=0, params_overrides=rows)`.
+
 - `poly_cantitruncate_families(poly, t, c_by_size, default_c)`
   - applies per‑face‑family `c` values.
   - optional `c_edge_by_pair` overrides edge‑bisector offsets per family pair.
@@ -104,8 +111,8 @@ p = poly_cantitruncate(hexahedron()); // defaults to trig solver for regular bas
 ### Dominant family (mixed faces)
 ```
 base = poly_rectify(octahedron()); // cuboctahedron
-sol = solve_cantitruncate_dominant_edges(base, 4); // prioritize squares
-p = poly_cantitruncate_families(base, sol[0], sol[1], c_edge_by_pair=sol[2]);
+rows = solve_cantitruncate_dominant_edges_params(base, 4); // prioritize squares
+p = poly_cantitruncate(base, t=0, c=0, params_overrides=rows);
 ```
 
 ### Inspect planarity

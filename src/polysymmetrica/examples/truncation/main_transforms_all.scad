@@ -30,11 +30,11 @@ transforms = [
 
 function _cantitruncate_demo(name, p) =
     (name == "cuboctahedron") ?
-        let(sol = solve_cantitruncate_dominant_edges(p, 4))
-        poly_cantitruncate_families(p, sol[0], sol[1], c_edge_by_pair=sol[2]) :
+        let(rows = solve_cantitruncate_dominant_edges_params(p, 4))
+        poly_cantitruncate(p, t=0, c=0, params_overrides=rows) :
     (name == "icosidodecahedron") ?
-        let(sol = solve_cantitruncate_dominant_edges(p, 5))
-        poly_cantitruncate_families(p, sol[0], sol[1], c_edge_by_pair=sol[2]) :
+        let(rows = solve_cantitruncate_dominant_edges_params(p, 5))
+        poly_cantitruncate(p, t=0, c=0, params_overrides=rows) :
         poly_cantitruncate(p);
 
 spacing_x = 140;

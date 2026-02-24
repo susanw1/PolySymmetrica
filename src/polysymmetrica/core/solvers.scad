@@ -33,6 +33,58 @@ function _ps_map_edge_c(face_len, adj_len, c_by_pair, default_c=0) =
     )
     (len(idxs) == 0) ? default_c : c_by_pair[idxs[0]][2];
 
+function _ps_cantitruncate_face_ids_of_size(faces0, n) =
+    [for (fi = [0:1:len(faces0)-1]) if (len(faces0[fi]) == n) fi];
+
+function _ps_cantitruncate_edge_ids_of_pair(faces0, edges, edge_faces, n0, n1) =
+    let(
+        lo = min(n0, n1),
+        hi = max(n0, n1)
+    )
+    [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                fpair = edge_faces[ei],
+                ok = len(fpair) == 2,
+                a = ok ? len(faces0[fpair[0]]) : -1,
+                b = ok ? len(faces0[fpair[1]]) : -1,
+                alo = min(a, b),
+                ahi = max(a, b)
+            )
+            if (ok && alo == lo && ahi == hi) ei
+    ];
+
+// Convert cantitruncate family maps into params_overrides rows for poly_cantitruncate().
+function ps_cantitruncate_params_rows(poly, c_by_size, default_c=0, c_edge_by_pair=undef) =
+    let(
+        verts = poly_verts(poly),
+        faces0 = ps_orient_all_faces_outward(verts, poly_faces(poly)),
+        edges = _ps_edges_from_faces(faces0),
+        edge_faces = ps_edge_faces_table(faces0, edges),
+        face_rows = [
+            for (p = c_by_size)
+                let(
+                    n = p[0],
+                    cv = p[1],
+                    ids = _ps_cantitruncate_face_ids_of_size(faces0, n)
+                )
+                if (len(ids) > 0) ["face", "id", ids, ["c", cv]]
+        ],
+        edge_rows = is_undef(c_edge_by_pair)
+            ? []
+            : [
+                for (p = c_edge_by_pair)
+                    let(
+                        n0 = p[0],
+                        n1 = p[1],
+                        cv = p[2],
+                        ids = _ps_cantitruncate_edge_ids_of_pair(faces0, edges, edge_faces, n0, n1)
+                    )
+                    if (len(ids) > 0) ["edge", "id", ids, ["c", cv]]
+            ]
+    )
+    concat(face_rows, edge_rows);
+
 // Solve per-face-family c values by matching dominant family to trig solution.
 function solve_cantitruncate_dominant(poly, dominant_size, edge_idx=undef) =
     let(
@@ -73,6 +125,20 @@ function solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx=undef)
         ]
     )
     [t, c_by_size, c_edge_by_pair];
+
+// Solve dominant-edge cantitruncate and return params_overrides rows for poly_cantitruncate().
+// Includes a global vertex t row so callers can use:
+//   poly_cantitruncate(poly, t=0, c=0, params_overrides=rows)
+// without carrying a separate tuple.
+function solve_cantitruncate_dominant_edges_params(poly, dominant_size, edge_idx=undef, default_c=0) =
+    let(
+        sol = solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx),
+        rows = ps_cantitruncate_params_rows(poly, sol[1], default_c, sol[2])
+    )
+    concat(
+        [["vert", "all", ["t", sol[0]]]],
+        rows
+    );
 
 // Trig-based solver for regular bases (one edge type).
 // Uses face interior angle and dihedral to compute t and c directly.
