@@ -33,6 +33,54 @@ function _ps_map_edge_c(face_len, adj_len, c_by_pair, default_c=0) =
     )
     (len(idxs) == 0) ? default_c : c_by_pair[idxs[0]][2];
 
+// Compute per-corner truncation estimate t = 1/(2+r),
+// where r = |B-C| / mean(|V-B|,|V-C|) for face corner (...B,V,C...).
+function solve_truncate_corner_t(verts, face, k) =
+    let(
+        n  = len(face),
+        vm = face[(k-1+n) % n],
+        v  = face[k],
+        vp = face[(k+1) % n],
+        V  = verts[v],
+        B  = verts[vm],
+        C  = verts[vp],
+
+        LB = norm(V - B),
+        LC = norm(V - C),
+        L  = (LB + LC) / 2,
+
+        chord = norm(B - C),
+        r = (L == 0) ? 0 : chord / L,
+
+        t = (2 + r == 0) ? 0 : 1 / (2 + r)
+    )
+    t;
+
+// Return a “best guess” truncation t if user passes t=undef.
+// - If the poly is locally uniform, returns the mean corner t.
+// - Otherwise returns fallback (default 0.2).
+//
+// tol is an absolute tolerance on (t_max - t_min).
+function solve_truncate_default_t(poly, tol = 1e-3, fallback = 0.2) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+
+        ts = [
+            for (f = faces)
+                for (k = [0 : len(f)-1])
+                    solve_truncate_corner_t(verts, f, k)
+        ],
+
+        _ = assert(len(ts) > 0, "solve_truncate_default_t: no face corners found"),
+
+        tmin = min(ts),
+        tmax = max(ts),
+        tavg = sum(ts) / len(ts),
+        ok = (tmax - tmin) <= tol
+    )
+    ok ? tavg : fallback;
+
 function _ps_cantitruncate_face_ids_of_size(faces0, n) =
     [for (fi = [0:1:len(faces0)-1]) if (len(faces0[fi]) == n) fi];
 

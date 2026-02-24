@@ -1507,55 +1507,10 @@ function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_
 
 
 
-// Compute per-corner truncation estimate t = 1/(2+r),
-// where r = |B-C| / mean(|V-B|,|V-C|) for face corner (...B,V,C...).
+// Truncation default estimators are implemented in solvers.scad.
+// Keep private wrappers here for local call-site stability.
 function _ps_corner_t(verts, face, k) =
-    let(
-        n  = len(face),
-        vm = face[(k-1+n) % n],
-        v  = face[k],
-        vp = face[(k+1) % n],
-        V  = verts[v],
-        B  = verts[vm],
-        C  = verts[vp],
+    solve_truncate_corner_t(verts, face, k);
 
-        LB = norm(V - B),
-        LC = norm(V - C),
-        L  = (LB + LC) / 2,
-
-        chord = norm(B - C),
-        r = (L == 0) ? 0 : chord / L,
-
-        t = (2 + r == 0) ? 0 : 1 / (2 + r)
-    )
-    t;
-
-// Return a “best guess” truncation t if user passes t=undef.
-// - If the poly is locally uniform, returns the mean corner t.
-// - Otherwise returns fallback (default 0.2).
-//
-// tol is an absolute tolerance on (t_max - t_min).
 function _ps_truncate_default_t(poly, tol = 1e-3, fallback = 0.2) =
-    let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly),
-
-        // gather per-corner t estimates
-        ts = [
-            for (f = faces)
-                for (k = [0 : len(f)-1])
-                    _ps_corner_t(verts, f, k)
-        ],
-
-        _ = assert(len(ts) > 0, "ps_truncate_default_t: no face corners found"),
-
-        tmin = min(ts),
-        tmax = max(ts),
-        tavg = sum(ts) / len(ts),
-
-        // decide if "uniform enough"
-        ok = (tmax - tmin) <= tol,
-
-        t0 = ok ? tavg : fallback
-    )
-    t0;
+    solve_truncate_default_t(poly, tol, fallback);
