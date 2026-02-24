@@ -243,9 +243,7 @@ function poly_truncate(poly, t=undef, c=undef, eps = 1e-8, params_overrides=unde
         rows = is_undef(params_overrides) ? [] : params_overrides,
         _pwarn = _ps_override_warn_unsupported(rows, "poly_truncate", [["vert", ["t", "c"]]])
     )
-    (!is_undef(t_base) && t_base == 0.5)
-        ? assert(false, "'t' cannot be 0.5 as this produces degenerate vertices - use poly_rectify() instead")
-        : let(
+    let(
             base = _ps_poly_base(poly),
             verts = base[0],
             faces = base[1],
