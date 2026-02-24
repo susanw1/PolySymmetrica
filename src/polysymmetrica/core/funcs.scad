@@ -359,6 +359,52 @@ function ps_face_has_edge(f, a, b) =
             ((x==a && y==b) || (x==b && y==a)) ? 1 : 0
     ]) > 0;
 
+// Faces incident to vertex vi (unordered).
+function vertex_incident_faces(poly, vi) =
+    let(faces = poly_faces(poly))
+    [
+        for (fi = [0 : len(faces)-1])
+            let(f = faces[fi])
+            if (sum([for (k = [0 : len(f)-1]) f[k] == vi ? 1 : 0]) > 0) fi
+    ];
+
+// Given current face around vertex v, pick the next incident face in the cycle.
+function next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces) =
+    let(
+        f = faces[f_cur],
+        n = len(f),
+        pos = [for (k = [0 : n-1]) if (f[k] == v) k],
+        k0 = pos[0],
+        k_prev = (k0 - 1 + n) % n,
+        k_next = (k0 + 1) % n,
+        v_prev = f[k_prev],
+        v_next = f[k_next],
+        ei1 = ps_find_edge_index(edges, v, v_next),
+        ei2 = ps_find_edge_index(edges, v_prev, v),
+        ef1 = edge_faces[ei1],
+        ef2 = edge_faces[ei2],
+        cand1 = (ef1[0] == f_cur ? ef1[1] : ef1[0]),
+        cand2 = (ef2[0] == f_cur ? ef2[1] : ef2[0]),
+        candidates = [cand1, cand2],
+        filtered = [for (cf = candidates) if (cf != f_prev) cf]
+    )
+    filtered[0];
+
+function faces_around_vertex_rec(v, f_cur, f_prev, f_start, faces, edges, edge_faces, acc = []) =
+    let(next = next_face_around_vertex(v, f_cur, f_prev, faces, edges, edge_faces))
+    (next == f_start)
+        ? concat(acc, [f_cur])
+        : faces_around_vertex_rec(v, next, f_cur, f_start, faces, edges, edge_faces, concat(acc, [f_cur]));
+
+// Incident faces around a vertex in cyclic order (for manifold neighborhoods).
+function faces_around_vertex(poly, v, edges, edge_faces) =
+    let(
+        faces = poly_faces(poly),
+        inc = vertex_incident_faces(poly, v),
+        start = inc[0]
+    )
+    faces_around_vertex_rec(v, start, -1, start, faces, edges, edge_faces);
+
 
 ///////////////////////////////////////
 // ---- Frame/placement helpers ----

@@ -108,6 +108,20 @@ If you are not compiling and call `ps_params_get(...)` directly, family matching
 
 This keeps operator code fast and keeps parameterization semantics consistent across operators.
 
+## Classification Context Consistency
+
+Family selectors depend on how classification is computed. If two stages use
+different classify settings, family ids may differ.
+
+Recommended pattern:
+
+1. Compute `cls = poly_classify(...)` once.
+2. Derive any `*_fid` arrays and compiled params from that same `cls`.
+3. Pass the same `cls` into placement modules (`classify=cls`) and any
+   transform logic that consumes family ids.
+
+This avoids family-id drift between overrides, transforms, and placement.
+
 ## Example File
 
 Runnable example:

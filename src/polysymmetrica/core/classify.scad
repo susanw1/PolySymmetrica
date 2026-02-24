@@ -1,5 +1,4 @@
 use <funcs.scad>
-use <duals.scad>
 
 // Polyhedral element classification by families (faces / edges / vertices).
 // detail=0: topology only
@@ -298,6 +297,33 @@ function poly_classify(poly, detail=1, eps=1e-6, radius=1, include_geom=false) =
         vert_fams = _ps_group_by_key(vert_keys)
     )
     [face_fams, edge_fams, vert_fams];
+
+// Access helpers for classification tuples [face_fams, edge_fams, vert_fams].
+function ps_classify_face_families(cls) =
+    (is_undef(cls) || len(cls) < 1 || is_undef(cls[0])) ? [] : cls[0];
+
+function ps_classify_edge_families(cls) =
+    (is_undef(cls) || len(cls) < 2 || is_undef(cls[1])) ? [] : cls[1];
+
+function ps_classify_vert_families(cls) =
+    (is_undef(cls) || len(cls) < 3 || is_undef(cls[2])) ? [] : cls[2];
+
+function ps_classify_counts(cls) =
+    let(
+        ff = ps_classify_face_families(cls),
+        ef = ps_classify_edge_families(cls),
+        vf = ps_classify_vert_families(cls)
+    )
+    [len(ff), len(ef), len(vf)];
+
+function ps_classify_face_ids(cls, n_faces) =
+    _ps_family_ids(n_faces, ps_classify_face_families(cls));
+
+function ps_classify_edge_ids(cls, n_edges) =
+    _ps_family_ids(n_edges, ps_classify_edge_families(cls));
+
+function ps_classify_vert_ids(cls, n_verts) =
+    _ps_family_ids(n_verts, ps_classify_vert_families(cls));
 
 // Pretty-print classification info for a poly.
 module show_poly(poly, detail=1, eps=1e-6, radius=1, include_geom=false) {

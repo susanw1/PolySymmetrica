@@ -3,7 +3,6 @@
 // Shared helpers for transform-style operators.
 
 use <funcs.scad>
-use <duals.scad>
 
 // Index k where edge f[k]->f[k+1] matches (v0->v1), or -1 if not found.
 function _ps_face_edge_index(f, v0, v1) =
