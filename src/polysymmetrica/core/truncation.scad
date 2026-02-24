@@ -557,12 +557,10 @@ function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_i
 // If `df` is omitted:
 // - use `c` if provided, else default `c=0.5`
 // - map `c` to `df` using the square-edge calibration map.
-function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6) =
+function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
     let(
-        df_eff = !is_undef(df)
-            ? df
-            : (!is_undef(c) ? _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx)
-                            : _ps_cantellate_df_from_c(poly, 0.5, df_max, steps, family_edge_idx))
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_cantellate", [["face", ["df", "c"]]])
     )
     let(
         base = _ps_poly_base(poly),
@@ -572,8 +570,36 @@ function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
+        face_fid = (len(rows) > 0 && ps_params_uses_family(rows, "face"))
+            ? ps_classify_face_ids(poly_classify(poly, 1, 1e-6, 1, false), len(faces0))
+            : undef,
+        params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+            ["face", "df", len(faces0), face_fid],
+            ["face", "c", len(faces0), face_fid]
+        ]),
+        face_df_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+        face_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+        has_c_overrides = !is_undef(face_c_by_idx) && (len([for (x = face_c_by_idx) if (!is_undef(x)) 1]) > 0),
+        need_c_map = is_undef(df) || !is_undef(c) || has_c_overrides,
+        cmap = need_c_map ? _ps_cantellate_df_map(poly, df_max, steps, family_edge_idx) : undef,
+        df_mid = is_undef(cmap) ? undef : cmap[0],
+        df_max_eff = is_undef(cmap) ? undef : cmap[1],
+        df_by_face = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    df_ov = ps_compiled_param_get(face_df_by_idx, fi),
+                    c_ov = ps_compiled_param_get(face_c_by_idx, fi),
+                    c_eff = !is_undef(c_ov) ? c_ov
+                        : !is_undef(c) ? c
+                        : 0.5
+                )
+                !is_undef(df_ov) ? df_ov
+                    : !is_undef(c_ov) ? _ps_cantellate_df_from_c_linear(c_eff, df_mid, df_max_eff)
+                    : !is_undef(df) ? df
+                    : _ps_cantellate_df_from_c_linear(c_eff, df_mid, df_max_eff)
+        ],
         // offset face corners: one point per (face, vertex) incidence
-        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df_eff),
+        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df_by_face),
         face_offsets = _ps_face_offsets(faces0),
         sites = [
             for (fi = [0:1:len(faces0)-1])
@@ -673,9 +699,9 @@ function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0,
 
 // Normalized cantellation: map c in [0,1] to df in [0, df_max],
 // with c=0.5 hitting the computed square-edge df.
-function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6) =
+function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
-    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
+    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps, params_overrides);
 
 // --- Snub helpers ---
 function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
@@ -1331,8 +1357,10 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
 //
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
-function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
+function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
     let(
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_cantitruncate", []),
         sol = (is_undef(t) && is_undef(c) && _ps_is_regular_base(poly)) ? solve_cantitruncate_trig(poly) : [t, c],
         t_eff = is_undef(sol[0]) ? _ps_truncate_default_t(poly) : sol[0],
         c_eff = is_undef(sol[1]) ? 0 : sol[1]
@@ -1422,8 +1450,10 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) 
 
 // Cantitruncation with per-face-family c values (indexed by face size).
 // c_by_size: list of [face_size, c] pairs; default_c used if size not found.
-function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_pair=undef, eps=1e-8, len_eps=1e-6) =
+function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_pair=undef, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_cantitruncate_families", []),
         t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
         base = _ps_poly_base(poly),
         verts0 = base[0],

@@ -209,6 +209,33 @@ module test_poly_cantitruncate__cube_edge_face_adjacency() {
     assert(min(shared) >= 1, "cantitruncate cube: quad vertices shared with face cycles");
 }
 
+module test_poly_cantellate__params_overrides_face_df_and_c() {
+    p = hexahedron();
+
+    q_df = poly_cantellate(p, df=0.05, params_overrides=[["face", "family", 0, ["df", 0.1]]]);
+    q_df_ref = poly_cantellate(p, df=0.1);
+    assert(_max_vertex_diff(q_df, q_df_ref) < 1e-7, "cantellate params_overrides face df should override scalar df");
+
+    q_c = poly_cantellate(p, df=0.05, params_overrides=[["face", "family", 0, ["c", 0.5]]]);
+    q_c_ref = poly_cantellate(p, c=0.5);
+    assert(_max_vertex_diff(q_c, q_c_ref) < 1e-7, "cantellate params_overrides face c should override scalar df");
+}
+
+module test_poly_cantitruncate__unsupported_params_overrides_ignored() {
+    p = hexahedron();
+    q0 = poly_cantitruncate(p, 0.2, 0.2);
+    q1 = poly_cantitruncate(
+        p,
+        0.2,
+        0.2,
+        params_overrides=[
+            ["face", "all", ["df", 0.1]],
+            ["vert", "all", ["c", 0.3]]
+        ]
+    );
+    assert(_max_vertex_diff(q0, q1) < 1e-7, "cantitruncate unsupported params_overrides should be ignored");
+}
+
 module test_poly_cantitruncate_dominant_edges__consistent_pairs() {
     base = poly_rectify(octahedron()); // cuboctahedron
     sol = solve_cantitruncate_dominant_edges(base, 4);
@@ -587,6 +614,8 @@ module run_TestTruncation() {
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
     test_poly_cantitruncate__tetra_counts();
+    test_poly_cantellate__params_overrides_face_df_and_c();
+    test_poly_cantitruncate__unsupported_params_overrides_ignored();
     test_poly_cantitruncate_dominant_edges__consistent_pairs();
     test_poly_cantitruncate_dominant_edges__planarity();
     test_great_rhombi__cube_square_faces();
