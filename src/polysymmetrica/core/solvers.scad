@@ -109,11 +109,11 @@ function ps_cantitruncate_params_rows(poly, c_by_size, default_c=0, c_edge_by_pa
         faces0 = ps_orient_all_faces_outward(verts, poly_faces(poly)),
         edges = _ps_edges_from_faces(faces0),
         edge_faces = ps_edge_faces_table(faces0, edges),
+        face_sizes = _ps_unique_ints([for (f = faces0) len(f)]),
         face_rows = [
-            for (p = c_by_size)
+            for (n = face_sizes)
                 let(
-                    n = p[0],
-                    cv = p[1],
+                    cv = _ps_map_face_c(n, c_by_size, default_c),
                     ids = _ps_cantitruncate_face_ids_of_size(faces0, n)
                 )
                 if (len(ids) > 0) ["face", "id", ids, ["c", cv]]

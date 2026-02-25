@@ -123,10 +123,10 @@ for (s = with_index(shape_labels)) {
 
 // Row labels
 for (r = with_index(row_labels)) {
-    translate([-95, spacing_y * r[0], label_z])
-        rotate([0, 0, -90])
+    translate([-75, spacing_y * r[0], label_z])
+        rotate([0, 0, 0])
             linear_extrude(height=label_h)
-                text(r[1], size=label_size, halign="left", valign="center");
+                text(r[1], size=label_size, halign="right", valign="center");
 }
 
 translate([0, 0, 0]) show_param_ops(tetrahedron(), "tetrahedron");

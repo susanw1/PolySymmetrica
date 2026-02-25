@@ -285,6 +285,20 @@ module test_solve_cantitruncate_dominant_edges_params__matches_legacy_rows() {
     assert(_max_vertex_diff(q0, q1) < 1e-7, "cantitruncate dominant edges params solver should match map-to-rows path");
 }
 
+module test_ps_cantitruncate_params_rows__default_c_applies_missing_sizes() {
+    base = poly_rectify(octahedron()); // cuboctahedron: face sizes 3 and 4
+    // Deliberately provide only one size to ensure default_c is applied to the other.
+    rows = ps_cantitruncate_params_rows(base, [[4, 0.2]], 0.05);
+
+    // Params-only path: scalar c=0 should not matter if rows carry default_c for missing sizes.
+    q_rows = poly_cantitruncate(base, t=0.2, c=0, params_overrides=rows);
+
+    // Reference path with explicit families helper.
+    q_ref = poly_cantitruncate_families(base, 0.2, [[4, 0.2]], default_c=0.05);
+
+    assert(_max_vertex_diff(q_rows, q_ref) < 1e-7, "ps_cantitruncate_params_rows should encode default_c for missing face-size families");
+}
+
 module test_poly_cantitruncate_dominant_edges__consistent_pairs() {
     base = poly_rectify(octahedron()); // cuboctahedron
     sol = solve_cantitruncate_dominant_edges(base, 4);
@@ -670,6 +684,7 @@ module run_TestTruncation() {
     test_poly_cantitruncate__params_overrides_edge_c();
     test_poly_cantitruncate_families__wrapper_matches_direct();
     test_solve_cantitruncate_dominant_edges_params__matches_legacy_rows();
+    test_ps_cantitruncate_params_rows__default_c_applies_missing_sizes();
     test_poly_cantitruncate_dominant_edges__consistent_pairs();
     test_poly_cantitruncate_dominant_edges__planarity();
     test_great_rhombi__cube_square_faces();
