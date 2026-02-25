@@ -1493,18 +1493,6 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, 
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
-// Cantitruncation with per-face-family c values (indexed by face size).
-// c_by_size: list of [face_size, c] pairs; default_c used if size not found.
-function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_pair=undef, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
-    let(
-        t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
-        base_rows = ps_cantitruncate_params_rows(poly, c_by_size, default_c, c_edge_by_pair),
-        rows = is_undef(params_overrides) ? base_rows : concat(base_rows, params_overrides)
-    )
-    poly_cantitruncate(poly, t=t_eff, c=default_c, eps=eps, len_eps=len_eps, params_overrides=rows);
-
-
-
 // Truncation default estimators are implemented in solvers.scad.
 // Keep private wrappers here for local call-site stability.
 function _ps_corner_t(verts, face, k) =

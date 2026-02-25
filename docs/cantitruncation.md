@@ -82,11 +82,6 @@ For bases with multiple face families (e.g. cuboctahedron), one global `c` canno
     - face rows for family `"c"`
     - edge rows for pair-family `"c"`
   - use with `poly_cantitruncate(..., t=0, c=0, params_overrides=rows)`.
-
-- `poly_cantitruncate_families(poly, t, c_by_size, default_c)`
-  - applies per‑face‑family `c` values.
-  - optional `c_edge_by_pair` overrides edge‑bisector offsets per family pair.
-
 This keeps the dominant family planar and lets secondary families follow.
 
 ## Inspecting Planarity
@@ -98,7 +93,8 @@ Use `poly_describe(poly, detail=3)` to echo `max_plane_err` per face. This is th
 ```
 base = poly_rectify(octahedron()); // cuboctahedron
 sol = solve_cantitruncate_dominant_edges(base, 4); // squares dominate
-p = poly_cantitruncate_families(base, sol[0], sol[1], c_edge_by_pair=sol[2]);
+rows = ps_cantitruncate_params_rows(base, sol[1], 0, sol[2]);
+p = poly_cantitruncate(base, t=sol[0], c=0, params_overrides=rows);
 ```
 
 ## Usage Examples
