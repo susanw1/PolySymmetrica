@@ -21,7 +21,7 @@ row_labels = [
     "truncate: some corners",
     "cantellate: top face only",
     "chamfer: top face only",
-    "cantitruncate: top family slice",
+    "cantitruncate: top face only",
     "snub: top face/verts only"
 ];
 
@@ -82,26 +82,29 @@ module show_param_ops(poly, poly_name) {
         ]
     );
 
-    // 4) Cantitruncate top slice only (corner t + one face c).
+    // 4) Cantitruncate top face only.
+    // Note: mixing selective t and selective c on unrelated local subsets can
+    // intentionally produce incompatible constraints and invalid polys.
     p3 = poly_cantitruncate(
         poly,
         t=0,
         c=0,
         params_overrides=[
-            ["vert", "id", top_vs, ["t", 0.20]],
-            ["face", "id", [top_f], ["c", 0.10]]
+            ["face", "all", ["c", 0.15]],
+            ["face", "id", [top_f], ["c", 0.40]]
         ]
     );
 
-    // 5) Snub top face/verts only.
+    // 5) Snub via structured overrides
     p4 = poly_snub(
         poly,
         angle=0,
         c=0,
         df=0,
         params_overrides=[
-            ["face", "id", [top_f], ["df", 0.08], ["angle", 16]],
-            ["vert", "id", top_vs, ["c", 0.06]]
+            ["face", "all", ["df", 0.18], ["angle", 10]],
+            ["face", "id", [top_f], ["df", 0.02], ["angle", 25]],
+            ["vert", "all", ["c", 0.06]]
         ]
     );
 

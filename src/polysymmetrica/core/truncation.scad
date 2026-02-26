@@ -651,7 +651,7 @@ function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family
 // Measure how square an edge face is (edge length spread).
 function _ps_face_edge_spread(verts, face) =
     let(
-        n = len(face),
+        n = is_undef(face) ? 0 : len(face),
         ls = (n < 2) ? [] : [for (i = [0:1:n-1]) norm(verts[face[i]] - verts[face[(i+1)%n]])]
     )
     (n == 4) ? (max(ls) - min(ls)) : undef;
