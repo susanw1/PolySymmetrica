@@ -268,6 +268,19 @@ For schema details, compile-spec format, and examples, see:
 
 When using family-targeted overrides (`"family"` rows), keep classification context consistent (`detail`, `radius`, `include_geom`) across all stages; best practice is to classify once and reuse that object.
 
+### **3.8 Validation Modes**
+
+`poly_valid(poly, mode, eps)` supports progressively stricter checks:
+
+| Mode       | Structural checks | Manifold closedness | Self-intersections | Outward + convex |
+| ---------- | ----------------- | ------------------- | ------------------ | ---------------- |
+| `"struct"` | ✅                | ☐                   | ☐                  | ☐                |
+| `"closed"` | ✅                | ✅                  | disallowed         | ☐                |
+| `"star_ok"`| ✅                | ✅                  | allowed            | ☐                |
+| `"convex"` | ✅                | ✅                  | disallowed         | ✅               |
+
+Use `"struct"` for early pipeline/debug stages, `"closed"` for printable manifold outputs, `"star_ok"` for stellated/self-intersecting faces, and `"convex"` when strict outward convex geometry is required.
+
 #### Naming conventions for `$ps_*` variables
 
 The following conventions are used consistently to make their meaning predictable:

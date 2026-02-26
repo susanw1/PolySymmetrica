@@ -29,6 +29,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Tests are plain OpenSCAD modules that call `assert(...)` in `src/tests/core/`.
 - Add new test modules with a `test_*` prefix and register them in `src/tests/run_all.scad`.
 - Keep numeric tolerances explicit (see `EPS` in `TestFuncs.scad`).
+- Do not rely on `poly_valid(...)` alone for transform correctness; add operation-specific tests (counts, adjacency, family behavior) for new geometry operators.
 
 ## Scaling & Dual Alignment Notes
 - Dual overlays are sensitive to which geometric feature you choose to align (edge midpoints vs face families).
