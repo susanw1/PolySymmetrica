@@ -289,16 +289,23 @@ module test_ps_cantitruncate_params_rows__default_c_applies_missing_sizes() {
     base = poly_rectify(octahedron()); // cuboctahedron: face sizes 3 and 4
     // Deliberately provide only one size to ensure default_c is applied to the other.
     rows = ps_cantitruncate_params_rows(base, [[4, 0.2]], 0.05);
+    faces = poly_faces(base);
+    size4_face_ids = [for (fi = [0:1:len(faces)-1]) if (len(faces[fi]) == 4) fi];
 
     // Params-only path: scalar c=0 should not matter if rows carry default_c for missing sizes.
     q_rows = poly_cantitruncate(base, t=0.2, c=0, params_overrides=rows);
 
-    // Reference path with explicit rows carrying full family coverage.
+    // Independent reference path:
+    // - all faces get default_c
+    // - size-4 faces are explicitly overridden to c=0.2
     q_ref = poly_cantitruncate(
         base,
         t=0.2,
         c=0,
-        params_overrides=ps_cantitruncate_params_rows(base, [[4, 0.2]], 0.05)
+        params_overrides=[
+            ["face", "all", ["c", 0.05]],
+            ["face", "id", size4_face_ids, ["c", 0.2]]
+        ]
     );
 
     assert(_max_vertex_diff(q_rows, q_ref) < 1e-7, "ps_cantitruncate_params_rows should encode default_c for missing face-size families");
