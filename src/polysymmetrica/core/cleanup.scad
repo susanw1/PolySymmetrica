@@ -59,7 +59,8 @@ function _ps_face_is_degenerate(verts, f, eps) =
     (len(f) < 3) ||
     (_ps_distinct_count(f) < 3) ||
     (_ps_distinct_count(f) != len(f)) ||
-    (_ps_face_area_mag(verts, f) <= eps);
+    // Area is quadratic in length, so compare against eps^2 (eps is linear tol).
+    (_ps_face_area_mag(verts, f) <= (eps * eps));
 
 function _ps_faces_drop_degenerate(verts, faces, eps) =
     [for (f = faces) if (!_ps_face_is_degenerate(verts, f, eps)) f];

@@ -58,6 +58,9 @@ function _tetra_with_duplicate_vertex() =
     )
     [v, f, poly_e_over_ir(p)];
 
+function _poly_scaled(poly, s) =
+    [for (v = poly_verts(poly)) v * s];
+
 
 // --- poly accessors ---
 module test_poly_accessors__basic() {
@@ -524,6 +527,16 @@ module test_poly_cleanup__merges_and_compacts_vertices() {
     assert(poly_valid(q, "closed"), "cleanup merge/compact should yield closed-valid tetra");
 }
 
+module test_poly_cleanup__tiny_uniform_scale_not_dropped_by_area_tol() {
+    p = hexahedron();
+    s = 1e-4;
+    v = _poly_scaled(p, s);
+    tiny = [v, poly_faces(p), poly_e_over_ir(p)];
+    q = poly_cleanup(tiny, eps=1e-8, fix_winding=true, drop_degenerate=true);
+    assert_int_eq(len(poly_faces(q)), len(poly_faces(p)), "cleanup should not drop valid tiny faces");
+    assert(poly_valid(q, "closed"), "cleanup tiny scale should remain closed-valid");
+}
+
 
 // ---- suite ----
 module run_TestFuncs() {
@@ -576,6 +589,7 @@ module run_TestFuncs() {
     test_poly_cleanup__drops_degenerate_faces();
     test_poly_cleanup__triangulates_nonplanar_faces();
     test_poly_cleanup__merges_and_compacts_vertices();
+    test_poly_cleanup__tiny_uniform_scale_not_dropped_by_area_tol();
 }
 
 run_TestFuncs();
