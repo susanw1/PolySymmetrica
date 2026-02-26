@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>
+use <params.scad>
 
 
 function dual_faces(poly, centers) =
@@ -295,7 +296,10 @@ function scale_dual_face_radius(poly, dual, face_k=undef, dual_face_k=undef) =
 
 // Public: polar dual, returned as a normalised poly descriptor.
 // Default behaviour: returns a descriptor with unit_edge = 1 (library convention).
-function poly_dual(poly) =
+function poly_dual(poly, params_overrides=undef) =
+    let(
+        _p_ok = assert(ps_params_row_count(params_overrides) == 0, "poly_dual: params_overrides not supported")
+    )
     let(
         // Ensure input faces are outward for correct polar normals
         verts0 = poly_verts(poly),

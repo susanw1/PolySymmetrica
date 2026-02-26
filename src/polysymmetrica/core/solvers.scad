@@ -33,6 +33,106 @@ function _ps_map_edge_c(face_len, adj_len, c_by_pair, default_c=0) =
     )
     (len(idxs) == 0) ? default_c : c_by_pair[idxs[0]][2];
 
+// Compute per-corner truncation estimate t = 1/(2+r),
+// where r = |B-C| / mean(|V-B|,|V-C|) for face corner (...B,V,C...).
+function solve_truncate_corner_t(verts, face, k) =
+    let(
+        n  = len(face),
+        vm = face[(k-1+n) % n],
+        v  = face[k],
+        vp = face[(k+1) % n],
+        V  = verts[v],
+        B  = verts[vm],
+        C  = verts[vp],
+
+        LB = norm(V - B),
+        LC = norm(V - C),
+        L  = (LB + LC) / 2,
+
+        chord = norm(B - C),
+        r = (L == 0) ? 0 : chord / L,
+
+        t = (2 + r == 0) ? 0 : 1 / (2 + r)
+    )
+    t;
+
+// Return a “best guess” truncation t if user passes t=undef.
+// - If the poly is locally uniform, returns the mean corner t.
+// - Otherwise returns fallback (default 0.2).
+//
+// tol is an absolute tolerance on (t_max - t_min).
+function solve_truncate_default_t(poly, tol = 1e-3, fallback = 0.2) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+
+        ts = [
+            for (f = faces)
+                for (k = [0 : len(f)-1])
+                    solve_truncate_corner_t(verts, f, k)
+        ],
+
+        _ = assert(len(ts) > 0, "solve_truncate_default_t: no face corners found"),
+
+        tmin = min(ts),
+        tmax = max(ts),
+        tavg = sum(ts) / len(ts),
+        ok = (tmax - tmin) <= tol
+    )
+    ok ? tavg : fallback;
+
+function _ps_cantitruncate_face_ids_of_size(faces0, n) =
+    [for (fi = [0:1:len(faces0)-1]) if (len(faces0[fi]) == n) fi];
+
+function _ps_cantitruncate_edge_ids_of_pair(faces0, edges, edge_faces, n0, n1) =
+    let(
+        lo = min(n0, n1),
+        hi = max(n0, n1)
+    )
+    [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                fpair = edge_faces[ei],
+                ok = len(fpair) == 2,
+                a = ok ? len(faces0[fpair[0]]) : -1,
+                b = ok ? len(faces0[fpair[1]]) : -1,
+                alo = min(a, b),
+                ahi = max(a, b)
+            )
+            if (ok && alo == lo && ahi == hi) ei
+    ];
+
+// Convert cantitruncate family maps into params_overrides rows for poly_cantitruncate().
+function ps_cantitruncate_params_rows(poly, c_by_size, default_c=0, c_edge_by_pair=undef) =
+    let(
+        verts = poly_verts(poly),
+        faces0 = ps_orient_all_faces_outward(verts, poly_faces(poly)),
+        edges = _ps_edges_from_faces(faces0),
+        edge_faces = ps_edge_faces_table(faces0, edges),
+        face_sizes = _ps_unique_ints([for (f = faces0) len(f)]),
+        face_rows = [
+            for (n = face_sizes)
+                let(
+                    cv = _ps_map_face_c(n, c_by_size, default_c),
+                    ids = _ps_cantitruncate_face_ids_of_size(faces0, n)
+                )
+                if (len(ids) > 0) ["face", "id", ids, ["c", cv]]
+        ],
+        edge_rows = is_undef(c_edge_by_pair)
+            ? []
+            : [
+                for (p = c_edge_by_pair)
+                    let(
+                        n0 = p[0],
+                        n1 = p[1],
+                        cv = p[2],
+                        ids = _ps_cantitruncate_edge_ids_of_pair(faces0, edges, edge_faces, n0, n1)
+                    )
+                    if (len(ids) > 0) ["edge", "id", ids, ["c", cv]]
+            ]
+    )
+    concat(face_rows, edge_rows);
+
 // Solve per-face-family c values by matching dominant family to trig solution.
 function solve_cantitruncate_dominant(poly, dominant_size, edge_idx=undef) =
     let(
@@ -73,6 +173,20 @@ function solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx=undef)
         ]
     )
     [t, c_by_size, c_edge_by_pair];
+
+// Solve dominant-edge cantitruncate and return params_overrides rows for poly_cantitruncate().
+// Includes a global vertex t row so callers can use:
+//   poly_cantitruncate(poly, t=0, c=0, params_overrides=rows)
+// without carrying a separate tuple.
+function solve_cantitruncate_dominant_edges_params(poly, dominant_size, edge_idx=undef, default_c=0) =
+    let(
+        sol = solve_cantitruncate_dominant_edges(poly, dominant_size, edge_idx),
+        rows = ps_cantitruncate_params_rows(poly, sol[1], default_c, sol[2])
+    )
+    concat(
+        [["vert", "all", ["t", sol[0]]]],
+        rows
+    );
 
 // Trig-based solver for regular bases (one edge type).
 // Uses face interior angle and dihedral to compute t and c directly.

@@ -108,6 +108,20 @@ If you are not compiling and call `ps_params_get(...)` directly, family matching
 
 This keeps operator code fast and keeps parameterization semantics consistent across operators.
 
+## Caveat: Geometric Compatibility
+
+`params_overrides` is intentionally expressive, so it can encode combinations that are
+topologically or geometrically incompatible (for example, strongly selective local
+overrides that force conflicting constraints between adjacent regions).
+
+In those cases, operators may produce degenerate faces or non-planar patches.
+Current guidance is:
+
+1. Prefer smooth family/all overrides for showcase/default usage.
+2. Validate outputs with `poly_valid(...)` when building custom local override sets.
+3. A user-facing `poly_cleanup(...)` pass is planned as follow-up for automatic
+   degenerate-element cleanup.
+
 ## Classification Context Consistency
 
 Family selectors depend on how classification is computed. If two stages use

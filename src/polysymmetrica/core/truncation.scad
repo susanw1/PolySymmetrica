@@ -30,6 +30,43 @@ function _ps_face_has_dir(f, v0, v1) =
 function _ps_all_near(vals, eps) =
     (len(vals) == 0) ? true : (max(vals) - min(vals) <= eps);
 
+function _ps_override_allowed_keys_for_kind(allowed_specs, kind) =
+    let(rows = [for (a = allowed_specs) if (a[0] == kind) a[1]])
+    (len(rows) == 0) ? [] : rows[0];
+
+function _ps_override_key_in(keys, k) =
+    len([for (x = keys) if (x == k) 1]) > 0;
+
+function _ps_override_row_keys(row) =
+    let(
+        start = _ps_params_row_kv_start(row)
+    )
+    (!is_list(row) || is_undef(start) || start > len(row)-1) ? []
+        : [
+            for (i = [start:1:len(row)-1])
+                let(p = row[i])
+                if (is_list(p) && len(p) >= 1 && is_string(p[0])) p[0]
+        ];
+
+function _ps_override_row_is_unsupported(row, allowed_specs) =
+    let(
+        kind = _ps_params_row_kind(row),
+        scope = _ps_params_row_scope(row),
+        keys = _ps_override_row_keys(row),
+        allowed_keys = _ps_override_allowed_keys_for_kind(allowed_specs, kind),
+        bad_keys = [for (k = keys) if (!_ps_override_key_in(allowed_keys, k)) k]
+    )
+    (is_undef(scope)) || (len(allowed_keys) == 0) || (len(bad_keys) > 0);
+
+function _ps_override_warn_unsupported(rows, op_name, allowed_specs) =
+    let(
+        bad_rows = [for (ri = [0:1:len(rows)-1]) if (_ps_override_row_is_unsupported(rows[ri], allowed_specs)) ri],
+        _ = (len(bad_rows) > 0)
+            ? echo(str(op_name, ": params_overrides ignored rows=", bad_rows))
+            : 0
+    )
+    0;
+
 // True if poly has a single face size and single edge length (within eps).
 function _ps_is_regular_base(poly, eps=1e-6) =
     let(
@@ -198,84 +235,99 @@ function _ps_truncate_norm_to_t(poly, c) =
 // - replaces each original vertex with a vertex-face
 // - replaces each original edge with two edge points
 // - `t` is the edge fraction from each endpoint; `c` maps to `t` via default normalization
-function poly_truncate(poly, t=undef, c=undef, eps = 1e-8) =
+function poly_truncate(poly, t=undef, c=undef, eps = 1e-8, params_overrides=undef) =
     let(
-        t_eff = !is_undef(t)
+        t_base = !is_undef(t)
             ? t
-            : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly))
+            : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly)),
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_truncate", [["vert", ["t", "c"]]])
     )
-    // should this assert? Or should we allow, or silently call rectify?
-    assert(t_eff != 0.5, "'t' cannot be 0.5 as this produces degenerate vertices - use poly_rectify() instead")
-    (t_eff == 0) 
-        ? poly
-        :
     let(
-        base = _ps_poly_base(poly),
-        verts = base[0],
-        faces = base[1],
-        edges = base[2],
-
-        // edge points: aligned with edges[ei]=[a,b]
-        edge_pts = _ps_edge_points(verts, edges, t_eff),
-
-        edge_faces = ps_edge_faces_table(faces, edges),
-
-        // sites: two per edge (near each endpoint)
-        sites = [
-            for (ei = [0:1:len(edges)-1])
-                each [[ei, edges[ei][0]], [ei, edges[ei][1]]]
-        ],
-        site_points = [
-            for (ei = [0:1:len(edges)-1])
-                each [edge_pts[ei][0], edge_pts[ei][1]]
-        ],
-
-        // truncated original faces -> 2n-gons
-        face_cycles = [
-            for (f = faces)
-                let(n = len(f))
-                [
-                    for (k = [0:1:n-1])
+            base = _ps_poly_base(poly),
+            verts = base[0],
+            faces = base[1],
+            edges = base[2],
+            edge_faces = base[3],
+            vert_fid = (len(rows) > 0 && ps_params_uses_family(rows, "vert"))
+                ? ps_classify_vert_ids(poly_classify(poly, 1, 1e-6, 1, false), len(verts))
+                : undef,
+            params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+                ["vert", "t", len(verts), vert_fid],
+                ["vert", "c", len(verts), vert_fid]
+            ]),
+            vert_t_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+            vert_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+            t_by_vert = [
+                for (vi = [0:1:len(verts)-1])
+                    let(
+                        t_ov = ps_compiled_param_get(vert_t_by_idx, vi),
+                        c_ov = ps_compiled_param_get(vert_c_by_idx, vi)
+                    )
+                    !is_undef(t_ov) ? t_ov
+                        : !is_undef(c_ov) ? _ps_truncate_norm_to_t(poly, c_ov)
+                        : t_base
+            ],
+            _t_ok = assert(min([for (tv = t_by_vert) (tv != 0.5) ? 1 : 0]) == 1, "poly_truncate: t=0.5 is not allowed"),
+            all_zero = max([for (tv = t_by_vert) abs(tv)]) <= eps
+        )
+        all_zero
+            ? poly
+            : let(
+                edge_pts = _ps_edge_points_by_vert_t(verts, edges, t_by_vert),
+                sites = [
+                    for (ei = [0:1:len(edges)-1])
+                        each [[ei, edges[ei][0]], [ei, edges[ei][1]]]
+                ],
+                site_points = [
+                    for (ei = [0:1:len(edges)-1])
+                        each [edge_pts[ei][0], edge_pts[ei][1]]
+                ],
+                face_cycles = [
+                    for (f = faces)
+                        let(n = len(f))
+                        [
+                            for (k = [0:1:n-1])
+                                let(
+                                    v      = f[k],
+                                    v_next = f[(k+1)%n],
+                                    v_prev = f[(k-1+n)%n],
+                                    idx_prev = _ps_edge_site_index(edges, v_prev, v, v),
+                                    idx_next = _ps_edge_site_index(edges, v, v_next, v)
+                                )
+                                each [[1, idx_prev], [1, idx_next]]
+                        ]
+                ],
+                vert_cycles = [
+                    for (vi = [0:1:len(verts)-1])
                         let(
-                            v      = f[k],
-                            v_next = f[(k+1)%n],
-                            v_prev = f[(k-1+n)%n],
-                            idx_prev = _ps_edge_site_index(edges, v_prev, v, v),
-                            idx_next = _ps_edge_site_index(edges, v, v_next, v)
+                            fc = faces_around_vertex(poly, vi, edges, edge_faces),
+                            neigh = [
+                                for (idx = [0:1:len(fc)-1])
+                                    let(
+                                        f = faces[ fc[idx] ],
+                                        m = len(f),
+                                        pos = _ps_index_of(f, vi),
+                                        v_next = f[(pos+1)%m]
+                                    )
+                                    v_next
+                            ]
                         )
-                        each [[1, idx_prev], [1, idx_next]]
-                ]
-        ],
-
-        // vertex faces: one per original vertex
-        vert_cycles = [
-            for (vi = [0:1:len(verts)-1])
-                let(
-                    fc = faces_around_vertex(poly, vi, edges, edge_faces),
-                    neigh = [
-                        for (idx = [0:1:len(fc)-1])
-                            let(
-                                f = faces[ fc[idx] ],
-                                m = len(f),
-                                pos = _ps_index_of(f, vi),
-                                v_next = f[(pos+1)%m]
-                            )
-                            v_next
-                    ]
-                )
-                [
-                    for (vn = neigh)
-                        [1, _ps_edge_site_index(edges, vi, vn, vi)]
-                ]
-        ],
-
-        cycles_all = concat(face_cycles, vert_cycles)
-    )
-    ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
+                        [
+                            for (vn = neigh)
+                                [1, _ps_edge_site_index(edges, vi, vn, vi)]
+                        ]
+                ],
+                cycles_all = concat(face_cycles, vert_cycles)
+            )
+            ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
 
 // Rectification:
 // replaces each original vertex by the cycle of incident edge midpoints.
-function poly_rectify(poly) =
+function poly_rectify(poly, params_overrides=undef) =
+    let(
+        _p_ok = assert(ps_params_row_count(params_overrides) == 0, "poly_rectify: params_overrides not supported")
+    )
     let(
         base = _ps_poly_base(poly),
         verts = base[0],
@@ -340,21 +392,41 @@ function poly_rectify(poly) =
 // - omits vertex faces
 // - `t` is a signed face-plane offset as a fraction of each face's collapse distance
 //   (positive = inward chamfer, negative = anti-chamfer)
-function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
+function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
     let(
-        t_eff = !is_undef(t)
+        t_base = !is_undef(t)
             ? t
             : (!is_undef(c) ? _ps_truncate_norm_to_t(poly, c) : _ps_truncate_default_t(poly)),
-        _t_ok = assert(abs(t_eff) != 1, "poly_chamfer: |t| must not be 1 (t=±1 collapses faces; use cleanup/hyper mode)"),
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_chamfer", [["face", ["t", "c"]]]),
         base = _ps_poly_base(poly),
         verts0 = base[0],
         faces0 = base[1],
         edges = base[2],
         edge_faces = base[3],
         face_n = base[4],
-
+        face_fid = (len(rows) > 0 && ps_params_uses_family(rows, "face"))
+            ? ps_classify_face_ids(poly_classify(poly, 1, 1e-6, 1, false), len(faces0))
+            : undef,
+        params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+            ["face", "t", len(faces0), face_fid],
+            ["face", "c", len(faces0), face_fid]
+        ]),
+        face_t_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+        face_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+        t_by_face = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    t_ov = ps_compiled_param_get(face_t_by_idx, fi),
+                    c_ov = ps_compiled_param_get(face_c_by_idx, fi)
+                )
+                !is_undef(t_ov) ? t_ov
+                    : !is_undef(c_ov) ? _ps_truncate_norm_to_t(poly, c_ov)
+                    : t_base
+        ],
+        _t_ok = assert(min([for (tv = t_by_face) (abs(tv) != 1) ? 1 : 0]) == 1, "poly_chamfer: |t| must not be 1 (t=±1 collapses faces; use cleanup/hyper mode)"),
+        all_zero = max([for (tv = t_by_face) abs(tv)]) <= eps,
         face_offsets = _ps_face_offsets(faces0),
-
         face_pts3d = [
             for (fi = [0:1:len(faces0)-1])
                 let(
@@ -370,7 +442,7 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                                 [v_dot(p, ex), v_dot(p, ey)]
                     ],
                     face_collapse = abs(_ps_face_bisector_collapse_d(f, fi, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)),
-                    d_f = -t_eff * face_collapse,
+                    d_f = -t_by_face[fi] * face_collapse,
                     inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, 0, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0),
                     p0 = center - n_f * d_f
                 )
@@ -379,14 +451,12 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                         p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
                 ]
         ],
-
         sites = [
             for (fi = [0:1:len(faces0)-1])
                 let(f = faces0[fi], n = len(f))
                 for (k = [0:1:n-1])
                     [fi, f[k]]
         ],
-
         site_points = [
             for (fi = [0:1:len(faces0)-1])
                 for (p = face_pts3d[fi])
@@ -397,7 +467,6 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                 let(f = faces0[fi], n = len(f))
                 [ for (k = [0:1:n-1]) [1, face_offsets[fi] + k] ]
         ],
-
         edge_cycles = [
             for (ei = [0:1:len(edges)-1])
                 let(
@@ -427,10 +496,11 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
                     [1, s_opp_v0]
                 ]
         ],
-
         cycles_all = concat(face_cycles, edge_cycles)
     )
-    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+    all_zero
+        ? poly
+        : ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
 // --- Cantellation helpers ---
 //
@@ -440,17 +510,19 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
 // - vertex faces are valence-gons
 // df offsets faces along their normals; edge/vertex faces are derived from those offsets.
 function _ps_face_offset_pts(verts0, faces0, face_n, df) =
+    let(df_by_face = is_list(df) ? df : [for (_ = [0:1:len(faces0)-1]) df])
     [
         for (fi = [0:1:len(faces0)-1])
             let(
                 f = faces0[fi],
                 n = len(f),
-                n_f = face_n[fi]
+                n_f = face_n[fi],
+                dfi = df_by_face[fi]
             )
             [
                 for (k = [0:1:n-1])
                     let(v = f[k])
-                    verts0[v] + df * n_f
+                    verts0[v] + dfi * n_f
             ]
     ];
 
@@ -483,12 +555,10 @@ function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_i
 // If `df` is omitted:
 // - use `c` if provided, else default `c=0.5`
 // - map `c` to `df` using the square-edge calibration map.
-function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6) =
+function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
     let(
-        df_eff = !is_undef(df)
-            ? df
-            : (!is_undef(c) ? _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx)
-                            : _ps_cantellate_df_from_c(poly, 0.5, df_max, steps, family_edge_idx))
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_cantellate", [["face", ["df", "c"]]])
     )
     let(
         base = _ps_poly_base(poly),
@@ -498,8 +568,36 @@ function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
+        face_fid = (len(rows) > 0 && ps_params_uses_family(rows, "face"))
+            ? ps_classify_face_ids(poly_classify(poly, 1, 1e-6, 1, false), len(faces0))
+            : undef,
+        params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+            ["face", "df", len(faces0), face_fid],
+            ["face", "c", len(faces0), face_fid]
+        ]),
+        face_df_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+        face_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+        has_c_overrides = !is_undef(face_c_by_idx) && (len([for (x = face_c_by_idx) if (!is_undef(x)) 1]) > 0),
+        need_c_map = is_undef(df) || !is_undef(c) || has_c_overrides,
+        cmap = need_c_map ? _ps_cantellate_df_map(poly, df_max, steps, family_edge_idx) : undef,
+        df_mid = is_undef(cmap) ? undef : cmap[0],
+        df_max_eff = is_undef(cmap) ? undef : cmap[1],
+        df_by_face = [
+            for (fi = [0:1:len(faces0)-1])
+                let(
+                    df_ov = ps_compiled_param_get(face_df_by_idx, fi),
+                    c_ov = ps_compiled_param_get(face_c_by_idx, fi),
+                    c_eff = !is_undef(c_ov) ? c_ov
+                        : !is_undef(c) ? c
+                        : 0.5
+                )
+                !is_undef(df_ov) ? df_ov
+                    : !is_undef(c_ov) ? _ps_cantellate_df_from_c_linear(c_eff, df_mid, df_max_eff)
+                    : !is_undef(df) ? df
+                    : _ps_cantellate_df_from_c_linear(c_eff, df_mid, df_max_eff)
+        ],
         // offset face corners: one point per (face, vertex) incidence
-        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df_eff),
+        face_pts = _ps_face_offset_pts(verts0, faces0, face_n, df_by_face),
         face_offsets = _ps_face_offsets(faces0),
         sites = [
             for (fi = [0:1:len(faces0)-1])
@@ -553,7 +651,7 @@ function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family
 // Measure how square an edge face is (edge length spread).
 function _ps_face_edge_spread(verts, face) =
     let(
-        n = len(face),
+        n = is_undef(face) ? 0 : len(face),
         ls = (n < 2) ? [] : [for (i = [0:1:n-1]) norm(verts[face[i]] - verts[face[(i+1)%n]])]
     )
     (n == 4) ? (max(ls) - min(ls)) : undef;
@@ -599,9 +697,9 @@ function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0,
 
 // Normalized cantellation: map c in [0,1] to df in [0, df_max],
 // with c=0.5 hitting the computed square-edge df.
-function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6) =
+function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
     let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
-    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps);
+    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps, params_overrides);
 
 // --- Snub helpers ---
 function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
@@ -1079,6 +1177,7 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
             : undef,
         auto_rows = is_undef(auto_params) ? [] : _ps_snub_params_rows(auto_params[0], auto_params[1], auto_params[2], (len(auto_params) > 4) ? auto_params[4] : undef),
         params_rows = is_undef(params_overrides) ? auto_rows : concat(auto_rows, params_overrides),
+        _pwarn = _ps_override_warn_unsupported(params_rows, "poly_snub", [["face", ["df", "angle"]], ["vert", ["c", "de"]]]),
         _choice = !is_undef(auto_params)
             ? echo(str("snub: using auto defaults tier=", auto_params[3], " c=", auto_params[2], " df=", auto_params[0], " angle=", auto_params[1]))
             : 0,
@@ -1256,11 +1355,13 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
 //
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
-function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) =
+function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
     let(
+        rows = is_undef(params_overrides) ? [] : params_overrides,
+        _pwarn = _ps_override_warn_unsupported(rows, "poly_cantitruncate", [["face", ["c"]], ["vert", ["t", "c"]], ["edge", ["c", "de"]]]),
         sol = (is_undef(t) && is_undef(c) && _ps_is_regular_base(poly)) ? solve_cantitruncate_trig(poly) : [t, c],
-        t_eff = is_undef(sol[0]) ? _ps_truncate_default_t(poly) : sol[0],
-        c_eff = is_undef(sol[1]) ? 0 : sol[1]
+        t_base = is_undef(sol[0]) ? _ps_truncate_default_t(poly) : sol[0],
+        c_base = is_undef(sol[1]) ? 0 : sol[1]
     )
     let(
         base = _ps_poly_base(poly),
@@ -1270,13 +1371,45 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) 
         edge_faces = base[3],
         face_n = base[4],
         poly0 = base[5],
+        need_face_fid = (len(rows) > 0 && ps_params_uses_family(rows, "face")),
+        need_vert_fid = (len(rows) > 0 && ps_params_uses_family(rows, "vert")),
+        need_edge_fid = (len(rows) > 0 && ps_params_uses_family(rows, "edge")),
+        cls = (need_face_fid || need_vert_fid || need_edge_fid) ? poly_classify(poly, 1, 1e-6, 1, false) : undef,
+        edge_fid = need_edge_fid ? ps_classify_edge_ids(cls, len(edges)) : undef,
+        vert_fid = need_vert_fid ? ps_classify_vert_ids(cls, len(verts0)) : undef,
+        face_fid = need_face_fid ? ps_classify_face_ids(cls, len(faces0)) : undef,
+        params_compiled = (len(rows) == 0) ? undef : ps_params_compile_specs(rows, [
+            ["vert", "t", len(verts0), vert_fid],
+            ["vert", "c", len(verts0), vert_fid],
+            ["face", "c", len(faces0), face_fid],
+            ["edge", "c", len(edges), edge_fid],
+            ["edge", "de", len(edges), edge_fid]
+        ]),
+        vert_t_by_idx = is_undef(params_compiled) ? undef : params_compiled[0],
+        vert_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[1],
+        face_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[2],
+        edge_c_by_idx = is_undef(params_compiled) ? undef : params_compiled[3],
+        edge_de_by_idx = is_undef(params_compiled) ? undef : params_compiled[4],
+        t_by_vert = [
+            for (vi = [0:1:len(verts0)-1])
+                let(
+                    t_ov = ps_compiled_param_get(vert_t_by_idx, vi),
+                    c_ov = ps_compiled_param_get(vert_c_by_idx, vi)
+                )
+                !is_undef(t_ov) ? t_ov
+                    : !is_undef(c_ov) ? _ps_truncate_norm_to_t(poly, c_ov)
+                    : t_base
+        ],
+        c_by_face = [
+            for (fi = [0:1:len(faces0)-1])
+                let(c_ov = ps_compiled_param_get(face_c_by_idx, fi))
+                is_undef(c_ov) ? c_base : c_ov
+        ],
         // scale by inter-radius for consistent parameterization
         ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
-        d_f = -c_eff * ir,
-        d_e = c_eff * ir,
         face_offsets = _ps_face_offsets(faces0),
         // edge points (truncation-style): two per edge
-        edge_pts = _ps_edge_points(verts0, edges, t_eff),
+        edge_pts = _ps_edge_points_by_vert_t(verts0, edges, t_by_vert),
         // face-vertex sites: one per (face, vertex)
         face_sites = [
             for (fi = [0:1:len(faces0)-1])
@@ -1292,13 +1425,27 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) 
                     center = poly_face_center(poly, fi, 1),
                     ex = poly_face_ex(poly, fi, 1),
                     ey = poly_face_ey(poly, fi, 1),
+                    d_f = -c_by_face[fi] * ir,
                     p0 = center - n_f * d_f,
                     pts2d = [
                         for (k = [0:1:n-1])
                             let(p = verts0[f[k]] - center)
                                 [v_dot(p, ex), v_dot(p, ey)]
                     ],
-                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, d_e, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
+                    d_e_edges = [
+                        for (k = [0:1:n-1])
+                            let(
+                                v0 = f[k],
+                                v1 = f[(k+1)%n],
+                                ei = ps_find_edge_index(edges, v0, v1),
+                                c_edge = ps_compiled_param_get(edge_c_by_idx, ei),
+                                de_edge = ps_compiled_param_get(edge_de_by_idx, ei)
+                            )
+                            !is_undef(de_edge) ? de_edge
+                                : !is_undef(c_edge) ? (c_edge * ir)
+                                : (c_by_face[fi] * ir)
+                    ],
+                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
                 )
                 [
                     for (k = [0:1:n-1])
@@ -1313,6 +1460,7 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) 
                     n = len(f),
                     n_f = face_n[fi],
                     center = poly_face_center(poly, fi, 1),
+                    d_f = -c_by_face[fi] * ir,
                     p0 = center - n_f * d_f
                 )
                 [
@@ -1345,156 +1493,10 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6) 
     )
     ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
 
-// Cantitruncation with per-face-family c values (indexed by face size).
-// c_by_size: list of [face_size, c] pairs; default_c used if size not found.
-function poly_cantitruncate_families(poly, t, c_by_size, default_c=0, c_edge_by_pair=undef, eps=1e-8, len_eps=1e-6) =
-    let(
-        t_eff = is_undef(t) ? _ps_truncate_default_t(poly) : t,
-        base = _ps_poly_base(poly),
-        verts0 = base[0],
-        faces0 = base[1],
-        edges = base[2],
-        edge_faces = base[3],
-        face_n = base[4],
-        poly0 = base[5],
-        ir = min([for (e = edges) norm((verts0[e[0]] + verts0[e[1]]) / 2)]),
-        face_offsets = _ps_face_offsets(faces0),
-        // edge points (truncation-style): two per edge
-        edge_pts = _ps_edge_points(verts0, edges, t_eff),
-        face_sites = [
-            for (fi = [0:1:len(faces0)-1])
-                for (v = faces0[fi])
-                    [fi, v]
-        ],
-        face_pts3d = [
-            for (fi = [0:1:len(faces0)-1])
-                let(
-                    f = faces0[fi],
-                    n = len(f),
-                    c_face = _ps_map_face_c(n, c_by_size, default_c),
-                    d_f = -c_face * ir,
-                    n_f = face_n[fi],
-                    center = poly_face_center(poly, fi, 1),
-                    ex = poly_face_ex(poly, fi, 1),
-                    ey = poly_face_ey(poly, fi, 1),
-                    p0 = center - n_f * d_f,
-                    pts2d = [
-                        for (k = [0:1:n-1])
-                            let(p = verts0[f[k]] - center)
-                                [v_dot(p, ex), v_dot(p, ey)]
-                    ],
-                    d_e_edges = [
-                        for (k = [0:1:n-1])
-                            let(
-                                v0 = f[k],
-                                v1 = f[(k+1)%n],
-                                ei = ps_find_edge_index(edges, v0, v1),
-                                adj = edge_faces[ei],
-                                f_adj = (len(adj) < 2) ? fi : ((adj[0] == fi) ? adj[1] : adj[0]),
-                                c_edge = is_undef(c_edge_by_pair)
-                                    ? c_face
-                                    : _ps_map_edge_c(n, len(faces0[f_adj]), c_edge_by_pair, c_face)
-                            )
-                            c_edge * ir
-                    ],
-                    inset2d = _ps_face_inset_bisector_2d(f, fi, d_f, d_e_edges, center, ex, ey, n_f, pts2d, edges, edge_faces, face_n, verts0)
-                )
-                [
-                    for (k = [0:1:n-1])
-                        p0 + ex * inset2d[k][0] + ey * inset2d[k][1]
-                ]
-        ],
-        face_edge_pts3d = [
-            for (fi = [0:1:len(faces0)-1])
-                let(
-                    f = faces0[fi],
-                    n = len(f),
-                    c_face = _ps_map_face_c(n, c_by_size, default_c),
-                    d_f = -c_face * ir,
-                    n_f = face_n[fi],
-                    center = poly_face_center(poly, fi, 1),
-                    p0 = center - n_f * d_f
-                )
-                [
-                    for (k = [0:1:n-1])
-                        let(
-                            v0 = f[k],
-                            v1 = f[(k+1)%n],
-                            p_pair = _ps_project_edge_pts_for_face_edge(verts0, edges, edge_pts, n_f, p0, v0, v1),
-                            p0o = p_pair[0],
-                            p1o = p_pair[1]
-                        )
-                        each [p0o, p1o]
-                ]
-        ],
-        face_edge_offsets = _ps_face_edge_offsets(faces0),
-        face_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_pts3d[fi]) p ],
-        face_edge_pts_flat = [ for (fi = [0:1:len(faces0)-1]) for (p = face_edge_pts3d[fi]) p ],
-        edge_site_offset = 0,
-        face_site_offset = len(face_edge_pts_flat),
-        sites = concat(
-            [ for (i = [0:1:len(face_edge_pts_flat)-1]) [0, i] ],
-            face_sites
-        ),
-        site_points = concat(face_edge_pts_flat, face_pts_flat),
-        face_cycles = _ps_face_cycles_from_face_edge_sites(faces0, [for (x = face_edge_offsets) edge_site_offset + x]),
-        edge_cycles = _ps_edge_cycles_from_face_edge_sites(faces0, edges, edge_faces, [for (x = face_edge_offsets) edge_site_offset + x]),
-        vert_cycles = _ps_vert_cycles_from_face_edge_sites(verts0, faces0, edges, edge_faces, [for (x = face_edge_offsets) edge_site_offset + x], poly0),
-        cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
-    )
-    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
-
-
-
-// Compute per-corner truncation estimate t = 1/(2+r),
-// where r = |B-C| / mean(|V-B|,|V-C|) for face corner (...B,V,C...).
+// Truncation default estimators are implemented in solvers.scad.
+// Keep private wrappers here for local call-site stability.
 function _ps_corner_t(verts, face, k) =
-    let(
-        n  = len(face),
-        vm = face[(k-1+n) % n],
-        v  = face[k],
-        vp = face[(k+1) % n],
-        V  = verts[v],
-        B  = verts[vm],
-        C  = verts[vp],
+    solve_truncate_corner_t(verts, face, k);
 
-        LB = norm(V - B),
-        LC = norm(V - C),
-        L  = (LB + LC) / 2,
-
-        chord = norm(B - C),
-        r = (L == 0) ? 0 : chord / L,
-
-        t = (2 + r == 0) ? 0 : 1 / (2 + r)
-    )
-    t;
-
-// Return a “best guess” truncation t if user passes t=undef.
-// - If the poly is locally uniform, returns the mean corner t.
-// - Otherwise returns fallback (default 0.2).
-//
-// tol is an absolute tolerance on (t_max - t_min).
 function _ps_truncate_default_t(poly, tol = 1e-3, fallback = 0.2) =
-    let(
-        verts = poly_verts(poly),
-        faces = poly_faces(poly),
-
-        // gather per-corner t estimates
-        ts = [
-            for (f = faces)
-                for (k = [0 : len(f)-1])
-                    _ps_corner_t(verts, f, k)
-        ],
-
-        _ = assert(len(ts) > 0, "ps_truncate_default_t: no face corners found"),
-
-        tmin = min(ts),
-        tmax = max(ts),
-        tavg = sum(ts) / len(ts),
-
-        // decide if "uniform enough"
-        ok = (tmax - tmin) <= tol,
-
-        t0 = ok ? tavg : fallback
-    )
-    t0;
+    solve_truncate_default_t(poly, tol, fallback);

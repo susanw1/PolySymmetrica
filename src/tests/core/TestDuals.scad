@@ -171,6 +171,14 @@ module test_poly_dual__dual_dual_face_match_octa() {
     assert_face_matches(p, q);
 }
 
+module test_poly_dual__empty_params_overrides_noop() {
+    p = _octa_poly();
+    d0 = poly_dual(p);
+    d1 = poly_dual(p, params_overrides=[]);
+    assert_near(poly_e_over_ir(d0), poly_e_over_ir(d1), 1e-9, "poly_dual empty params_overrides e/ir");
+    assert_face_matches(d0, d1);
+}
+
 
 // suite
 module run_TestDuals() {
@@ -188,4 +196,5 @@ module run_TestDuals() {
     test_face_family_helpers__truncated_octa();
     test_scale_dual_edge_cross__octa_consistent();
     test_poly_dual__dual_dual_face_match_octa();
+    test_poly_dual__empty_params_overrides_noop();
 }

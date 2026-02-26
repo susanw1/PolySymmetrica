@@ -200,6 +200,9 @@ PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 | `$ps_face_midradius`            |   ✅  |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
 | `$ps_face_radius`              |   ✅  |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
 | `$ps_face_pts2d`                |   ✅  |   ☐   |   ☐   | Face polygon vertices in **face-local 2D coords** `[[x,y]...]` suitable for `polygon(points=...)`                                                              |
+| `$ps_face_pts3d_local`          |   ✅  |   ☐   |   ☐   | Face vertices in **face-local 3D coords** `[[x,y,z]...]`, mean-centered in local z (planar faces are near `z=0`)                                               |
+| `$ps_face_planarity_err`        |   ✅  |   ☐   |   ☐   | Max local-z deviation across face vertices (0 for perfectly planar in local frame)                                                                               |
+| `$ps_face_is_planar`            |   ✅  |   ☐   |   ☐   | Boolean planarity flag (`$ps_face_planarity_err <= 1e-8`)                                                                                                         |
 | `$ps_face_family_id`            |   ✅  |   ☐   |   ☐   | Family id of the current face from `poly_classify(...)`                                                                                                           |
 | `$ps_face_neighbors_idx`       |   ✅  |   ☐   |   ☐   | Adjacent face indices per face edge (aligned with `$ps_face_pts2d` order; `undef` for boundary edges)                                                         |
 | `$ps_face_dihedrals`            |   ✅  |   ☐   |   ☐   | Dihedral angles per face edge, degrees (aligned with `$ps_face_pts2d` order; internal dihedral for closed manifolds)                                           |
@@ -265,6 +268,19 @@ For schema details, compile-spec format, and examples, see:
 
 When using family-targeted overrides (`"family"` rows), keep classification context consistent (`detail`, `radius`, `include_geom`) across all stages; best practice is to classify once and reuse that object.
 
+### **3.8 Validation Modes**
+
+`poly_valid(poly, mode, eps)` supports progressively stricter checks:
+
+| Mode       | Structural checks | Manifold closedness | Self-intersections | Outward + convex |
+| ---------- | ----------------- | ------------------- | ------------------ | ---------------- |
+| `"struct"` | ✅                | ☐                   | ☐                  | ☐                |
+| `"closed"` | ✅                | ✅                  | disallowed         | ☐                |
+| `"star_ok"`| ✅                | ✅                  | allowed            | ☐                |
+| `"convex"` | ✅                | ✅                  | disallowed         | ✅               |
+
+Use `"struct"` for early pipeline/debug stages, `"closed"` for printable manifold outputs, `"star_ok"` for stellated/self-intersecting faces, and `"convex"` when strict outward convex geometry is required.
+
 #### Naming conventions for `$ps_*` variables
 
 The following conventions are used consistently to make their meaning predictable:
@@ -290,6 +306,10 @@ The following conventions are used consistently to make their meaning predictabl
   2D points in the local XY plane, suitable for `polygon(points=...)` and **ordered LHR (CW from outside)**.
 
   * Example: `$ps_face_pts2d`
+* `*_pts3d_local`
+  3D points in the local frame, useful when a face may be non-planar.
+
+  * Example: `$ps_face_pts3d_local`
 
 ##### Distances and radii
 

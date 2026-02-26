@@ -54,6 +54,22 @@ function _ps_edge_points(verts0, edges, t) =
             [ A + t * (B - A), B + t * (A - B) ]
     ];
 
+// Edge points with per-vertex truncation factors.
+// For edge [a,b], first point is near a using t_by_vert[a], second near b using t_by_vert[b].
+function _ps_edge_points_by_vert_t(verts0, edges, t_by_vert) =
+    [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                a = edges[ei][0],
+                b = edges[ei][1],
+                A = verts0[a],
+                B = verts0[b],
+                ta = t_by_vert[a],
+                tb = t_by_vert[b]
+            )
+            [ A + ta * (B - A), B + tb * (A - B) ]
+    ];
+
 // Face cycles from face-edge sites (2n-gons).
 function _ps_face_cycles_from_face_edge_sites(faces0, face_edge_offsets) =
     [

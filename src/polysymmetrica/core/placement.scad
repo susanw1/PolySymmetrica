@@ -67,9 +67,13 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
                 let(p = verts[vid] * scale - center)
                     [ v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) ]
         ];
+        zvals = [for (p = face_verts_local) p[2]];
+        zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals);
+        face_planarity_err = (len(zvals) == 0) ? 0 : max([for (z = zvals) abs(z - zmean)]);
+        face_pts3d_local = [for (p = face_verts_local) [p[0], p[1], p[2] - zmean]];
         // 2D projection for polygon(), in face plane coords
         face_pts2d = [
-            for (p = face_verts_local)
+            for (p = face_pts3d_local)
                 [ p[0], p[1] ]
         ];
 
@@ -81,6 +85,9 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
         $ps_face_radius       = face_radius;        // (mean) distance from face centre to vertices
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
+        $ps_face_pts3d_local  = face_pts3d_local;   // [[x,y,z]...] in face-local coords, mean-centered in z
+        $ps_face_planarity_err = face_planarity_err; // max deviation from local best-fit z level
+        $ps_face_is_planar    = face_planarity_err <= 1e-8;
         $ps_face_family_id    = is_undef(cls) ? undef : face_family_ids[fi];
         $ps_face_family_count = is_undef(family_counts) ? undef : family_counts[0];
         $ps_edge_family_count = edge_family_count;

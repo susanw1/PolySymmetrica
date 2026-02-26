@@ -209,6 +209,108 @@ module test_poly_cantitruncate__cube_edge_face_adjacency() {
     assert(min(shared) >= 1, "cantitruncate cube: quad vertices shared with face cycles");
 }
 
+module test_poly_cantellate__params_overrides_face_df_and_c() {
+    p = hexahedron();
+
+    q_df = poly_cantellate(p, df=0.05, params_overrides=[["face", "family", 0, ["df", 0.1]]]);
+    q_df_ref = poly_cantellate(p, df=0.1);
+    assert(_max_vertex_diff(q_df, q_df_ref) < 1e-7, "cantellate params_overrides face df should override scalar df");
+
+    q_c = poly_cantellate(p, df=0.05, params_overrides=[["face", "family", 0, ["c", 0.5]]]);
+    q_c_ref = poly_cantellate(p, c=0.5);
+    assert(_max_vertex_diff(q_c, q_c_ref) < 1e-7, "cantellate params_overrides face c should override scalar df");
+}
+
+module test_poly_cantitruncate__unsupported_params_overrides_ignored() {
+    p = hexahedron();
+    q0 = poly_cantitruncate(p, 0.2, 0.2);
+    q1 = poly_cantitruncate(
+        p,
+        0.2,
+        0.2,
+        params_overrides=[
+            ["face", "all", ["df", 0.1]],
+            ["edge", "all", ["t", 0.3]]
+        ]
+    );
+    assert(_max_vertex_diff(q0, q1) < 1e-7, "cantitruncate unsupported params_overrides should be ignored");
+}
+
+module test_poly_cantitruncate__params_overrides_face_c() {
+    p = hexahedron();
+    q1 = poly_cantitruncate(p, 0.2, 0.1, params_overrides=[["face", "family", 0, ["c", 0.2]]]);
+    qx = poly_cantitruncate(p, 0.2, 0.2);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "cantitruncate params_overrides face c should override scalar c");
+}
+
+module test_poly_cantitruncate__params_overrides_vert_t() {
+    p = hexahedron();
+    q1 = poly_cantitruncate(p, 0.2, 0.2, params_overrides=[["vert", "family", 0, ["t", 0.1]]]);
+    qx = poly_cantitruncate(p, 0.1, 0.2);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "cantitruncate params_overrides vert t should override scalar t");
+}
+
+module test_poly_cantitruncate__params_overrides_edge_c() {
+    p = hexahedron();
+    q1 = poly_cantitruncate(
+        p,
+        0.2,
+        0.1,
+        params_overrides=[
+            ["face", "all", ["c", 0.2]],
+            ["edge", "all", ["c", 0.2]]
+        ]
+    );
+    qx = poly_cantitruncate(p, 0.2, 0.2);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "cantitruncate params_overrides edge c should apply with face c");
+}
+
+module test_ps_cantitruncate_params_rows__direct_matches_scalar_cube() {
+    p = hexahedron();
+    rows = ps_cantitruncate_params_rows(p, [[4, 0.2]], 0.1);
+    q1 = poly_cantitruncate(p, t=0.2, c=0, params_overrides=rows);
+    qx = poly_cantitruncate(p, 0.2, 0.2);
+    assert(_max_vertex_diff(q1, qx) < 1e-7, "cantitruncate rows path should match scalar cube path");
+}
+
+module test_solve_cantitruncate_dominant_edges_params__matches_legacy_rows() {
+    base = poly_rectify(octahedron()); // cuboctahedron
+    sol = solve_cantitruncate_dominant_edges(base, 4);
+    t = sol[0];
+    rows = ps_cantitruncate_params_rows(base, sol[1], 0, sol[2]);
+    rowsp = solve_cantitruncate_dominant_edges_params(base, 4);
+
+    q0 = poly_cantitruncate(base, t=t, c=0, params_overrides=rows);
+    q1 = poly_cantitruncate(base, t=0, c=0, params_overrides=rowsp);
+    assert(_max_vertex_diff(q0, q1) < 1e-7, "cantitruncate dominant edges params solver should match map-to-rows path");
+}
+
+module test_ps_cantitruncate_params_rows__default_c_applies_missing_sizes() {
+    base = poly_rectify(octahedron()); // cuboctahedron: face sizes 3 and 4
+    // Deliberately provide only one size to ensure default_c is applied to the other.
+    rows = ps_cantitruncate_params_rows(base, [[4, 0.2]], 0.05);
+    faces = poly_faces(base);
+    size4_face_ids = [for (fi = [0:1:len(faces)-1]) if (len(faces[fi]) == 4) fi];
+
+    // Params-only path: scalar c=0 should not matter if rows carry default_c for missing sizes.
+    q_rows = poly_cantitruncate(base, t=0.2, c=0, params_overrides=rows);
+
+    // Independent reference path:
+    // - all faces get default_c
+    // - size-4 faces are explicitly overridden to c=0.2
+    q_ref = poly_cantitruncate(
+        base,
+        t=0.2,
+        c=0,
+        params_overrides=[
+            ["face", "all", ["c", 0.05]],
+            ["face", "id", size4_face_ids, ["c", 0.2]]
+        ]
+    );
+
+    assert(_max_vertex_diff(q_rows, q_ref) < 1e-7, "ps_cantitruncate_params_rows should encode default_c for missing face-size families");
+}
+
 module test_poly_cantitruncate_dominant_edges__consistent_pairs() {
     base = poly_rectify(octahedron()); // cuboctahedron
     sol = solve_cantitruncate_dominant_edges(base, 4);
@@ -230,7 +332,12 @@ module test_poly_cantitruncate_dominant_edges__planarity() {
     else {
         base = poly_rectify(octahedron()); // cuboctahedron
         sol = solve_cantitruncate_dominant_edges(base, 4);
-        p = poly_cantitruncate_families(base, sol[0], sol[1], c_edge_by_pair=sol[2]);
+        p = poly_cantitruncate(
+            base,
+            t=sol[0],
+            c=0,
+            params_overrides=ps_cantitruncate_params_rows(base, sol[1], 0, sol[2])
+        );
         verts = poly_verts(p);
         faces = poly_faces(p);
         errs = [for (f = faces) _face_max_plane_err(verts, f)];
@@ -587,6 +694,14 @@ module run_TestTruncation() {
     test_poly_truncate_then_dual__counts_relations();
     test_poly_rectify__tetra_counts();
     test_poly_cantitruncate__tetra_counts();
+    test_poly_cantellate__params_overrides_face_df_and_c();
+    test_poly_cantitruncate__unsupported_params_overrides_ignored();
+    test_poly_cantitruncate__params_overrides_face_c();
+    test_poly_cantitruncate__params_overrides_vert_t();
+    test_poly_cantitruncate__params_overrides_edge_c();
+    test_ps_cantitruncate_params_rows__direct_matches_scalar_cube();
+    test_solve_cantitruncate_dominant_edges_params__matches_legacy_rows();
+    test_ps_cantitruncate_params_rows__default_c_applies_missing_sizes();
     test_poly_cantitruncate_dominant_edges__consistent_pairs();
     test_poly_cantitruncate_dominant_edges__planarity();
     test_great_rhombi__cube_square_faces();
