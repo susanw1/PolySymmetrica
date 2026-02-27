@@ -152,6 +152,29 @@ module test_ps_reverse__edge_cases() {
     assert(_ps_reverse([1,2,3]) == [3,2,1], "reverse list");
 }
 
+module test_ps_identity_map__basic() {
+    assert(_ps_identity_map(0) == [], "identity map empty");
+    assert(_ps_identity_map(4) == [0,1,2,3], "identity map 4");
+}
+
+module test_ps_distinct_count__basic() {
+    assert_int_eq(_ps_distinct_count([]), 0, "distinct empty");
+    assert_int_eq(_ps_distinct_count([1,1,1]), 1, "distinct all same");
+    assert_int_eq(_ps_distinct_count([1,2,1,3,2]), 3, "distinct mixed");
+}
+
+module test_ps_face_clean_cycle__basic() {
+    assert(_ps_face_clean_cycle([]) == [], "clean cycle empty");
+    assert(_ps_face_clean_cycle([0,1,1,2,0]) == [1,2,0], "clean cycle drops cyclic dup + closure");
+    assert(_ps_face_clean_cycle([0,0,0]) == [], "clean cycle all same collapses");
+}
+
+module test_ps_faces_remap__basic() {
+    faces = [[0,1,2],[2,3,0]];
+    map = [0,2,1,3];
+    assert(_ps_faces_remap(faces, map) == [[0,2,1],[1,3,0]], "faces remap");
+}
+
 // --- _ps_list_contains / _ps_index_of ---
 module test_ps_list_contains_index__basic() {
     assert(_ps_list_contains([1,2,3], 2), "contains 2");
@@ -253,6 +276,21 @@ module test_face_normal__orientation() {
     n2 = ps_face_normal(verts, [0,2,1]);
     assert_vec3_near(n1, [0,0,-1], 1e-12, "normal ccw");
     assert_vec3_near(n2, [0,0,1], 1e-12, "normal cw");
+}
+
+module test_ps_face_area_mag__triangle_unit_half() {
+    verts = [[0,0,0],[1,0,0],[0,1,0]];
+    a = _ps_face_area_mag(verts, [0,1,2]);
+    assert_near(a, 0.5, 1e-12, "face area triangle");
+}
+
+module test_ps_face_planarity_err__planar_and_nonplanar() {
+    planar = [[0,0,0],[1,0,0],[1,1,0],[0,1,0]];
+    nonplanar = [[0,0,0],[1,0,0],[1,1,0.2],[0,1,0]];
+    e0 = _ps_face_planarity_err(planar, [0,1,2,3], 1e-12);
+    e1 = _ps_face_planarity_err(nonplanar, [0,1,2,3], 1e-12);
+    assert_near(e0, 0, 1e-12, "planarity err planar");
+    assert(e1 > 0, "planarity err nonplanar > 0");
 }
 
 
@@ -554,6 +592,10 @@ module run_TestFuncs() {
     test_v_sum__vec3_list();
     test_ps_ordered_pair__basic();
     test_ps_reverse__edge_cases();
+    test_ps_identity_map__basic();
+    test_ps_distinct_count__basic();
+    test_ps_face_clean_cycle__basic();
+    test_ps_faces_remap__basic();
     test_ps_list_contains_index__basic();
     test_ps_point_eq__eps();
     test_find_edge_index__finds();
@@ -563,6 +605,8 @@ module run_TestFuncs() {
 
     test_face_centroid__triangle();
     test_face_normal__orientation();
+    test_ps_face_area_mag__triangle_unit_half();
+    test_ps_face_planarity_err__planar_and_nonplanar();
 
     test_poly_vertex_neighbor__returns_incident_vertex();
 

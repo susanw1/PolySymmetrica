@@ -1207,14 +1207,6 @@ function ps_snub_default_params_overrides(poly, handedness=1, eps=1e-9) =
     )
     _ps_snub_params_rows(params[0], params[1], params[2], face_df_by_family);
 
-function _ps_face_max_plane_err(verts, f) =
-    let(
-        n = ps_face_normal(verts, f),
-        v0 = verts[f[0]],
-        errs = [for (vid = f) abs(v_dot(n, verts[vid] - v0))]
-    )
-    (len(errs) == 0) ? 0 : max(errs);
-
 // Snub operator with optional scalar controls and/or structured per-element overrides.
 //
 // Fallback strategy:
@@ -1408,7 +1400,7 @@ function poly_snub(
         edge_tris_flat = [for (t = edge_tris) each t],
         faces_new = concat(face_faces, edge_tris_flat, vert_faces),
         faces_oriented = ps_orient_all_faces_outward(verts, faces_new),
-        errs = [for (f = faces_oriented) _ps_face_max_plane_err(verts, f)],
+        errs = [for (f = faces_oriented) _ps_face_planarity_err(verts, f)],
         max_err = (len(errs) == 0) ? 0 : max(errs),
         bad = [for (e = errs) if (e > eps) e],
         _0 = (len(bad) > 0)

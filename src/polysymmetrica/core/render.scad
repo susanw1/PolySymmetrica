@@ -38,10 +38,7 @@ module poly_describe(poly, name = undef, detail = 1) {
                 basic1 = str("face#", $ps_face_idx, ": (", $ps_vertex_count, " verts) vert_idx: ", face_verts),
                 more2 = str(" poly_rad: ", $ps_face_midradius, " verts: ", [for (f = face_verts) verts[f]],
                     " lengths: ", [for (fi = [0:1:len(face_verts)-1]) norm(verts[face_verts[fi]]-verts[face_verts[(fi+1)%len(face_verts)]]) ]),
-                n = ps_face_normal(verts, face_verts),
-                v0 = verts[face_verts[0]],
-                plane_errs = [for (f = face_verts) abs(v_dot(n, (verts[f] - v0)))],
-                max_plane_err = (len(plane_errs) == 0) ? 0 : max(plane_errs),
+                max_plane_err = _ps_face_planarity_err(verts, face_verts),
                 more3 = str(" max_plane_err: ", max_plane_err)
             )
             echo (str("  ", basic1, detail > 1 ? more2 : "", detail > 2 ? more3 : ""));
@@ -63,4 +60,3 @@ module poly_describe(poly, name = undef, detail = 1) {
     }
     echo ("======================");
 }
-

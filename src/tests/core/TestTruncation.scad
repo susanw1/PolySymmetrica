@@ -35,14 +35,6 @@ function _map_face_c(size, c_by_size, default=0) =
     let(idxs = [for (i = [0:1:len(c_by_size)-1]) if (c_by_size[i][0] == size) i])
     (len(idxs) == 0) ? default : c_by_size[idxs[0]][1];
 
-function _face_max_plane_err(verts, face) =
-    let(
-        n = v_norm(ps_face_normal(verts, face)),
-        d = v_dot(n, verts[face[0]]),
-        errs = [for (vi = face) abs(v_dot(n, verts[vi]) - d)]
-    )
-    (len(errs) == 0) ? 0 : max(errs);
-
 function _max_vertex_diff(p1, p2) =
     let(
         v1 = poly_verts(p1),
@@ -340,7 +332,7 @@ module test_poly_cantitruncate_dominant_edges__planarity() {
         );
         verts = poly_verts(p);
         faces = poly_faces(p);
-        errs = [for (f = faces) _face_max_plane_err(verts, f)];
+        errs = [for (f = faces) _ps_face_planarity_err(verts, f)];
         max_err = max(errs);
         assert(max_err <= 1e-3, str("cantitruncate dominant edges planarity max_err=", max_err));
     }

@@ -103,6 +103,29 @@ function _ps_index_of_undef(list) =
 function _ps_reverse(list) =
     [ for (i = [len(list)-1 : -1 : 0]) list[i] ];
 
+function _ps_identity_map(n) =
+    [for (i = [0:1:n-1]) i];
+
+function _ps_distinct_count(list) =
+    len([for (i = [0:1:len(list)-1]) if (_ps_index_of(list, list[i]) == i) 1]);
+
+function _ps_face_strip_adjacent_dups(f) =
+    let(n = len(f))
+    (n == 0) ? [] :
+    [for (i = [0:1:n-1]) if (f[i] != f[(i-1+n)%n]) f[i]];
+
+function _ps_face_trim_closing_dup(f) =
+    (len(f) >= 2 && f[0] == f[len(f)-1]) ? [for (i = [0:1:len(f)-2]) f[i]] : f;
+
+function _ps_face_clean_cycle(f) =
+    _ps_face_trim_closing_dup(_ps_face_strip_adjacent_dups(f));
+
+function _ps_faces_clean_cycles(faces) =
+    [for (f = faces) _ps_face_clean_cycle(f)];
+
+function _ps_faces_remap(faces, old_to_new) =
+    [for (f = faces) [for (vi = f) old_to_new[vi]]];
+
 function _ps_neighbor_face(neighbors, idx) =
     let(hit = [for (p = neighbors) if (p[0] == idx) p[1]])
     (len(hit) == 0) ? undef : hit[0];
@@ -293,6 +316,29 @@ function ps_face_normal(verts, f) =
         verts[f[2]] - verts[f[0]],
         verts[f[1]] - verts[f[0]]
     ));
+
+// Magnitude of polygon area via triangle fan (works for planar faces).
+function _ps_face_area_mag(verts, f) =
+    (len(f) < 3) ? 0 :
+    sum([
+        for (i = [1:1:len(f)-2])
+            norm(v_cross(verts[f[i]] - verts[f[0]], verts[f[i+1]] - verts[f[0]])) / 2
+    ]);
+
+// Max signed-distance deviation of face vertices from face plane.
+function _ps_face_planarity_err(verts, f, eps=1e-12) =
+    (len(f) < 3) ? 0 :
+    let(
+        n_raw = ps_face_normal(verts, f),
+        n_len = norm(n_raw),
+        n = (n_len <= eps) ? [0,0,1] : (n_raw / n_len),
+        d = v_dot(n, verts[f[0]]),
+        errs = [for (vi = f) abs(v_dot(n, verts[vi]) - d)]
+    )
+    (len(errs) == 0) ? 0 : max(errs);
+
+function _ps_faces_max_planarity_err(verts, faces, eps=1e-12) =
+    (len(faces) == 0) ? 0 : max([for (f = faces) _ps_face_planarity_err(verts, f, eps)]);
 
 
 // Return index of some neighbour vertex of vi (from the face list)
