@@ -27,28 +27,8 @@ function _ps_face_points_to_indices(uniq, face_pts, eps) =
     [ for (p = face_pts) _ps_find_point(uniq, p, eps) ];
 
 // Build a poly descriptor from face point lists (dedup + orient + unit-edge scale).
-function _ps_face_drop_adjacent_dups(f, i=0, acc=[]) =
-    (i >= len(f)) ? acc :
-    let(v = f[i])
-    ((len(acc) == 0 || acc[len(acc)-1] != v)
-        ? _ps_face_drop_adjacent_dups(f, i+1, concat(acc, [v]))
-        : _ps_face_drop_adjacent_dups(f, i+1, acc));
-
-function _ps_face_trim_cycle_repeat(f) =
-    (len(f) > 1 && f[0] == f[len(f)-1]) ? [for (i = [0:1:len(f)-2]) f[i]] : f;
-
-function _ps_face_simplify_indices(f) =
-    let(
-        a = _ps_face_drop_adjacent_dups(f),
-        b = _ps_face_trim_cycle_repeat(a)
-    )
-    b;
-
-function _ps_face_distinct_count(f) =
-    len([for (i = [0:1:len(f)-1]) if (_ps_index_of(f, f[i]) == i) 1]);
-
 function _ps_face_keep_after_simplify(f) =
-    (len(f) >= 3) && (_ps_face_distinct_count(f) >= 3);
+    (len(f) >= 3) && (_ps_distinct_count(f) >= 3);
 
 function _ps_poly_from_face_points(faces_pts_all, eps, len_eps=undef) =
     let(
@@ -71,7 +51,7 @@ function _ps_poly_from_face_points(faces_pts_all, eps, len_eps=undef) =
         all_pts = [ for (fp = faces_pts_all) for (p = fp) p ],
         uniq_verts = _ps_unique_points(all_pts, len_eps_eff),
         faces_idx = [ for (fp = faces_pts_all) _ps_face_points_to_indices(uniq_verts, fp, len_eps_eff) ],
-        faces_idx_simpl = [ for (f = faces_idx) _ps_face_simplify_indices(f) ],
+        faces_idx_simpl = [ for (f = faces_idx) _ps_face_clean_cycle(f) ],
         faces_idx_keep = [ for (f = faces_idx_simpl) if (_ps_face_keep_after_simplify(f)) f ],
         _simp_ok = assert(len(faces_idx_keep) > 0, "transform: no non-degenerate faces after simplification"),
         faces_out = ps_orient_all_faces_outward(uniq_verts, faces_idx_keep),

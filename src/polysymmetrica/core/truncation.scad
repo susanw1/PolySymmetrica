@@ -235,7 +235,15 @@ function _ps_truncate_norm_to_t(poly, c) =
 // - replaces each original vertex with a vertex-face
 // - replaces each original edge with two edge points
 // - `t` is the edge fraction from each endpoint; `c` maps to `t` via default normalization
-function poly_truncate(poly, t=undef, c=undef, eps = 1e-8, params_overrides=undef) =
+function poly_truncate(
+    poly,
+    t=undef,
+    c=undef,
+    eps = 1e-8,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(
         t_base = !is_undef(t)
             ? t
@@ -271,7 +279,8 @@ function poly_truncate(poly, t=undef, c=undef, eps = 1e-8, params_overrides=unde
             _t_ok = assert(min([for (tv = t_by_vert) (tv != 0.5) ? 1 : 0]) == 1, "poly_truncate: t=0.5 is not allowed"),
             all_zero = max([for (tv = t_by_vert) abs(tv)]) <= eps
         )
-        all_zero
+        let(
+            q = all_zero
             ? poly
             : let(
                 edge_pts = _ps_edge_points_by_vert_t(verts, edges, t_by_vert),
@@ -320,11 +329,18 @@ function poly_truncate(poly, t=undef, c=undef, eps = 1e-8, params_overrides=unde
                 ],
                 cycles_all = concat(face_cycles, vert_cycles)
             )
-            ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps);
+            ps_poly_transform_from_sites(verts, sites, site_points, cycles_all, eps, eps)
+        )
+        ps_finalize_poly(q, cleanup, cleanup_eps);
 
 // Rectification:
 // replaces each original vertex by the cycle of incident edge midpoints.
-function poly_rectify(poly, params_overrides=undef) =
+function poly_rectify(
+    poly,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(
         _p_ok = assert(ps_params_row_count(params_overrides) == 0, "poly_rectify: params_overrides not supported")
     )
@@ -385,14 +401,24 @@ function poly_rectify(poly, params_overrides=undef) =
                 [ for (ei = f) [1, ei] ]
         ]
     )
-    ps_poly_transform_from_sites(verts, [for (i = [0:1:len(edge_mid)-1]) [i]], edge_mid, cycles_all);
+    let(q = ps_poly_transform_from_sites(verts, [for (i = [0:1:len(edge_mid)-1]) [i]], edge_mid, cycles_all))
+    ps_finalize_poly(q, cleanup, cleanup_eps);
 
 // Chamfer:
 // - keeps original vertices in edge faces (hex-like around each old edge)
 // - omits vertex faces
 // - `t` is a signed face-plane offset as a fraction of each face's collapse distance
 //   (positive = inward chamfer, negative = anti-chamfer)
-function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
+function poly_chamfer(
+    poly,
+    t=undef,
+    c=undef,
+    eps = 1e-8,
+    len_eps = 1e-6,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(
         t_base = !is_undef(t)
             ? t
@@ -498,9 +524,10 @@ function poly_chamfer(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params
         ],
         cycles_all = concat(face_cycles, edge_cycles)
     )
-    all_zero
+    let(q = all_zero
         ? poly
-        : ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+        : ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps))
+    ps_finalize_poly(q, cleanup, cleanup_eps);
 
 // --- Cantellation helpers ---
 //
@@ -555,7 +582,19 @@ function _ps_cantellate_df_from_c(poly, c, df_max=undef, steps=16, family_edge_i
 // If `df` is omitted:
 // - use `c` if provided, else default `c=0.5`
 // - map `c` to `df` using the square-edge calibration map.
-function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family_edge_idx=0, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
+function poly_cantellate(
+    poly,
+    df=undef,
+    c=undef,
+    df_max=undef,
+    steps=16,
+    family_edge_idx=0,
+    eps = 1e-8,
+    len_eps = 1e-6,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(
         rows = is_undef(params_overrides) ? [] : params_overrides,
         _pwarn = _ps_override_warn_unsupported(rows, "poly_cantellate", [["face", ["df", "c"]]])
@@ -646,7 +685,8 @@ function poly_cantellate(poly, df=undef, c=undef, df_max=undef, steps=16, family
         ],
         cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
     )
-    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+    let(q = ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps))
+    ps_finalize_poly(q, cleanup, cleanup_eps);
 
 // Measure how square an edge face is (edge length spread).
 function _ps_face_edge_spread(verts, face) =
@@ -697,9 +737,23 @@ function cantellate_square_df(poly, df_min, df_max, steps=40, family_edge_idx=0,
 
 // Normalized cantellation: map c in [0,1] to df in [0, df_max],
 // with c=0.5 hitting the computed square-edge df.
-function poly_cantellate_norm(poly, c, df_max=undef, steps=16, family_edge_idx=0, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
+function poly_cantellate_norm(
+    poly,
+    c,
+    df_max=undef,
+    steps=16,
+    family_edge_idx=0,
+    eps=1e-8,
+    len_eps=1e-6,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(df = _ps_cantellate_df_from_c(poly, c, df_max, steps, family_edge_idx))
-    poly_cantellate(poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps, params_overrides);
+    poly_cantellate(
+        poly, df, undef, df_max, steps, family_edge_idx, eps, len_eps, params_overrides,
+        cleanup, cleanup_eps
+    );
 
 // --- Snub helpers ---
 function _ps_snub_face_cached_point(face_pts, faces0, fi, v) =
@@ -1153,14 +1207,6 @@ function ps_snub_default_params_overrides(poly, handedness=1, eps=1e-9) =
     )
     _ps_snub_params_rows(params[0], params[1], params[2], face_df_by_family);
 
-function _ps_face_max_plane_err(verts, f) =
-    let(
-        n = ps_face_normal(verts, f),
-        v0 = verts[f[0]],
-        errs = [for (vid = f) abs(v_dot(n, verts[vid] - v0))]
-    )
-    (len(errs) == 0) ? 0 : max(errs);
-
 // Snub operator with optional scalar controls and/or structured per-element overrides.
 //
 // Fallback strategy:
@@ -1169,7 +1215,19 @@ function _ps_face_max_plane_err(verts, f) =
 //   before explicit `params_overrides` rows so explicit rows win by precedence.
 // - Scalar args (`angle`, `c`, `df`, `de`) remain convenient globals; compiled
 //   overrides can replace them per face/vertex.
-function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1, eps=1e-8, len_eps=1e-6, params_overrides=undef) =
+function poly_snub(
+    poly,
+    angle=undef,
+    c=undef,
+    df=undef,
+    de=undef,
+    handedness=1,
+    eps=1e-8,
+    len_eps=1e-6,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(
         _ = assert(poly_valid(poly, "star_ok"), "snub: requires manifold poly (star_ok)"),
         auto_params = (is_undef(c) && is_undef(df) && is_undef(angle) && is_undef(de))
@@ -1342,20 +1400,32 @@ function poly_snub(poly, angle=undef, c=undef, df=undef, de=undef, handedness=1,
         edge_tris_flat = [for (t = edge_tris) each t],
         faces_new = concat(face_faces, edge_tris_flat, vert_faces),
         faces_oriented = ps_orient_all_faces_outward(verts, faces_new),
-        errs = [for (f = faces_oriented) _ps_face_max_plane_err(verts, f)],
+        errs = [for (f = faces_oriented) _ps_face_planarity_err(verts, f)],
         max_err = (len(errs) == 0) ? 0 : max(errs),
         bad = [for (e = errs) if (e > eps) e],
         _0 = (len(bad) > 0)
             ? echo("snub: non-planar faces", len(bad), "max_plane_err", max_err)
             : 0
     )
-    make_poly(verts, faces_oriented, poly_e_over_ir(q));
+    let(
+        p_snub = make_poly(verts, faces_oriented, poly_e_over_ir(q))
+    )
+    ps_finalize_poly(p_snub, cleanup, cleanup_eps);
 
 // --- Cantitruncation operators ---
 //
 // Cantitruncation: truncation + cantellation (two parameters).
 // t controls face-plane shift (like chamfer), c controls edge/vertex expansion (like cantellate).
-function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, params_overrides=undef) =
+function poly_cantitruncate(
+    poly,
+    t=undef,
+    c=undef,
+    eps = 1e-8,
+    len_eps = 1e-6,
+    params_overrides=undef,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
     let(
         rows = is_undef(params_overrides) ? [] : params_overrides,
         _pwarn = _ps_override_warn_unsupported(rows, "poly_cantitruncate", [["face", ["c"]], ["vert", ["t", "c"]], ["edge", ["c", "de"]]]),
@@ -1491,7 +1561,8 @@ function poly_cantitruncate(poly, t=undef, c=undef, eps = 1e-8, len_eps = 1e-6, 
         // Debug: echo one decagon face cycle points and their angles (first face with n>=5*2)
         cycles_all = concat(face_cycles, edge_cycles, vert_cycles)
     )
-    ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps);
+    let(q = ps_poly_transform_from_sites(verts0, sites, site_points, cycles_all, eps, len_eps))
+    ps_finalize_poly(q, cleanup, cleanup_eps);
 
 // Truncation default estimators are implemented in solvers.scad.
 // Keep private wrappers here for local call-site stability.

@@ -3,6 +3,32 @@
 // Shared helpers for transform-style operators.
 
 use <funcs.scad>
+use <cleanup.scad>
+
+// Shared transform finalizer.
+// Keeps fast path unchanged when cleanup=false.
+function ps_finalize_poly(
+    poly,
+    cleanup=false,
+    cleanup_eps=1e-8
+) =
+    cleanup
+        ? let(
+            cleaned = poly_cleanup(
+                poly,
+                eps=cleanup_eps,
+                // Keep operator-integrated cleanup narrowly focused on degeneracy.
+                fix_winding=false,
+                drop_degenerate=true,
+                triangulate_nonplanar=false,
+                merge_vertices=true,
+                remove_unreferenced=false
+            )
+        )
+        // Preserve the operator's e_over_ir descriptor to avoid
+        // re-scaling regressions when transformed meshes carry large coordinates.
+        make_poly(poly_verts(cleaned), poly_faces(cleaned), poly_e_over_ir(poly))
+        : poly;
 
 // Index k where edge f[k]->f[k+1] matches (v0->v1), or -1 if not found.
 function _ps_face_edge_index(f, v0, v1) =

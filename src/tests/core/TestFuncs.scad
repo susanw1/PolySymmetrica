@@ -1,6 +1,8 @@
 use <../../polysymmetrica/core/funcs.scad>
+use <../../polysymmetrica/core/cleanup.scad>
 use <../../polysymmetrica/core/params.scad>
 use <../../polysymmetrica/core/validate.scad>
+use <../../polysymmetrica/models/platonics_all.scad>
 use <../testing_util.scad>
 
 EPS = 1e-9;
@@ -17,6 +19,47 @@ module assert_vec3_near(v, w, eps=EPS, msg="") {
 module assert_int_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
 }
+
+function _count_faces_of_size(poly, k) =
+    sum([for (f = poly_faces(poly)) (len(f) == k) ? 1 : 0]);
+
+function _cube_with_cycle_noise() =
+    let(
+        p = hexahedron(),
+        v = poly_verts(p),
+        f = poly_faces(p),
+        f0 = f[0],
+        f0_noisy = [f0[0], f0[1], f0[1], f0[2], f0[3], f0[0]],
+        f_new = concat([f0_noisy], [for (i = [1:1:len(f)-1]) f[i]])
+    )
+    [v, f_new, poly_e_over_ir(p)];
+
+function _cube_with_degenerate_extra_face() =
+    let(
+        p = hexahedron(),
+        v = poly_verts(p),
+        f = poly_faces(p)
+    )
+    [v, concat(f, [[0,1,0]]), poly_e_over_ir(p)];
+
+function _pyramid_with_nonplanar_base() =
+    let(
+        v = [[1,1,0],[-1,1,0],[-1,-1,0.2],[1,-1,0],[0,0,1]],
+        f = [[0,1,2,3],[0,4,1],[1,4,2],[2,4,3],[3,4,0]]
+    )
+    [v, f, 1];
+
+function _tetra_with_duplicate_vertex() =
+    let(
+        p = _tetra_poly(),
+        v0 = poly_verts(p),
+        v = concat(v0, [v0[0]]),
+        f = [[4,1,2],[4,3,1],[4,2,3],[1,3,2]]
+    )
+    [v, f, poly_e_over_ir(p)];
+
+function _poly_scaled(poly, s) =
+    [for (v = poly_verts(poly)) v * s];
 
 
 // --- poly accessors ---
@@ -107,6 +150,29 @@ module test_ps_reverse__edge_cases() {
     assert(_ps_reverse([]) == [], "reverse empty");
     assert(_ps_reverse([1]) == [1], "reverse singleton");
     assert(_ps_reverse([1,2,3]) == [3,2,1], "reverse list");
+}
+
+module test_ps_identity_map__basic() {
+    assert(_ps_identity_map(0) == [], "identity map empty");
+    assert(_ps_identity_map(4) == [0,1,2,3], "identity map 4");
+}
+
+module test_ps_distinct_count__basic() {
+    assert_int_eq(_ps_distinct_count([]), 0, "distinct empty");
+    assert_int_eq(_ps_distinct_count([1,1,1]), 1, "distinct all same");
+    assert_int_eq(_ps_distinct_count([1,2,1,3,2]), 3, "distinct mixed");
+}
+
+module test_ps_face_clean_cycle__basic() {
+    assert(_ps_face_clean_cycle([]) == [], "clean cycle empty");
+    assert(_ps_face_clean_cycle([0,1,1,2,0]) == [1,2,0], "clean cycle drops cyclic dup + closure");
+    assert(_ps_face_clean_cycle([0,0,0]) == [], "clean cycle all same collapses");
+}
+
+module test_ps_faces_remap__basic() {
+    faces = [[0,1,2],[2,3,0]];
+    map = [0,2,1,3];
+    assert(_ps_faces_remap(faces, map) == [[0,2,1],[1,3,0]], "faces remap");
 }
 
 // --- _ps_list_contains / _ps_index_of ---
@@ -210,6 +276,21 @@ module test_face_normal__orientation() {
     n2 = ps_face_normal(verts, [0,2,1]);
     assert_vec3_near(n1, [0,0,-1], 1e-12, "normal ccw");
     assert_vec3_near(n2, [0,0,1], 1e-12, "normal cw");
+}
+
+module test_ps_face_area_mag__triangle_unit_half() {
+    verts = [[0,0,0],[1,0,0],[0,1,0]];
+    a = _ps_face_area_mag(verts, [0,1,2]);
+    assert_near(a, 0.5, 1e-12, "face area triangle");
+}
+
+module test_ps_face_planarity_err__planar_and_nonplanar() {
+    planar = [[0,0,0],[1,0,0],[1,1,0],[0,1,0]];
+    nonplanar = [[0,0,0],[1,0,0],[1,1,0.2],[0,1,0]];
+    e0 = _ps_face_planarity_err(planar, [0,1,2,3], 1e-12);
+    e1 = _ps_face_planarity_err(nonplanar, [0,1,2,3], 1e-12);
+    assert_near(e0, 0, 1e-12, "planarity err planar");
+    assert(e1 > 0, "planarity err nonplanar > 0");
 }
 
 
@@ -453,6 +534,47 @@ module test_params__selector_precedence_and_compile() {
     assert_near(arr[4], 0.4, EPS, "compile key elem4 id override");
 }
 
+// --- cleanup ---
+module test_poly_cleanup__normalizes_face_cycles() {
+    p = _cube_with_cycle_noise();
+    q = poly_cleanup(p, eps=1e-8, fix_winding=true, drop_degenerate=true);
+    f0 = poly_faces(q)[0];
+    assert_int_eq(len(f0), 4, "cleanup normalized noisy face to quad");
+    assert(poly_valid(q, "closed"), "cleanup cycle normalization should produce closed-valid poly");
+}
+
+module test_poly_cleanup__drops_degenerate_faces() {
+    p = _cube_with_degenerate_extra_face();
+    q = poly_cleanup(p, eps=1e-8, fix_winding=true, drop_degenerate=true);
+    assert_int_eq(len(poly_faces(q)), 6, "cleanup dropped degenerate extra face");
+    assert(poly_valid(q, "closed"), "cleanup dropped degenerate face should remain closed-valid");
+}
+
+module test_poly_cleanup__triangulates_nonplanar_faces() {
+    p = _pyramid_with_nonplanar_base();
+    q = poly_cleanup(p, eps=1e-8, triangulate_nonplanar=true, fix_winding=true);
+    assert_int_eq(len(poly_faces(q)), 6, "cleanup triangulates nonplanar quad base into two triangles");
+    assert_int_eq(_count_faces_of_size(q, 4), 0, "cleanup triangulated nonplanar quads");
+    assert(poly_valid(q, "struct"), "cleanup triangulated output should be structurally valid");
+}
+
+module test_poly_cleanup__merges_and_compacts_vertices() {
+    p = _tetra_with_duplicate_vertex();
+    q = poly_cleanup(p, eps=1e-8, merge_vertices=true, remove_unreferenced=true, fix_winding=true);
+    assert_int_eq(len(poly_verts(q)), 4, "cleanup merged duplicate vertex and compacted unreferenced");
+    assert(poly_valid(q, "closed"), "cleanup merge/compact should yield closed-valid tetra");
+}
+
+module test_poly_cleanup__tiny_uniform_scale_not_dropped_by_area_tol() {
+    p = hexahedron();
+    s = 1e-4;
+    v = _poly_scaled(p, s);
+    tiny = [v, poly_faces(p), poly_e_over_ir(p)];
+    q = poly_cleanup(tiny, eps=1e-8, fix_winding=true, drop_degenerate=true);
+    assert_int_eq(len(poly_faces(q)), len(poly_faces(p)), "cleanup should not drop valid tiny faces");
+    assert(poly_valid(q, "closed"), "cleanup tiny scale should remain closed-valid");
+}
+
 
 // ---- suite ----
 module run_TestFuncs() {
@@ -470,6 +592,10 @@ module run_TestFuncs() {
     test_v_sum__vec3_list();
     test_ps_ordered_pair__basic();
     test_ps_reverse__edge_cases();
+    test_ps_identity_map__basic();
+    test_ps_distinct_count__basic();
+    test_ps_face_clean_cycle__basic();
+    test_ps_faces_remap__basic();
     test_ps_list_contains_index__basic();
     test_ps_point_eq__eps();
     test_find_edge_index__finds();
@@ -479,6 +605,8 @@ module run_TestFuncs() {
 
     test_face_centroid__triangle();
     test_face_normal__orientation();
+    test_ps_face_area_mag__triangle_unit_half();
+    test_ps_face_planarity_err__planar_and_nonplanar();
 
     test_poly_vertex_neighbor__returns_incident_vertex();
 
@@ -501,6 +629,11 @@ module run_TestFuncs() {
     test_params_overrides__compile_dense_arrays();
     test_params_overrides__compile_single_key();
     test_params__selector_precedence_and_compile();
+    test_poly_cleanup__normalizes_face_cycles();
+    test_poly_cleanup__drops_degenerate_faces();
+    test_poly_cleanup__triangulates_nonplanar_faces();
+    test_poly_cleanup__merges_and_compacts_vertices();
+    test_poly_cleanup__tiny_uniform_scale_not_dropped_by_area_tol();
 }
 
 run_TestFuncs();

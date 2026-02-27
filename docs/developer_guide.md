@@ -60,6 +60,7 @@ PolySymmetrica/
 │   │   │   ├─ transform.scad       # site-based mesh assembly
 │   │   │   ├─ transform_util.scad  # shared transform helpers
 │   │   │   ├─ validate.scad        # poly validity checks
+│   │   │   ├─ cleanup.scad         # structural cleanup/normalization
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
 │   │   │

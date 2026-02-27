@@ -54,6 +54,8 @@ module show_param_ops(poly, poly_name) {
     top_f = _top_face_idx(poly);
     top_vs = _top_face_verts(poly);
     some_vs = _some_top_verts(poly, (len(top_vs) >= 4) ? 4 : 2);
+    use_cleanup = true;
+    cleanup_eps = 1e-8;
 
     // 1) Truncate some corners only.
     p0 = poly_truncate(
@@ -61,7 +63,9 @@ module show_param_ops(poly, poly_name) {
         t=0.001,
         params_overrides=[
             ["vert", "id", some_vs, ["t", 0.25]]
-        ]
+        ],
+        cleanup=use_cleanup,
+        cleanup_eps=cleanup_eps
     );
 
     // 2) Cantellate just the top face.
@@ -70,7 +74,9 @@ module show_param_ops(poly, poly_name) {
         df=0,
         params_overrides=[
             ["face", "id", [top_f], ["df", 0.14]]
-        ]
+        ],
+        cleanup=use_cleanup,
+        cleanup_eps=cleanup_eps
     );
 
     // 3) Chamfer just the top face.
@@ -79,7 +85,9 @@ module show_param_ops(poly, poly_name) {
         t=0,
         params_overrides=[
             ["face", "id", [top_f], ["t", 0.30]]
-        ]
+        ],
+        cleanup=use_cleanup,
+        cleanup_eps=cleanup_eps
     );
 
     // 4) Cantitruncate top face only.
@@ -90,9 +98,11 @@ module show_param_ops(poly, poly_name) {
         t=0,
         c=0,
         params_overrides=[
-            ["face", "all", ["c", 0.15]],
+            ["face", "all", ["c", 0.0]],
             ["face", "id", [top_f], ["c", 0.40]]
-        ]
+        ],
+        cleanup=use_cleanup,
+        cleanup_eps=cleanup_eps
     );
 
     // 5) Snub via structured overrides
@@ -102,10 +112,12 @@ module show_param_ops(poly, poly_name) {
         c=0,
         df=0,
         params_overrides=[
-            ["face", "all", ["df", 0.18], ["angle", 10]],
+            ["face", "all", ["df", 0.2], ["angle", 0]],
             ["face", "id", [top_f], ["df", 0.02], ["angle", 25]],
-            ["vert", "all", ["c", 0.06]]
-        ]
+            ["vert", "all", ["c", 0.01]]
+        ],
+        cleanup=use_cleanup,
+        cleanup_eps=cleanup_eps
     );
 
     rows = [p0, p1, p2, p3, p4];
