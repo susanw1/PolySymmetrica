@@ -81,9 +81,24 @@ module test_poly_prism__height_controls() {
     assert_near(zspan, 1.0, 1e-9, "prism height*height_scale");
 }
 
+module test_poly_prism__height_scale_keeps_nominal_edge_normalization() {
+    p1 = poly_prism(6, edge=1, height_scale=1);
+    p2 = poly_prism(6, edge=1, height_scale=2);
+    assert_near(poly_e_over_ir(p1), 1, 1e-10, "prism n=6 baseline e_over_ir");
+    assert_near(poly_e_over_ir(p2), 1, 1e-10, "prism n=6 tall e_over_ir");
+}
+
+module test_poly_antiprism__height_scale_keeps_nominal_edge_normalization() {
+    p1 = poly_antiprism(6, edge=1, angle=0, height_scale=1);
+    p2 = poly_antiprism(6, edge=1, angle=0, height_scale=2);
+    assert_near(poly_e_over_ir(p1), poly_e_over_ir(p2), 1e-10, "antiprism n=6 e_over_ir invariant vs height_scale");
+}
+
 module run_TestPrisms() {
     test_poly_prism__counts_and_validity();
     test_poly_antiprism__counts_and_validity();
     test_poly_antiprism__angle_and_height_controls();
     test_poly_prism__height_controls();
+    test_poly_prism__height_scale_keeps_nominal_edge_normalization();
+    test_poly_antiprism__height_scale_keeps_nominal_edge_normalization();
 }

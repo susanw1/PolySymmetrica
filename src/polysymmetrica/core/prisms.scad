@@ -13,6 +13,14 @@ function _ps_ngon_radius(n, edge) =
 function _ps_ngon_ring(n, radius, z, phase=0) =
     [ for (k = [0:1:n-1]) [radius * cos(360*k/n + phase), radius * sin(360*k/n + phase), z] ];
 
+function _ps_poly_ir(verts, faces) =
+    let(
+        edges = _ps_edges_from_faces(faces),
+        mids = [for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)],
+        ir = min(mids),
+        _ok = assert(ir > 0, "prism/antiprism: inter-radius must be > 0")
+    ) ir;
+
 function _ps_prism_height(edge, height, height_scale) =
     ((is_undef(height) ? edge : height) * height_scale);
 
@@ -50,9 +58,11 @@ function poly_prism(n=3, edge=1, height=undef, height_scale=1) =
             [[for (k = [0:1:n-1]) n + k]],                         // top
             [for (k = [0:1:n-1]) [k, (k+1)%n, n+((k+1)%n), n+k]] // sides
         ),
-        faces = ps_orient_all_faces_outward(verts, faces_raw)
+        faces = ps_orient_all_faces_outward(verts, faces_raw),
+        ir = _ps_poly_ir(verts, faces),
+        e_over_ir = edge / ir
     )
-    make_poly(verts, faces);
+    make_poly(verts, faces, e_over_ir);
 
 // Regular antiprism with n-gon caps and 2n side triangles.
 //
@@ -86,6 +96,8 @@ function poly_antiprism(n=3, edge=1, angle=0, height=undef, height_scale=1) =
                 [for (k = [0:1:n-1]) [(k+1)%n, n+((k+1)%n), n+k]]
             )
         ),
-        faces = ps_orient_all_faces_outward(verts, faces_raw)
+        faces = ps_orient_all_faces_outward(verts, faces_raw),
+        ir = _ps_poly_ir(verts, faces),
+        e_over_ir = edge / ir
     )
-    make_poly(verts, faces);
+    make_poly(verts, faces, e_over_ir);

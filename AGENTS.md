@@ -9,6 +9,7 @@
 
 ## Build, Test, and Development Commands
 This repo is OpenSCAD-first; there is no separate build system.
+- Prefer `openscad-nightly` for command-line renders/tests when available (significantly faster F6/CGAL path on this machine).
 - Render an example locally:
   `openscad -o /tmp/ps-preview.stl src/polysymmetrica/examples/basics/main-basics.scad`
 - Run the full test suite (check console for PASS):
@@ -17,6 +18,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-neg.stl src/tests/run_negative.scad`
 - Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
 - Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
+- Process safety: never kill `openscad-nightly` broadly (`pkill openscad*` etc.). The user keeps an interactive `openscad-nightly` session running.
+  Only target exact non-interactive command lines started for this task.
 
 ## Coding Style & Naming Conventions
 - Indentation: 4 spaces; keep blank lines between logical blocks.

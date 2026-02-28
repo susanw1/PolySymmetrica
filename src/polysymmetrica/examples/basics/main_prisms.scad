@@ -31,3 +31,26 @@ for (n_pair = with_index(ns)) {
             linear_extrude(height=label_h)
                 text(str("antiprism n=", n), size=label_size, halign="right", valign="center");
 }
+
+// Parameter playground (explicit height/angle variants).
+play_y = 300;
+
+prism_cases = [
+    ["prism n=6 (tall)", function() poly_prism(6, height_scale=1.5)],
+    ["prism n=8 (flat)", function() poly_prism(8, height_scale=0.7)],
+    ["prism n=7 (explicit h)", function() poly_prism(7, height=0.8, height_scale=1.25)]
+];
+
+antiprism_cases = [
+    ["antiprism n=6 (+10deg)", function() poly_antiprism(6, angle=10)],
+    ["antiprism n=6 (-10deg)", function() poly_antiprism(6, angle=-10)],
+    ["antiprism n=7 (explicit h)", function() poly_antiprism(7, height=0.9, height_scale=1.3)]
+];
+
+for (item = with_index(prism_cases)) {
+    translate([item[0] * spacing_x, play_y, 0]) demo(item[1][1](), name=item[1][0]);
+}
+
+for (item = with_index(antiprism_cases)) {
+    translate([item[0] * spacing_x, play_y + spacing_y, 0]) demo(item[1][1](), name=item[1][0]);
+}
