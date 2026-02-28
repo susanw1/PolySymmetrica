@@ -8,9 +8,8 @@ T = 0.01;
 
 COLORS = [ "", "", "", "yellow", "red", "green", "blue", "gray", "red", "white", "red" ];
 
-// Robust face cap:
-// - planar faces: single polygon extrusion
-// - non-planar faces: triangle-fan fallback to avoid full-loop polygon dropouts
+// Robust face cap: triangle-fan extrusion for all faces.
+// This avoids full-loop polygon failures on partial/near-degenerate transforms.
 module _face_fill_plate(thk = T) {
     n = len($ps_face_pts2d);
     if (n >= 3) {
@@ -18,24 +17,20 @@ module _face_fill_plate(thk = T) {
             ? [for (p = $ps_face_pts2d) [p[0], p[1], 0]]
             : $ps_face_pts3d_local;
         pts2d = [for (p = pts3d) [p[0], p[1]]];
-        is_planar = is_undef($ps_face_is_planar) ? true : $ps_face_is_planar;
-        if (is_planar) {
-            linear_extrude(height = thk) polygon(points = pts2d);
-        } else {
-            cx = sum([for (p = pts3d) p[0]]) / n;
-            cy = sum([for (p = pts3d) p[1]]) / n;
-            c = [cx, cy];
-            union() {
-                for (i = [0:1:n-1]) {
-                    linear_extrude(height = thk)
-                        polygon(points = [c, pts2d[i], pts2d[(i+1)%n]]);
-                }
+        cx = sum([for (p = pts3d) p[0]]) / n;
+        cy = sum([for (p = pts3d) p[1]]) / n;
+        c = [cx, cy];
+        union() {
+            for (i = [0:1:n-1]) {
+                linear_extrude(height = thk)
+                    polygon(points = [c, pts2d[i], pts2d[(i+1)%n]]);
             }
         }
     }
 }
 
 module demo(p, ir = IR, detail = 0, name = undef) {
+    assert(p, "Polyhedron p must be supplied");
     poly_describe(p, detail = detail, name = name);
     place_on_faces(p, ir) {
         let (col = COLORS[$ps_vertex_count]) {
