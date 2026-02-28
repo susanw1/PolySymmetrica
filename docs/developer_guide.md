@@ -61,6 +61,7 @@ PolySymmetrica/
 │   │   │   ├─ transform_util.scad  # shared transform helpers
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
+│   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
 │   │   │
@@ -96,6 +97,7 @@ Related deep-dive notes:
 - [Cantellation notes](cantellation.md)
 - [Cantitruncation notes](cantitruncation.md)
 - [Snub notes](snubs.md)
+- [Prisms and antiprisms](prisms.md)
 - [Params overrides](params_overrides.md)
 
 ---
