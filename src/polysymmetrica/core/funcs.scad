@@ -317,6 +317,46 @@ function ps_face_normal(verts, f) =
         verts[f[1]] - verts[f[0]]
     ));
 
+// Frame normal for face-local placement.
+// For non-planar faces this uses a Newell-style best-fit normal and then
+// aligns it with the topological face orientation from ps_face_normal(...).
+function ps_face_frame_normal(verts, f, eps=1e-12) =
+    let(
+        n = len(f),
+        nx = (n < 3) ? 0 : sum([
+            for (i = [0:1:n-1])
+                let(
+                    j = (i + 1) % n,
+                    pi = verts[f[i]],
+                    pj = verts[f[j]]
+                )
+                (pi[1] - pj[1]) * (pi[2] + pj[2])
+        ]),
+        ny = (n < 3) ? 0 : sum([
+            for (i = [0:1:n-1])
+                let(
+                    j = (i + 1) % n,
+                    pi = verts[f[i]],
+                    pj = verts[f[j]]
+                )
+                (pi[2] - pj[2]) * (pi[0] + pj[0])
+        ]),
+        nz = (n < 3) ? 0 : sum([
+            for (i = [0:1:n-1])
+                let(
+                    j = (i + 1) % n,
+                    pi = verts[f[i]],
+                    pj = verts[f[j]]
+                )
+                (pi[0] - pj[0]) * (pi[1] + pj[1])
+        ]),
+        n_newell = [nx, ny, nz],
+        n_topo = ps_face_normal(verts, f),
+        n_raw = (norm(n_newell) > eps) ? n_newell : n_topo,
+        n_aligned = (v_dot(n_raw, n_topo) < 0) ? [-n_raw[0], -n_raw[1], -n_raw[2]] : n_raw
+    )
+    v_norm(n_aligned);
+
 // Magnitude of polygon area via triangle fan (works for planar faces).
 function _ps_face_area_mag(verts, f) =
     (len(f) < 3) ? 0 :
@@ -473,8 +513,17 @@ function poly_face_ex(poly, fi, scale) =
     let(f      = poly_faces(poly)[fi],
         vs     = poly_verts(poly),
         center = poly_face_center(poly, fi, scale),
-        v0     = vs[f[0]] * scale)
-    v_norm(v0 - center);   // local +X points to vertex 0
+        v0     = vs[f[0]] * scale,
+        ez     = poly_face_ez(poly, fi, scale),
+        ex_raw = v0 - center,
+        // Keep face frame orthonormal even for non-planar faces:
+        // project candidate x-axis into the local face plane.
+        ex_proj = ex_raw - ez * v_dot(ex_raw, ez),
+        ex_fallback_raw = (vs[f[1]] * scale) - (vs[f[0]] * scale),
+        ex_fallback = ex_fallback_raw - ez * v_dot(ex_fallback_raw, ez))
+    (norm(ex_proj) > 1e-12)
+        ? v_norm(ex_proj)
+        : v_norm(ex_fallback);   // local +X points towards face vertex order
 
 
 function poly_face_ey(poly, fi, scale) =
@@ -487,11 +536,9 @@ function poly_face_ey(poly, fi, scale) =
 function poly_face_ez(poly, fi, scale) =
     let(f  = poly_faces(poly)[fi],
         vs = poly_verts(poly),
-        v0 = vs[f[0]] * scale,
-        v1 = vs[f[1]] * scale,
-        v2 = vs[f[2]] * scale)
-    // LHR outward normal (clockwise from outside).
-    v_norm(v_cross(v2 - v0, v1 - v0));
+        vs_scaled = [for (v = vs) v * scale])
+    // Frame +Z for placement; best-fit for non-planar faces, aligned to LHR.
+    ps_face_frame_normal(vs_scaled, f);
 
 
 function ps_frame_matrix(center, ex, ey, ez) = [

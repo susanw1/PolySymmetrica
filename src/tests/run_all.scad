@@ -6,6 +6,7 @@ use <core/TestCleanup.scad>
 use <core/TestValidity.scad>
 use <core/TestClassify.scad>
 use <core/TestPlacement.scad>
+use <core/TestPrisms.scad>
 
 echo("=== PolySymmetrica tests: START ===");
 
@@ -17,6 +18,7 @@ run_TestCleanup();
 run_TestValidity();
 run_TestClassify();
 run_TestPlacement();
+run_TestPrisms();
 
 echo("=== PolySymmetrica tests: PASS ===");
 
