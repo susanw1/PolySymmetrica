@@ -293,6 +293,26 @@ module test_ps_face_planarity_err__planar_and_nonplanar() {
     assert(e1 > 0, "planarity err nonplanar > 0");
 }
 
+module test_face_frame_normal__planar_matches_face_normal() {
+    verts = [[0,0,0],[1,0,0],[1,1,0],[0,1,0]];
+    f = [0,1,2,3];
+    n_topo = ps_face_normal(verts, f);
+    n_frame = ps_face_frame_normal(verts, f);
+    assert_vec3_near(n_frame, n_topo, 1e-12, "frame normal equals topo normal for planar face");
+}
+
+module test_face_frame_normal__nonplanar_is_unit_and_oriented() {
+    verts = [[0,0,0],[1,0,0],[1,1,0.2],[0,1,0]];
+    f = [0,1,2,3];
+    n_frame = ps_face_frame_normal(verts, f);
+    n_topo = ps_face_normal(verts, f);
+    n_rev = ps_face_frame_normal(verts, _ps_reverse(f));
+
+    assert_near(v_len(n_frame), 1, 1e-9, "frame normal unit");
+    assert(v_dot(n_frame, n_topo) > 0, "frame normal aligned with topo orientation");
+    assert_near(v_dot(n_frame, n_rev), -1, 1e-9, "frame normal flips with reversed winding");
+}
+
 
 // --- poly_vertex_neighbor ---
 module test_poly_vertex_neighbor__returns_incident_vertex() {
@@ -355,6 +375,15 @@ module test_poly_face_axes__orthonormalish() {
     assert_near(v_dot(ex, ez), 0, 1e-8, "ex ⟂ ez");
     // ey depends on cross(ez,ex) so should be orthogonal
     assert_near(v_dot(ey, ez), 0, 1e-8, "ey ⟂ ez");
+}
+
+module test_poly_face_ez__uses_frame_normal_for_nonplanar_face() {
+    p = _pyramid_with_nonplanar_base();
+    verts = poly_verts(p);
+    f = poly_faces(p)[0];
+    ez = poly_face_ez(p, 0, 1);
+    n_frame = ps_face_frame_normal(verts, f);
+    assert_vec3_near(ez, n_frame, 1e-9, "poly_face_ez should use frame normal");
 }
 
 
@@ -607,6 +636,8 @@ module run_TestFuncs() {
     test_face_normal__orientation();
     test_ps_face_area_mag__triangle_unit_half();
     test_ps_face_planarity_err__planar_and_nonplanar();
+    test_face_frame_normal__planar_matches_face_normal();
+    test_face_frame_normal__nonplanar_is_unit_and_oriented();
 
     test_poly_vertex_neighbor__returns_incident_vertex();
 
@@ -617,6 +648,7 @@ module run_TestFuncs() {
 
     test_poly_face_center__matches_centroid_for_triangle();
     test_poly_face_axes__orthonormalish();
+    test_poly_face_ez__uses_frame_normal_for_nonplanar_face();
 
     test_orient_face_outward__makes_centroid_dot_normal_nonnegative();
     test_orient_all_faces_outward__length_preserved();

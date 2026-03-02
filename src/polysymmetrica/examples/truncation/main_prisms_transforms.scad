@@ -34,17 +34,17 @@ transform_ops = [
 // Calibrated externally via main_prism_param_calc.scad.
 AP6_CANT_ROWS = [
     ["face", "family", 0, ["df", 0.32]],
-    ["face", "family", 1, ["df", 0.16]]
+    ["face", "family", 1, ["c", 0.2]]
 ];
 AP7_CANT_ROWS = [
     ["face", "family", 0, ["df", 0.30]],
-    ["face", "family", 1, ["df", 0.10]]
+    ["face", "family", 1, ["df", 0.30]]
 ];
 
-PR6_CT_T = 0.06;
-PR6_CT_C = 0.03;
-AP6_CT_T = 0.06;
-AP6_CT_C = 0.03;
+PR6_CT_T = 0.2;
+PR6_CT_C = 0.2;
+AP6_CT_T = 0.2;
+AP6_CT_C = 0.3;
 
 for (op = with_index(transform_ops)) {
     for (shape = with_index(base_shapes)) {
