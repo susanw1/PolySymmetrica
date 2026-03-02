@@ -79,7 +79,7 @@ function poly_antiprism(n=3, edge=1, angle=0, height=undef, height_scale=1) =
         _hs_ok = assert(height_scale > 0, "poly_antiprism: height_scale must be > 0"),
         h_base = is_undef(height) ? _ps_antiprism_height(n, edge, angle) : height,
         h = h_base * height_scale,
-        _h_ok = assert(h >= 0, "poly_antiprism: height must be >= 0"),
+        _h_ok = assert(h > 0, "poly_antiprism: height must be > 0"),
         r = _ps_ngon_radius(n, edge),
         z0 = -h / 2,
         z1 = h / 2,
