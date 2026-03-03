@@ -7,6 +7,7 @@ use <core/TestValidity.scad>
 use <core/TestClassify.scad>
 use <core/TestPlacement.scad>
 use <core/TestPrisms.scad>
+use <core/TestAttach.scad>
 
 echo("=== PolySymmetrica tests: START ===");
 
@@ -19,6 +20,7 @@ run_TestValidity();
 run_TestClassify();
 run_TestPlacement();
 run_TestPrisms();
+run_TestAttach();
 
 echo("=== PolySymmetrica tests: PASS ===");
 

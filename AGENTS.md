@@ -73,6 +73,11 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - `classify.scad` now uses `_ps_*_keys_from(...)` forms directly; legacy wrapper variants were removed as dead code.
 - Keep debug/probe and generated artifacts in `/tmp`; do not leave temporary `.scad` probes in repo root.
+- `poly_attach(...)` lives in `core/attach.scad` and requires `poly_valid(..., "closed")` for both inputs.
+  It aligns two selected planar faces (same arity), drops seam faces, then always seam-merges via `poly_cleanup(...)`.
+  Use `rotate_step` for cyclic vertex correspondence and `scale_mode="fit_edge"` when input face sizes differ.
+  `f1` now accepts either a scalar face index or a list (`f1=[...]`) to attach one copy of `p2` per listed face in a single pass.
+  Attach mapping now defaults to chirality-preserving orientation (`mirror=false`); legacy reflected behavior is opt-in via `mirror=true`.
 
 ## Pre-PR Inert Cleanup Checklist
 - Confirm the work is functionally inert (no geometry/output-intent changes).
