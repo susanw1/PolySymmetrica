@@ -61,6 +61,7 @@ PolySymmetrica/
 │   │   │   ├─ transform_util.scad  # shared transform helpers
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
+│   │   │   ├─ attach.scad          # face-to-face poly attachment
 │   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
@@ -87,6 +88,7 @@ PolySymmetrica/
     ├─ cantitruncation.md
     ├─ cantellation.md
     ├─ snubs.md
+    ├─ attach.md
     └─ images/
 ```
 
@@ -99,6 +101,7 @@ Related deep-dive notes:
 - [Snub notes](snubs.md)
 - [Prisms and antiprisms](prisms.md)
 - [Params overrides](params_overrides.md)
+- [Face attachment](attach.md)
 
 ---
 
@@ -271,7 +274,35 @@ For schema details, compile-spec format, and examples, see:
 
 When using family-targeted overrides (`"family"` rows), keep classification context consistent (`detail`, `radius`, `include_geom`) across all stages; best practice is to classify once and reuse that object.
 
-### **3.8 Validation Modes**
+### **3.8 Face Attachment**
+
+`poly_attach(...)` composes two closed polys by welding selected faces:
+
+- selected seam faces are aligned and opposed in normal direction,
+- seam faces are removed from each input,
+- seam vertices are merged using cleanup tolerance,
+- output is asserted closed-valid.
+
+API:
+
+```scad
+poly_attach(
+    p1, p2,
+    f1=0, f2=0,
+    rotate_step=0,
+    scale_mode="fit_edge",
+    eps=1e-8,
+    cleanup=true,
+    cleanup_eps=1e-8
+)
+```
+
+See:
+
+- [attach.md](attach.md)
+- [`src/polysymmetrica/examples/basics/main_attach.scad`](../src/polysymmetrica/examples/basics/main_attach.scad)
+
+### **3.9 Validation Modes**
 
 `poly_valid(poly, mode, eps)` supports progressively stricter checks:
 
