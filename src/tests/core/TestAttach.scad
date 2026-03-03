@@ -52,10 +52,29 @@ module test_poly_attach__fit_edge_matches_unscaled_reference() {
     }
 }
 
+module test_poly_attach__f1_scalar_shorthand_equals_singleton_list() {
+    p_scalar = poly_attach(hexahedron(), hexahedron(), f1=0, f2=0);
+    p_list = poly_attach(hexahedron(), hexahedron(), f1=[0], f2=0);
+    assert_int_eq(len(poly_verts(p_scalar)), len(poly_verts(p_list)), "attach f1 scalar/list verts len");
+    assert_int_eq(len(poly_faces(p_scalar)), len(poly_faces(p_list)), "attach f1 scalar/list faces len");
+    for (i = [0:1:len(poly_verts(p_scalar))-1]) {
+        assert_near(norm(poly_verts(p_scalar)[i] - poly_verts(p_list)[i]), 0, 1e-10, str("attach f1 scalar/list vert#", i));
+    }
+}
+
+module test_poly_attach__multi_face_list() {
+    p = poly_attach(hexahedron(), hexahedron(), f1=[0,1], f2=0);
+    assert(poly_valid(p, "closed"), "attach cube+cube two-face list should be closed valid");
+    assert_int_eq(len(poly_verts(p)), 16, "attach cube+cube two-face verts");
+    assert_int_eq(len(poly_faces(p)), 14, "attach cube+cube two-face faces");
+    assert_int_eq(len(poly_edges(p)), 28, "attach cube+cube two-face edges");
+}
+
 module run_TestAttach() {
     test_poly_attach__tetra_to_tetra_counts();
     test_poly_attach__cube_to_cube_counts();
     test_poly_attach__rotate_step_modulo();
     test_poly_attach__fit_edge_matches_unscaled_reference();
+    test_poly_attach__f1_scalar_shorthand_equals_singleton_list();
+    test_poly_attach__multi_face_list();
 }
-

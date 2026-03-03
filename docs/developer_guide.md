@@ -288,7 +288,7 @@ API:
 ```scad
 poly_attach(
     p1, p2,
-    f1=0, f2=0,
+    f1=0, f2=0,        // f1 accepts index or [idx...]
     rotate_step=0,
     scale_mode="fit_edge",
     eps=1e-8,

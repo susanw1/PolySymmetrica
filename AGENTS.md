@@ -76,6 +76,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `poly_attach(...)` lives in `core/attach.scad` and requires `poly_valid(..., "closed")` for both inputs.
   It aligns two selected planar faces (same arity), drops seam faces, then always seam-merges via `poly_cleanup(...)`.
   Use `rotate_step` for cyclic vertex correspondence and `scale_mode="fit_edge"` when input face sizes differ.
+  `f1` now accepts either a scalar face index or a list (`f1=[...]`) to attach one copy of `p2` per listed face in a single pass.
 
 ## Pre-PR Inert Cleanup Checklist
 - Confirm the work is functionally inert (no geometry/output-intent changes).

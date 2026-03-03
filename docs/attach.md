@@ -9,7 +9,7 @@ Implemented in: `src/polysymmetrica/core/attach.scad`
 ```scad
 poly_attach(
     p1, p2,
-    f1=0, f2=0,
+    f1=0, f2=0,        // f1 accepts index or [idx...]
     rotate_step=0,
     scale_mode="fit_edge",   // "fit_edge" | "none"
     eps=1e-8,
@@ -26,7 +26,10 @@ poly_attach(
 
 ## Parameter Meaning
 
-- `f1`, `f2`: seam face indices in `p1` and `p2`.
+- `f1`: seam face index (or list of indices) in `p1`.
+  - scalar `f1=x` is shorthand for `f1=[x]`.
+  - list mode attaches one transformed copy of `p2` per listed face.
+- `f2`: seam face index in `p2` (same seam face used for each `f1` entry in list mode).
 - `rotate_step`: cyclic correspondence shift for `p2` seam face vertices before alignment.
   - useful when same-arity faces have multiple valid edge matchings.
 - `scale_mode`:
@@ -40,7 +43,7 @@ poly_attach(
 1. Outward-orients both input face sets.
 2. Builds local frames for seam faces.
 3. Maps all points of `p2` into `p1` seam frame, with opposite seam normal.
-4. Drops seam faces `f1` and `f2`.
+4. Drops all seam faces in `f1` from `p1` and seam face `f2` from each attached copy.
 5. Concatenates meshes and seam-merges with `poly_cleanup(...)`.
 6. Asserts final result is `poly_valid(..., "closed")`.
 
@@ -61,6 +64,12 @@ Edge correspondence shift:
 q = poly_attach(hexahedron(), hexahedron(), f1=0, f2=0, rotate_step=1);
 ```
 
+Attach one poly on multiple target faces:
+
+```scad
+q = poly_attach(hexahedron(), hexahedron(), f1=[0,1], f2=0);
+```
+
 Attach scaled poly with automatic seam scaling:
 
 ```scad
@@ -79,4 +88,4 @@ See runnable demo: `src/polysymmetrica/examples/basics/main_attach.scad`
 - This is currently face-to-face only (no edge/vertex attach mode).
 - It is strict by design: invalid seam topology fails early.
 - For reproducible orientation/correspondence control, prefer explicit `f1/f2` and `rotate_step`.
-
+- In list mode, `f1` entries must be unique and in-range.
