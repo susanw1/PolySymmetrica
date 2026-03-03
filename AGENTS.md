@@ -79,6 +79,17 @@ This repo is OpenSCAD-first; there is no separate build system.
   `f1` now accepts either a scalar face index or a list (`f1=[...]`) to attach one copy of `p2` per listed face in a single pass.
   Attach mapping now defaults to chirality-preserving orientation (`mirror=false`); legacy reflected behavior is opt-in via `mirror=true`.
 
+## Session Notes (Non-Planar Face Frames)
+- `place_on_faces(...)` now uses a frame normal intended for placement (`ps_face_frame_normal(...)`) rather than relying only on the first triangle normal.
+- `ps_face_frame_normal(...)` uses a Newell-style best-fit normal for non-planar faces, then aligns sign to `ps_face_normal(...)` so winding/orientation semantics remain consistent.
+- `ps_face_normal(...)` is still the topological/orientation normal and should remain unchanged for validation/duals logic.
+- For non-planar faces, `$ps_poly_center_local` may legitimately have significant local X/Y components; this is expected and indicates the face center is not radially aligned to poly center.
+- `poly_face_ex(...)` must be projected onto the local face plane (perpendicular to face EZ) before normalization; otherwise local-dot projections drift and `$ps_poly_center_local` placement can be wrong.
+- Coverage added in `src/tests/core/TestFuncs.scad`:
+  - `test_face_frame_normal__planar_matches_face_normal`
+  - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
+  - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
+
 ## Pre-PR Inert Cleanup Checklist
 - Confirm the work is functionally inert (no geometry/output-intent changes).
 - Remove clearly unused locals/helpers/wrappers only when references are zero.
