@@ -12,6 +12,7 @@ poly_attach(
     f1=0, f2=0,        // f1 accepts index or [idx...]
     rotate_step=0,
     scale_mode="fit_edge",   // "fit_edge" | "none"
+    mirror=false,            // false=preserve chirality, true=mirror across seam
     eps=1e-8,
     cleanup=true,
     cleanup_eps=1e-8
@@ -34,7 +35,10 @@ poly_attach(
   - useful when same-arity faces have multiple valid edge matchings.
 - `scale_mode`:
   - `"fit_edge"`: scales `p2` so mean edge length of face `f2` matches face `f1`.
-  - `"none"`: no scaling; use only if seam faces already match size.
+  - `"none"`: no scaling; use only if seam faces already match size (otherwise seam welding may fail closed-valid checks).
+- `mirror`:
+  - `false` (default): orientation-preserving seam mapping (keeps `p2` chirality).
+  - `true`: reflected seam mapping (legacy mirror behavior).
 - `cleanup`: enables degenerate-face dropping in seam cleanup.
 - `cleanup_eps`: tolerance for seam vertex merge and cleanup operations.
 

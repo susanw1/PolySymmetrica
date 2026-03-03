@@ -13,6 +13,7 @@
 //   f1=0, f2=0,           // f1 accepts index or list of indices
 //   rotate_step=0,
 //   scale_mode="fit_edge",   // "fit_edge" | "none"
+//   mirror=false,         // false=preserve chirality, true=mirror p2 across seam
 //   eps=1e-8,
 //   cleanup=true,
 //   cleanup_eps=1e-8
@@ -53,7 +54,7 @@ function _ps_face_avg_edge_len(verts, f) =
     )
     (n == 0) ? 0 : sum(lens) / n;
 
-function _ps_attach_map_point(p, frame1, frame2) =
+function _ps_attach_map_point(p, frame1, frame2, mirror=false) =
     let(
         c1 = frame1[0], ex1 = frame1[1], ey1 = frame1[2], ez1 = frame1[3],
         c2 = frame2[0], ex2 = frame2[1], ey2 = frame2[2], ez2 = frame2[3],
@@ -62,7 +63,10 @@ function _ps_attach_map_point(p, frame1, frame2) =
         y = v_dot(d, ey2),
         z = v_dot(d, ez2)
     )
-    c1 + x * ex1 + y * ey1 - z * ez1;
+    // mirror=false: orientation-preserving map (det +1), keeps p2 chirality.
+    // mirror=true: legacy reflected map (det -1), explicit opt-in.
+    mirror ? (c1 + x * ex1 + y * ey1 - z * ez1)
+           : (c1 + x * ex1 - y * ey1 - z * ez1);
 
 function _ps_drop_face_by_idx(faces, fi_drop) =
     [for (fi = [0:1:len(faces)-1]) if (fi != fi_drop) faces[fi]];
@@ -75,6 +79,7 @@ function poly_attach(
     f1=0, f2=0,
     rotate_step=0,
     scale_mode="fit_edge",
+    mirror=false,
     eps=1e-8,
     cleanup=true,
     cleanup_eps=1e-8
@@ -83,6 +88,7 @@ function poly_attach(
         _0 = assert(poly_valid(p1, "closed"), "attach: p1 must be closed-valid"),
         _1 = assert(poly_valid(p2, "closed"), "attach: p2 must be closed-valid"),
         _2 = assert(scale_mode == "fit_edge" || scale_mode == "none", "attach: scale_mode must be 'fit_edge' or 'none'"),
+        _2b = assert(is_bool(mirror), "attach: mirror must be boolean"),
 
         v1 = poly_verts(p1),
         f1_all = ps_orient_all_faces_outward(v1, poly_faces(p1)),
@@ -127,7 +133,7 @@ function poly_attach(
                     frame1 = _ps_face_frame_raw(v1, face1),
                     frame2 = _ps_face_frame_raw(v2, face2)
                 )
-                [for (p = v2) _ps_attach_map_point(p, frame1, frame2)]
+                [for (p = v2) _ps_attach_map_point(p, frame1, frame2, mirror)]
         ],
         verts_add = [
             for (ci = [0:1:len(copies_verts)-1])

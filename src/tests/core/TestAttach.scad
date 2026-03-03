@@ -16,6 +16,16 @@ module assert_near(a, b, eps=EPS, msg="") {
 function _poly_scaled(poly, s) =
     [[for (v = poly_verts(poly)) v * s], poly_faces(poly), poly_e_over_ir(poly)];
 
+function _tetra_skew_apex() =
+    let(
+        t = tetrahedron(),
+        v = poly_verts(t),
+        f = poly_faces(t),
+        apex = v[3] + [0.25, -0.1, 0.2],
+        v2 = [v[0], v[1], v[2], apex]
+    )
+    [v2, f, poly_e_over_ir(t)];
+
 module test_poly_attach__tetra_to_tetra_counts() {
     p = poly_attach(tetrahedron(), tetrahedron(), f1=0, f2=0);
     assert(poly_valid(p, "closed"), "attach tetra+t tetra should be closed valid");
@@ -70,6 +80,17 @@ module test_poly_attach__multi_face_list() {
     assert_int_eq(len(poly_edges(p)), 28, "attach cube+cube two-face edges");
 }
 
+module test_poly_attach__mirror_flag_changes_result() {
+    p2 = _tetra_skew_apex();
+    q0 = poly_attach(octahedron(), p2, f1=0, f2=0, mirror=false);
+    q1 = poly_attach(octahedron(), p2, f1=0, f2=0, mirror=true);
+    assert(poly_valid(q0, "closed"), "attach mirror=false closed");
+    assert(poly_valid(q1, "closed"), "attach mirror=true closed");
+    // A skew (non-symmetric) p2 should produce a different glued result when mirrored.
+    dmax = max([for (i = [0:1:len(poly_verts(q0))-1]) norm(poly_verts(q0)[i] - poly_verts(q1)[i])]);
+    assert(dmax > 1e-6, str("attach mirror flag should change geometry dmax=", dmax));
+}
+
 module run_TestAttach() {
     test_poly_attach__tetra_to_tetra_counts();
     test_poly_attach__cube_to_cube_counts();
@@ -77,4 +98,5 @@ module run_TestAttach() {
     test_poly_attach__fit_edge_matches_unscaled_reference();
     test_poly_attach__f1_scalar_shorthand_equals_singleton_list();
     test_poly_attach__multi_face_list();
+    test_poly_attach__mirror_flag_changes_result();
 }
