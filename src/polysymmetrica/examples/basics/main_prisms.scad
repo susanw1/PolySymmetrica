@@ -1,3 +1,5 @@
+use <../../core/duals.scad>
+use <../../core/truncation.scad>
 use <../../core/prisms.scad>
 use <../truncation/util_demo.scad>
 
@@ -38,13 +40,20 @@ play_y = 300;
 prism_cases = [
     ["prism n=6 (tall)", function() poly_prism(6, height_scale=1.5)],
     ["prism n=8 (flat)", function() poly_prism(8, height_scale=0.7)],
-    ["prism n=7 (explicit h)", function() poly_prism(7, height=0.8, height_scale=1.25)]
+    ["prism n=7 (explicit h)", function() poly_prism(7, height=0.8, height_scale=1.25)],
+    ["prism {5/2}", function() poly_prism(5, p=2)],
+    ["dual:prism {5/2}", function() poly_dual(poly_prism(5, p=2))],
+    ["rectify:prism {5/2}", function() poly_rectify(poly_prism(5, p=2))],
+
 ];
 
 antiprism_cases = [
     ["antiprism n=6 (+10deg)", function() poly_antiprism(6, angle=10)],
     ["antiprism n=6 (-10deg)", function() poly_antiprism(6, angle=-10)],
-    ["antiprism n=7 (explicit h)", function() poly_antiprism(7, height=0.9, height_scale=1.3)]
+    ["antiprism n=7 (explicit h)", function() poly_antiprism(7, height=0.9, height_scale=1.3)],
+    ["antiprism {5/2}", function() poly_antiprism(5, p=2)],
+    ["dual:antiprism {5/2}", function() poly_dual(poly_antiprism(5, p=2))],
+    ["rectify:antiprism {5/2}", function() poly_rectify(poly_antiprism(5, p=2))],
 ];
 
 for (item = with_index(prism_cases)) {

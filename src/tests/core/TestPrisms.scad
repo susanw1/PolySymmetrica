@@ -12,6 +12,10 @@ module assert_near(a, b, eps=EPS, msg="") {
     assert(abs(a-b) <= eps, str(msg, " expected=", b, " got=", a));
 }
 
+module assert_true(v, msg="") {
+    assert(v == true, msg);
+}
+
 function _count_faces_of_size(poly, k) =
     sum([for (f = poly_faces(poly)) (len(f) == k) ? 1 : 0]);
 
@@ -94,6 +98,28 @@ module test_poly_antiprism__height_scale_keeps_nominal_edge_normalization() {
     assert_near(poly_e_over_ir(p1), poly_e_over_ir(p2), 1e-10, "antiprism n=6 e_over_ir invariant vs height_scale");
 }
 
+module test_poly_star_prism__counts_and_validity() {
+    p = poly_prism(5, p=2);
+    assert_int_eq(len(poly_verts(p)), 10, "star prism {5,2} verts");
+    assert_int_eq(len(poly_faces(p)), 7, "star prism {5,2} faces");
+    assert_int_eq(len(poly_edges(p)), 15, "star prism {5,2} edges");
+    assert_int_eq(_count_faces_of_size(p, 5), 2, "star prism {5,2} two 5-gon caps");
+    assert_int_eq(_count_faces_of_size(p, 4), 5, "star prism {5,2} five side quads");
+    assert_true(poly_valid(p, "star_ok"), "star prism {5,2} star_ok valid");
+    assert(_edge_rel_spread(p) < 1e-10, "star prism {5,2} uniform edges");
+}
+
+module test_poly_star_antiprism__counts_and_validity() {
+    p = poly_antiprism(5, p=2);
+    assert_int_eq(len(poly_verts(p)), 10, "star antiprism {5,2} verts");
+    assert_int_eq(len(poly_faces(p)), 12, "star antiprism {5,2} faces");
+    assert_int_eq(len(poly_edges(p)), 20, "star antiprism {5,2} edges");
+    assert_int_eq(_count_faces_of_size(p, 5), 2, "star antiprism {5,2} two 5-gon caps");
+    assert_int_eq(_count_faces_of_size(p, 3), 10, "star antiprism {5,2} ten side triangles");
+    assert_true(poly_valid(p, "star_ok"), "star antiprism {5,2} star_ok valid");
+    assert(_edge_rel_spread(p) < 1e-10, "star antiprism {5,2} uniform edges");
+}
+
 module run_TestPrisms() {
     test_poly_prism__counts_and_validity();
     test_poly_antiprism__counts_and_validity();
@@ -101,4 +127,6 @@ module run_TestPrisms() {
     test_poly_prism__height_controls();
     test_poly_prism__height_scale_keeps_nominal_edge_normalization();
     test_poly_antiprism__height_scale_keeps_nominal_edge_normalization();
+    test_poly_star_prism__counts_and_validity();
+    test_poly_star_antiprism__counts_and_validity();
 }
