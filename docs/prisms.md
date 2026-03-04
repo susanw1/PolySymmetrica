@@ -2,8 +2,8 @@
 
 `core/prisms.scad` provides two generators:
 
-- `poly_prism(n=3, edge=1, height=undef, height_scale=1)`
-- `poly_antiprism(n=3, edge=1, angle=0, height=undef, height_scale=1)`
+- `poly_prism(n=3, p=1, edge=1, height=undef, height_scale=1)`
+- `poly_antiprism(n=3, p=1, edge=1, angle=0, height=undef, height_scale=1)`
 
 Both return a standard PolySymmetrica poly descriptor: `[verts, faces, e_over_ir]`.
 
@@ -12,6 +12,9 @@ Both return a standard PolySymmetrica poly descriptor: `[verts, faces, e_over_ir
 ### Shared
 
 - `n`: polygon side count (`n >= 3`)
+- `p`: polygon step (`1 <= p < n/2`, `gcd(n,p)=1`)
+  - `p=1` gives regular n-gon caps
+  - `p>1` gives star/compound-style cap ordering `{n,p}` (single-cycle only in v1)
 - `edge`: target edge length
 - `height`: explicit cap-to-cap separation (if `undef`, regular default is solved)
 - `height_scale`: multiplier applied to the chosen base height (`height` if supplied, else regular default)
@@ -19,8 +22,8 @@ Both return a standard PolySymmetrica poly descriptor: `[verts, faces, e_over_ir
 ### Antiprism only
 
 - `angle`: additive top-ring twist offset in degrees relative to the regular antiprism twist
-  - actual twist = `180/n + angle`
-  - `angle=0` gives the exact regular antiprism
+  - actual twist = `180*p/n + angle`
+  - `angle=0` gives the exact regular/star antiprism for `{n,p}`
 
 ## Regular defaults
 
@@ -33,7 +36,9 @@ When `height=undef`, default is `height=edge`, so base edges and vertical edges 
 When `height=undef`, height is solved from:
 
 - base ring radius: `R = edge / (2*sin(180/n))`
+- base ring radius (regular/star): `R = edge / (2*sin(180*p/n))`
 - twist: `theta = 180/n + angle`
+- twist (regular/star): `theta = 180*p/n + angle`
 - lateral edge condition: `edge^2 = 2*R^2*(1-cos(theta)) + h^2`
 
 So:
@@ -50,12 +55,20 @@ use <src/polysymmetrica/examples/truncation/util_demo.scad>
 
 demo(poly_prism(6));                         // regular hexagonal prism
 demo(poly_prism(5, height=0.8));             // explicit height
+demo(poly_prism(5, p=2));                    // pentagrammic prism {5/2}
 demo(poly_antiprism(5));                     // regular pentagonal antiprism
 demo(poly_antiprism(5, angle=8));            // extra twist
 demo(poly_antiprism(6, height=1.0));         // explicit antiprism height
+demo(poly_antiprism(5, p=2));                // pentagrammic antiprism {5/2}
 ```
 
 Example scene:
 
 - `src/polysymmetrica/examples/basics/main_prisms.scad`
 
+Negative-test runners (expected to fail with assertions):
+
+- `src/tests/negative/prism_bad_p0.scad`
+- `src/tests/negative/prism_bad_half.scad`
+- `src/tests/negative/prism_bad_coprime.scad`
+- or run all negatives: `src/tests/run_negative_all.sh`

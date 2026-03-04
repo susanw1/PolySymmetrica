@@ -1,5 +1,7 @@
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/prisms.scad>
+use <../../polysymmetrica/core/duals.scad>
+use <../../polysymmetrica/core/truncation.scad>
 use <../../polysymmetrica/core/validate.scad>
 
 EPS = 1e-8;
@@ -120,6 +122,16 @@ module test_poly_star_antiprism__counts_and_validity() {
     assert(_edge_rel_spread(p) < 1e-10, "star antiprism {5,2} uniform edges");
 }
 
+module test_poly_star_prism__dual_and_rectify_validity() {
+    p = poly_prism(5, p=2);
+    qd = poly_dual(p);
+    qr = poly_rectify(p);
+    assert_true(poly_valid(qd, "star_ok"), "dual(star prism {5,2}) star_ok valid");
+    assert_true(poly_valid(qr, "star_ok"), "rectify(star prism {5,2}) star_ok valid");
+    assert(len(poly_faces(qd)) > 0 && len(poly_verts(qd)) > 0, "dual(star prism {5,2}) non-empty");
+    assert(len(poly_faces(qr)) > 0 && len(poly_verts(qr)) > 0, "rectify(star prism {5,2}) non-empty");
+}
+
 module run_TestPrisms() {
     test_poly_prism__counts_and_validity();
     test_poly_antiprism__counts_and_validity();
@@ -129,4 +141,5 @@ module run_TestPrisms() {
     test_poly_antiprism__height_scale_keeps_nominal_edge_normalization();
     test_poly_star_prism__counts_and_validity();
     test_poly_star_antiprism__counts_and_validity();
+    test_poly_star_prism__dual_and_rectify_validity();
 }

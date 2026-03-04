@@ -4,7 +4,7 @@
 - `src/polysymmetrica/core/`: core math, placement, duals, truncation utilities.
 - `src/polysymmetrica/models/`: base polyhedra (tetrahedron, octahedron, icosahedron) and derived solids.
 - `src/polysymmetrica/examples/`: runnable OpenSCAD examples (basics, truncation, poly-frame).
-- `src/tests/` and `src/tests/core/`: OpenSCAD unit tests and test runner files.
+- `src/tests/`, `src/tests/core/`, and `src/tests/negative/`: OpenSCAD unit tests and runner files.
 - `docs/`: developer guide and images used in documentation.
 
 ## Build, Test, and Development Commands
@@ -16,6 +16,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - Negative test (expects a failure):
   `openscad -o /tmp/ps-neg.stl src/tests/run_negative.scad`
+- Run all negative tests (expects each file in `src/tests/negative/` to fail):
+  `src/tests/run_negative_all.sh`
 - Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
 - Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
 - Process safety: never kill `openscad-nightly` broadly (`pkill openscad*` etc.). The user keeps an interactive `openscad-nightly` session running.
