@@ -4,7 +4,7 @@
 - `src/polysymmetrica/core/`: core math, placement, duals, truncation utilities.
 - `src/polysymmetrica/models/`: base polyhedra (tetrahedron, octahedron, icosahedron) and derived solids.
 - `src/polysymmetrica/examples/`: runnable OpenSCAD examples (basics, truncation, poly-frame).
-- `src/tests/` and `src/tests/core/`: OpenSCAD unit tests and test runner files.
+- `src/tests/`, `src/tests/core/`, and `src/tests/negative/`: OpenSCAD unit tests and runner files.
 - `docs/`: developer guide and images used in documentation.
 
 ## Build, Test, and Development Commands
@@ -16,6 +16,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - Negative test (expects a failure):
   `openscad -o /tmp/ps-neg.stl src/tests/run_negative.scad`
+- Run all negative tests (expects each file in `src/tests/negative/` to fail):
+  `src/tests/run_negative_all.sh`
 - Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
 - Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
 - Process safety: never kill `openscad-nightly` broadly (`pkill openscad*` etc.). The user keeps an interactive `openscad-nightly` session running.
@@ -78,6 +80,17 @@ This repo is OpenSCAD-first; there is no separate build system.
   Use `rotate_step` for cyclic vertex correspondence and `scale_mode="fit_edge"` when input face sizes differ.
   `f1` now accepts either a scalar face index or a list (`f1=[...]`) to attach one copy of `p2` per listed face in a single pass.
   Attach mapping now defaults to chirality-preserving orientation (`mirror=false`); legacy reflected behavior is opt-in via `mirror=true`.
+
+## Session Notes (Non-Planar Face Frames)
+- `place_on_faces(...)` now uses a frame normal intended for placement (`ps_face_frame_normal(...)`) rather than relying only on the first triangle normal.
+- `ps_face_frame_normal(...)` uses a Newell-style best-fit normal for non-planar faces, then aligns sign to `ps_face_normal(...)` so winding/orientation semantics remain consistent.
+- `ps_face_normal(...)` is still the topological/orientation normal and should remain unchanged for validation/duals logic.
+- For non-planar faces, `$ps_poly_center_local` may legitimately have significant local X/Y components; this is expected and indicates the face center is not radially aligned to poly center.
+- `poly_face_ex(...)` must be projected onto the local face plane (perpendicular to face EZ) before normalization; otherwise local-dot projections drift and `$ps_poly_center_local` placement can be wrong.
+- Coverage added in `src/tests/core/TestFuncs.scad`:
+  - `test_face_frame_normal__planar_matches_face_normal`
+  - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
+  - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
 ## Pre-PR Inert Cleanup Checklist
 - Confirm the work is functionally inert (no geometry/output-intent changes).
