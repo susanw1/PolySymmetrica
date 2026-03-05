@@ -72,3 +72,16 @@ Negative-test runners (expected to fail with assertions):
 - `src/tests/negative/prism_bad_half.scad`
 - `src/tests/negative/prism_bad_coprime.scad`
 - or run all negatives: `src/tests/run_negative_all.sh`
+
+## Known rendering limitation (star faces)
+
+For star caps (`p > 1`), faces are self-intersecting loops in 3D.  
+`poly_render(...)` currently delegates to `polyhedron(points, faces)`, and OpenSCAD F6 backends may triangulate/fill those loops differently than 2D `polygon()` even-odd behavior. This can appear as unexpected filled regions on star faces.
+
+Current workaround for visual/debug output:
+
+- render face-local plates from placement (`$ps_face_pts2d`) via `polygon()`/`linear_extrude`, instead of a single `polyhedron(...)` cap for those faces.
+
+Repro/inspection scene:
+
+- `src/polysymmetrica/examples/basics/main_star_face_render.scad`
