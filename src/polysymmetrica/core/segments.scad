@@ -97,6 +97,18 @@ function _ps_seg_segments_from_ts(pts3d, edge_ts, nodes, eps=1e-9) =
                     [u, v, ei, t0, t1]
     ];
 
+function _ps_seg_min_pair_idx(pairs, idx=0, best=0) =
+    (idx >= len(pairs)) ? best :
+    _ps_seg_min_pair_idx(pairs, idx + 1, (pairs[idx][0] < pairs[best][0]) ? idx : best);
+
+function _ps_seg_remove_at(list, idx) =
+    [for (i = [0:1:len(list)-1]) if (i != idx) list[i]];
+
+function _ps_seg_sort_pairs(pairs, acc=[]) =
+    (len(pairs) == 0) ? acc :
+    let(mi = _ps_seg_min_pair_idx(pairs))
+    _ps_seg_sort_pairs(_ps_seg_remove_at(pairs, mi), concat(acc, [pairs[mi]]));
+
 function _ps_seg_next_hedge(nodes, hedges, cur_hi) =
     let(
         h = hedges[cur_hi],
@@ -111,12 +123,21 @@ function _ps_seg_next_hedge(nodes, hedges, cur_hi) =
                 )
                 [atan2(dy, dx), hi]
         ],
-        ord = [for (p = _ps_sort(pairs)) p[1]],
-        rev = (cur_hi % 2 == 0) ? cur_hi + 1 : cur_hi - 1,
+        ord = [for (p = _ps_seg_sort_pairs(pairs)) p[1]],
+        rev_hits = [
+            for (k = [0:1:len(hedges)-1])
+                if (
+                    k != cur_hi &&
+                    hedges[k][2] == h[2] &&
+                    hedges[k][0] == h[1] &&
+                    hedges[k][1] == h[0]
+                ) k
+        ],
+        rev = (len(rev_hits) == 0) ? undef : rev_hits[0],
         pos = search(rev, ord),
         m = len(ord)
     )
-    (m == 0 || len(pos) == 0) ? undef : ord[(pos[0] - 1 + m) % m];
+    (is_undef(rev) || m == 0 || len(pos) == 0) ? undef : ord[(pos[0] - 1 + m) % m];
 
 function _ps_seg_trace_cycle(nodes, hedges, start_hi, cur_hi, acc_h, acc_n, depth, max_depth) =
     (depth > max_depth) ? [[], []] :
@@ -154,14 +175,25 @@ function _ps_seg_extract_cycles(nodes, hedges, input_area_sign, hi=0, visited=un
         pts2d = [for (ni = ns) [nodes[ni][0], nodes[ni][1]]],
         pts3d = [for (ni = ns) nodes[ni]],
         area = _ps_seg_poly_area2(pts2d),
-        keep = (len(hs) >= 3) && (len(ns) >= 3) && ((area * input_area_sign) > eps),
+        keep = (len(hs) >= 3) && (len(ns) >= 3) && (abs(area) > eps),
         edge_ids = [for (hidx = hs) hedges[hidx][3]],
         kinds = [for (_k = edge_ids) "parent"],
-        cyc = [pts2d, pts3d, edge_ids, kinds],
+        cyc = [pts2d, pts3d, edge_ids, kinds, ns],
         vis2 = (len(hs) == 0) ? _ps_list_set(vis, hi, true) : _ps_seg_set_true_many(vis, hs),
         cycles2 = keep ? concat(cycles, [cyc]) : cycles
     )
     _ps_seg_extract_cycles(nodes, hedges, input_area_sign, hi + 1, vis2, cycles2, eps);
+
+function _ps_seg_dedupe_cycles(cycles, i=0, keys=[], acc=[]) =
+    (i >= len(cycles)) ? acc :
+    let(
+        c = cycles[i],
+        key = _ps_sort(c[4]),
+        seen = len([for (k = keys) if (k == key) 1]) > 0,
+        keys2 = seen ? keys : concat(keys, [key]),
+        acc2 = seen ? acc : concat(acc, [c])
+    )
+    _ps_seg_dedupe_cycles(cycles, i + 1, keys2, acc2);
 
 function _ps_seg_point_in_poly_evenodd(pt, poly, eps=1e-9) =
     let(
@@ -204,17 +236,25 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
         ],
         nodes = _ps_seg_unique_nodes(raw_nodes, eps),
         segs = _ps_seg_segments_from_ts(face_pts3d_local, ts, nodes, eps),
-        hedges = concat([
-            for (si = [0:1:len(segs)-1])
-                let(s = segs[si])
-                [[s[0], s[1], si, s[2], s[3], s[4]], [s[1], s[0], si, s[2], s[4], s[3]]]
-        ]),
+        hedges = concat(
+            [
+                for (si = [0:1:len(segs)-1])
+                    let(s = segs[si])
+                    [s[0], s[1], si, s[2], s[3], s[4]]
+            ],
+            [
+                for (si = [0:1:len(segs)-1])
+                    let(s = segs[si])
+                    [s[1], s[0], si, s[2], s[4], s[3]]
+            ]
+        ),
         outer2d = [for (p = face_pts3d_local) [p[0], p[1]]],
         input_area = _ps_seg_poly_area2(outer2d),
         input_sign = (input_area >= 0) ? 1 : -1,
         cycles = _ps_seg_extract_cycles(nodes, hedges, input_sign, 0, undef, [], eps),
+        cycles_u = _ps_seg_dedupe_cycles(cycles),
         filtered = [
-            for (c = cycles)
+            for (c = cycles_u)
                 let(
                     pts2d = c[0],
                     pts3d = c[1],

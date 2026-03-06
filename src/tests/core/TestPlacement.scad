@@ -106,7 +106,7 @@ module test_place_on_face_segments__star_face_split() {
             place_on_face_segments() {
                 assert(!is_undef($ps_seg_idx), "segment idx should be defined");
                 assert(!is_undef($ps_seg_count), "segment count should be defined");
-                assert($ps_seg_count >= 1, "segment count should be >= 1");
+                assert($ps_seg_count > 1, "star face should split into multiple segments");
                 assert($ps_seg_vertex_count >= 3, "segment should have at least 3 vertices");
                 assert(len($ps_seg_pts2d) == $ps_seg_vertex_count, "segment pts2d count");
                 assert(len($ps_seg_pts3d_local) == $ps_seg_vertex_count, "segment pts3d count");
