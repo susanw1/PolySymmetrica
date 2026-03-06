@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use <funcs.scad>
+include <segments.scad>
 use <classify.scad>
 
 function _ps_cls_opt(classify_opts, i, def) =
