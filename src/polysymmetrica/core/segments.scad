@@ -394,9 +394,83 @@ function _ps_seg_is_parent_edge(seg2d, face_pts2d, eps=1e-8) =
             (colinear && overlaps) ? 1 : 0
     ]) == 1;
 
-function _ps_seg_face_tris(face_idx_loop) =
-    (len(face_idx_loop) < 3) ? [] :
-    [ for (k = [1:1:len(face_idx_loop)-2]) [face_idx_loop[0], face_idx_loop[k], face_idx_loop[k+1]] ];
+function _ps_seg_orient2(a, b, c) =
+    _ps_seg_cross2([b[0] - a[0], b[1] - a[1]], [c[0] - a[0], c[1] - a[1]]);
+
+function _ps_seg_point_in_tri2(p, a, b, c, eps=1e-9) =
+    let(
+        o0 = _ps_seg_orient2(a, b, p),
+        o1 = _ps_seg_orient2(b, c, p),
+        o2 = _ps_seg_orient2(c, a, p),
+        has_neg = (o0 < -eps) || (o1 < -eps) || (o2 < -eps),
+        has_pos = (o0 > eps) || (o1 > eps) || (o2 > eps)
+    )
+    !(has_neg && has_pos);
+
+function _ps_seg_is_ear(idxs, i, pts2d, sign, eps=1e-9) =
+    let(
+        m = len(idxs),
+        ip = (i - 1 + m) % m,
+        in = (i + 1) % m,
+        a = pts2d[idxs[ip]],
+        b = pts2d[idxs[i]],
+        c = pts2d[idxs[in]],
+        convex = (sign * _ps_seg_orient2(a, b, c)) > eps,
+        inside = len([
+            for (j = [0:1:m-1])
+                if (j != ip && j != i && j != in)
+                    let(p = pts2d[idxs[j]])
+                    if (_ps_seg_point_in_tri2(p, a, b, c, eps)) 1
+        ]) > 0
+    )
+    convex && !inside;
+
+function _ps_seg_ear_tris(idxs, pts2d, sign, eps=1e-9, guard=0) =
+    let(m = len(idxs))
+    (m < 3) ? [] :
+    (m == 3) ? [[idxs[0], idxs[1], idxs[2]]] :
+    (guard > max(64, m * m))
+        ? [for (k = [1:1:m-2]) [idxs[0], idxs[k], idxs[k+1]]]
+        : let(
+            ear_pos = [for (i = [0:1:m-1]) if (_ps_seg_is_ear(idxs, i, pts2d, sign, eps)) i]
+        )
+        (len(ear_pos) == 0)
+            ? [for (k = [1:1:m-2]) [idxs[0], idxs[k], idxs[k+1]]]
+            : let(
+                i0 = ear_pos[0],
+                tri = [idxs[(i0 - 1 + m) % m], idxs[i0], idxs[(i0 + 1) % m]],
+                idxs2 = _ps_seg_remove_at(idxs, i0)
+            )
+            concat([tri], _ps_seg_ear_tris(idxs2, pts2d, sign, eps, guard + 1));
+
+function _ps_seg_triangulate_simple_poly_idx(pts2d, eps=1e-9) =
+    let(
+        n = len(pts2d),
+        idxs = [for (i = [0:1:n-1]) i],
+        area = _ps_seg_poly_area2(pts2d),
+        sign = (area >= 0) ? 1 : -1
+    )
+    (n < 3) ? [] : _ps_seg_ear_tris(idxs, pts2d, sign, eps, 0);
+
+// Triangulate a face in face-local coordinates.
+// Unlike a simple fan, this path handles concave/self-intersecting loops by:
+// 1) splitting into simple segments via ps_face_segments(..., "all"),
+// 2) ear-clipping each simple segment.
+function _ps_seg_face_tris3(face_idx_loop, poly_verts_local, eps=1e-8) =
+    let(
+        face_pts3d = [for (vi = face_idx_loop) poly_verts_local[vi]],
+        segs = ps_face_segments(face_pts3d, "all", eps)
+    )
+    [
+        for (s = segs)
+            let(
+                pts2d = s[0],
+                pts3d = s[1],
+                tris_idx = _ps_seg_triangulate_simple_poly_idx(pts2d, eps)
+            )
+            for (t = tris_idx)
+                [pts3d[t[0]], pts3d[t[1]], pts3d[t[2]]]
+    ];
 
 function _ps_seg_unique_pts3(raw_pts, eps=1e-8, i=0, acc=[]) =
     (i >= len(raw_pts)) ? acc :
@@ -469,13 +543,13 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
                 if (fj != face_idx)
                     let(
                         f = poly_faces_idx[fj],
-                        tris = _ps_seg_face_tris(f)
+                        tris3 = _ps_seg_face_tris3(f, poly_verts_local, eps)
                     )
-                    for (t = tris)
+                    for (tri = tris3)
                         let(
-                            a = poly_verts_local[t[0]],
-                            b = poly_verts_local[t[1]],
-                            c = poly_verts_local[t[2]],
+                            a = tri[0],
+                            b = tri[1],
+                            c = tri[2],
                             seg = _ps_seg_tri_plane_segment(a, b, c, eps)
                         )
                         if (!is_undef(seg) && norm([seg[1][0]-seg[0][0], seg[1][1]-seg[0][1]]) > eps)

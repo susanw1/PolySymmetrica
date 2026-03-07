@@ -156,6 +156,48 @@ module test_seg_cycle_probe_point__concave_inside() {
     assert(!_ps_seg_point_on_poly_boundary(probe, concave, 1e-8), str("probe should not lie on boundary, probe=", probe));
 }
 
+function _tri2_area(a, b, c) =
+    abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2;
+
+function _list_sum(xs, i=0, acc=0) =
+    (i >= len(xs)) ? acc : _list_sum(xs, i + 1, acc + xs[i]);
+
+module test_seg_face_tris3__concave_area_preserved() {
+    // Concave simple polygon: fan triangulation would over-cover; ear clipping should preserve area.
+    pts3 = [[0,0,0], [4,0,0], [4,1,0], [1,1,0], [1,4,0], [0,4,0]];
+    tris = _ps_seg_face_tris3([0,1,2,3,4,5], pts3, 1e-9);
+    area_poly = abs(_ps_seg_poly_area2([for (p = pts3) [p[0], p[1]]]));
+    area_tris = sum([
+        for (t = tris)
+            _tri2_area(
+                [t[0][0], t[0][1]],
+                [t[1][0], t[1][1]],
+                [t[2][0], t[2][1]]
+            )
+    ]);
+    assert_int_eq(len(tris), 4, "concave hex should triangulate to 4 triangles");
+    assert(abs(area_tris - area_poly) < 1e-6, str("concave triangulation area mismatch poly=", area_poly, " tris=", area_tris));
+}
+
+module test_seg_face_tris3__star_area_matches_segments() {
+    // Pentagram-style self-intersecting face loop.
+    pts3 = [[0,9,0], [-5,-5,0], [8,3,0], [-8,3,0], [5,-5,0]];
+    tris = _ps_seg_face_tris3([0,1,2,3,4], pts3, 1e-9);
+    segs = ps_face_segments(pts3, "all", 1e-9);
+    area_tris = _list_sum([
+        for (t = tris)
+            _tri2_area(
+                [t[0][0], t[0][1]],
+                [t[1][0], t[1][1]],
+                [t[2][0], t[2][1]]
+            )
+    ]);
+    area_segs = _list_sum([for (s = segs) abs(_ps_seg_poly_area2(s[0]))]);
+    assert(len(segs) > 1, "star face should segment into multiple simple loops");
+    assert(len(tris) > len(segs), "triangulation should produce multiple triangles over segments");
+    assert(abs(area_tris - area_segs) < 1e-6, str("star triangulation area mismatch tris=", area_tris, " segs=", area_segs));
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -166,4 +208,6 @@ module run_TestPlacement() {
     test_place_on_face_segments__star_face_split();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
     test_seg_cycle_probe_point__concave_inside();
+    test_seg_face_tris3__concave_area_preserved();
+    test_seg_face_tris3__star_area_matches_segments();
 }
