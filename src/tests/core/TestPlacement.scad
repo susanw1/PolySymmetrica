@@ -9,6 +9,10 @@ module assert_int_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
 }
 
+module assert_vec3_near(v, w, eps=1e-9, msg="") {
+    assert(norm(v - w) <= eps, str(msg, " expected=", w, " got=", v));
+}
+
 module test_place_on_faces__family_ids_and_counts_from_classify() {
     p = rhombicuboctahedron();
     faces = poly_faces(p);
@@ -117,6 +121,34 @@ module test_place_on_face_segments__star_face_split() {
     }
 }
 
+module test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts() {
+    // Build a slightly warped cube so at least some faces are non-planar.
+    base = hexahedron();
+    verts0 = poly_verts(base);
+    faces0 = poly_faces(base);
+    verts = [
+        for (i = [0:1:len(verts0)-1])
+            (i == 0) ? (verts0[i] + [0.35, -0.2, 0.45]) : verts0[i]
+    ];
+    p = make_poly(verts, faces0);
+
+    place_on_faces(p)
+        let(
+            face = faces0[$ps_face_idx],
+            zmean = sum([for (q = $ps_face_pts3d_local) q[2]]) / len($ps_face_pts3d_local)
+        ) {
+            assert(abs(zmean) < 1e-9, str("face local z should be mean-centered, fi=", $ps_face_idx, " zmean=", zmean));
+            for (k = [0:1:len(face)-1])
+                let(vi = face[k])
+                    assert_vec3_near(
+                        $ps_poly_verts_local[vi],
+                        $ps_face_pts3d_local[k],
+                        1e-8,
+                        str("poly/local vertex mismatch at face=", $ps_face_idx, " k=", k, " vi=", vi)
+                    );
+        }
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -125,4 +157,5 @@ module run_TestPlacement() {
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_face_segments__star_face_split();
+    test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
 }

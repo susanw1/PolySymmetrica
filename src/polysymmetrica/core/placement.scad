@@ -56,7 +56,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
 
         // Vector from face centre to polyhedral centre (which is at world [0,0,0]), expressed in LOCAL coords.
         // World-space vector is -center.
-        poly_center_local = [
+        poly_center_local_raw = [
             v_dot(-center, ex),
             v_dot(-center, ey),
             v_dot(-center, ez)
@@ -69,7 +69,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
                     [ v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) ]
         ];
         // Whole poly vertices in THIS face-local frame (for optional face-cut analysis).
-        poly_verts_local = [
+        poly_verts_local_raw = [
             for (vi = [0:1:len(verts)-1])
                 let(p = verts[vi] * scale - center)
                     [ v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) ]
@@ -78,6 +78,10 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
         zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals);
         face_planarity_err = (len(zvals) == 0) ? 0 : max([for (z = zvals) abs(z - zmean)]);
         face_pts3d_local = [for (p = face_verts_local) [p[0], p[1], p[2] - zmean]];
+        // Keep all exported face-local coordinates in the SAME z-origin:
+        // the face's mean z is shifted to z=0 (important for non-planar faces).
+        poly_center_local = [poly_center_local_raw[0], poly_center_local_raw[1], poly_center_local_raw[2] - zmean];
+        poly_verts_local = [for (p = poly_verts_local_raw) [p[0], p[1], p[2] - zmean]];
         // 2D projection for polygon(), in face plane coords
         face_pts2d = [
             for (p = face_pts3d_local)

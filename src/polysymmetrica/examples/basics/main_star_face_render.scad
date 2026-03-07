@@ -54,7 +54,7 @@ module _face_polygon_fill(poly, ir=IR, thk=0.02) {
 
 module _face_segment_fill(poly, ir=IR, thk=0.02) {
     place_on_faces(poly, ir) {
-        place_on_face_segments(mode="evenodd") { 
+        place_on_face_segments(mode="evenodd") {
             color(_seg_color($ps_seg_idx), 1)
                 linear_extrude(height=thk)
                     polygon(points = $ps_seg_pts2d);
@@ -79,7 +79,7 @@ module _face_geom_cut_stencil(poly, ir=IR, thk=0.4) {
     place_on_faces(poly, ir) {
         // Focus on side panels where penetrating geometry matters most.
         if ($ps_vertex_count == 3) { // && $ps_face_idx == 2) {
-            color("lightblue")
+            render() color("lightblue")
                 difference() {
                     linear_extrude(height=thk, center=true)
                         polygon(points = $ps_face_pts2d);
@@ -130,7 +130,7 @@ translate([300, 0, 0]) {
 
 // Optional tiny raw repro: same crossing loop in 2D polygon vs 3D polyhedron.
 // Some OpenSCAD backends fill these differently for self-intersecting loops.
-SHOW_MIN_REPRO = true;
+SHOW_MIN_REPRO = false;
 if (SHOW_MIN_REPRO) {
     pts2d = [[0,9],[-5,-5],[8,3],[-8,3],[5,-5]];
     pts3d_top = [for (q = pts2d) [q[0], q[1], 1]];
