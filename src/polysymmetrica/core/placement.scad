@@ -68,6 +68,12 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
                 let(p = verts[vid] * scale - center)
                     [ v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) ]
         ];
+        // Whole poly vertices in THIS face-local frame (for optional face-cut analysis).
+        poly_verts_local = [
+            for (vi = [0:1:len(verts)-1])
+                let(p = verts[vi] * scale - center)
+                    [ v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) ]
+        ];
         zvals = [for (p = face_verts_local) p[2]];
         zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals);
         face_planarity_err = (len(zvals) == 0) ? 0 : max([for (z = zvals) abs(z - zmean)]);
@@ -87,6 +93,8 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
         $ps_face_pts3d_local  = face_pts3d_local;   // [[x,y,z]...] in face-local coords, mean-centered in z
+        $ps_poly_verts_local  = poly_verts_local;   // whole-poly verts in this face-local frame
+        $ps_poly_faces_idx    = faces;              // whole-poly face index loops
         $ps_face_planarity_err = face_planarity_err; // max deviation from local best-fit z level
         $ps_face_is_planar    = face_planarity_err <= 1e-8;
         $ps_face_family_id    = is_undef(cls) ? undef : face_family_ids[fi];
