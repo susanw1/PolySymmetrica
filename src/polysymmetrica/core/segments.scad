@@ -215,6 +215,62 @@ function _ps_seg_point_in_poly_evenodd(pt, poly, eps=1e-9) =
     )
     (sum(hits) % 2) == 1;
 
+function _ps_seg_point_seg_dist(pt, a, b, eps=1e-12) =
+    let(
+        ab = [b[0] - a[0], b[1] - a[1]],
+        ap = [pt[0] - a[0], pt[1] - a[1]],
+        den = ab[0]*ab[0] + ab[1]*ab[1],
+        t = (den <= eps) ? 0 : max(0, min(1, (ap[0]*ab[0] + ap[1]*ab[1]) / den)),
+        q = [a[0] + t * ab[0], a[1] + t * ab[1]]
+    )
+    norm([pt[0] - q[0], pt[1] - q[1]]);
+
+function _ps_seg_point_on_poly_boundary(pt, poly, eps=1e-9) =
+    max([
+        for (i = [0:1:len(poly)-1])
+            let(a = poly[i], b = poly[(i+1)%len(poly)])
+            (_ps_seg_point_seg_dist(pt, a, b, eps) <= eps) ? 1 : 0
+    ]) == 1;
+
+// Pick a robust interior sample for a cycle (works for concave simple polygons):
+// try centroid first, then inward-offset probes from each edge midpoint.
+function _ps_seg_cycle_probe_point(poly, eps=1e-9) =
+    let(
+        n = len(poly),
+        cx = sum([for (p = poly) p[0]]) / n,
+        cy = sum([for (p = poly) p[1]]) / n,
+        centroid = [cx, cy],
+        area = _ps_seg_poly_area2(poly),
+        sgn = (area >= 0) ? 1 : -1,
+        xs = [for (p = poly) p[0]],
+        ys = [for (p = poly) p[1]],
+        diag = norm([max(xs) - min(xs), max(ys) - min(ys)]),
+        delta = max(10 * eps, 1e-4 * max(1, diag)),
+        edge_probes = [
+            for (i = [0:1:n-1])
+                let(
+                    a = poly[i],
+                    b = poly[(i+1)%n],
+                    dx = b[0] - a[0],
+                    dy = b[1] - a[1],
+                    L = norm([dx, dy]),
+                    mx = (a[0] + b[0]) / 2,
+                    my = (a[1] + b[1]) / 2,
+                    nx = (L <= eps) ? 0 : sgn * (-dy) / L,
+                    ny = (L <= eps) ? 0 : sgn * ( dx) / L
+                )
+                [mx + delta * nx, my + delta * ny]
+        ],
+        cands = concat([centroid], edge_probes),
+        idxs = [
+            for (i = [0:1:len(cands)-1])
+                if (_ps_seg_point_in_poly_evenodd(cands[i], poly, eps) &&
+                    !_ps_seg_point_on_poly_boundary(cands[i], poly, 10*eps))
+                    i
+        ]
+    )
+    (len(idxs) > 0) ? cands[idxs[0]] : centroid;
+
 // Segment a face loop in face-local coordinates.
 // Input:  face_pts3d_local = [[x,y,z], ...] in loop order.
 // Return: [[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]
@@ -260,8 +316,8 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
                     pts3d = c[1],
                     edge_ids = c[2],
                     kinds = c[3],
-                    centroid = [sum([for (p = pts2d) p[0]]) / len(pts2d), sum([for (p = pts2d) p[1]]) / len(pts2d)],
-                    in_evenodd = _ps_seg_point_in_poly_evenodd(centroid, outer2d, eps),
+                    probe = _ps_seg_cycle_probe_point(pts2d, eps),
+                    in_evenodd = _ps_seg_point_in_poly_evenodd(probe, outer2d, eps),
                     keep = (mode == "all") ? true : in_evenodd
                 )
                 if (keep) [pts2d, pts3d, edge_ids, kinds]

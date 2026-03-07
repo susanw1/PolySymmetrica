@@ -149,6 +149,13 @@ module test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts() 
         }
 }
 
+module test_seg_cycle_probe_point__concave_inside() {
+    concave = [[0,0], [4,0], [4,1], [1,1], [1,4], [0,4]];
+    probe = _ps_seg_cycle_probe_point(concave, 1e-9);
+    assert(_ps_seg_point_in_poly_evenodd(probe, concave, 1e-9), str("probe should be inside concave polygon, probe=", probe));
+    assert(!_ps_seg_point_on_poly_boundary(probe, concave, 1e-8), str("probe should not lie on boundary, probe=", probe));
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -158,4 +165,5 @@ module run_TestPlacement() {
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_face_segments__star_face_split();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
+    test_seg_cycle_probe_point__concave_inside();
 }
