@@ -1,5 +1,6 @@
 use <../../core/funcs.scad>
 use <../../core/render.scad>
+use <../../core/segments.scad>
 use <../../core/validate.scad>
 
 // Base in-plane inset applied to each face edge (mm).
@@ -264,7 +265,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
         polyhedron(points = points, faces = faces, convexity = 2);
 
         // flat roof part
-        translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk) polygon(points = pts_gap);
+        translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk) ps_polygon(points = pts_gap);
 
         // top pillow part
         if (rad > pillow_min_rad) {
@@ -273,18 +274,18 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
                 translate([0, 0, base_z_eff + face_thk])
                     linear_extrude(height = 0.01)
                         offset(delta = -pillow_inset)
-                            polygon(points = pts_gap);
+                            ps_polygon(points = pts_gap);
                 translate([0, 0, base_z_eff + face_thk + pillow_thk])
                     linear_extrude(height = 0.01)
                         offset(delta = -(pillow_inset + pillow_ramp))
-                            polygon(points = pts_gap);
+                            ps_polygon(points = pts_gap);
             }
         }
     }
 
     // Conditionally clears the airspace above the face, to remove material from the face-mount above the face
     if (clear_space) {
-        color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height) polygon(points = pts_gap);
+        color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height) ps_polygon(points = pts_gap);
     }
 }
 

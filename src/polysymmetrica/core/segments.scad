@@ -385,6 +385,29 @@ module place_on_face_segments(mode="evenodd", eps=1e-8) {
     }
 }
 
+// Safe 2D polygon fill for possibly concave/self-intersecting loops.
+// Intended as a drop-in substitute for polygon(points=...) in cases where
+// OpenSCAD's native handling can be backend-dependent for crossing loops.
+//
+// Example:
+//   ps_polygon($ps_face_pts2d, mode="nonzero");
+//
+// mode:
+// - "evenodd": parity fill (can leave star centers hollow)
+// - "nonzero": winding fill (fills star centers)
+// - "all": render all extracted cycles (debug)
+module ps_polygon(points, mode="nonzero", eps=1e-8) {
+    assert(!is_undef(points), "ps_polygon: points must be defined");
+    assert(len(points) >= 3, "ps_polygon: need at least 3 points");
+    pts3d = [for (p = points) [p[0], p[1], 0]];
+    segs = ps_face_segments(pts3d, mode, eps);
+    union() {
+        for (s = segs)
+            polygon(points = s[0]);
+    }
+}
+
+
 function _ps_seg_close2(a, b, eps=1e-8) =
     norm([a[0] - b[0], a[1] - b[1]]) <= eps;
 
