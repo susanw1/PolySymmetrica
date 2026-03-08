@@ -2,28 +2,27 @@ use <../../core/funcs.scad>
 use <../../core/placement.scad>
 use <../../core/duals.scad>
 use <../../core/render.scad>
+use <../../core/segments.scad>
 
 IR = 30;
 T = 0.01;
 
 COLORS = [ "", "", "", "yellow", "red", "green", "blue", "gray", "red", "white", "red" ];
 
-// Robust face cap: triangle-fan extrusion for all faces.
-// This avoids full-loop polygon failures on partial/near-degenerate transforms.
+// Robust face cap:
+// - simple/concave faces: segment triangulation via ps_face_segments
+// - self-intersecting star faces: nonzero winding keeps the intended center fill
 module _face_fill_plate(thk = T) {
     n = len($ps_face_pts2d);
     if (n >= 3) {
         pts3d = is_undef($ps_face_pts3d_local)
             ? [for (p = $ps_face_pts2d) [p[0], p[1], 0]]
             : $ps_face_pts3d_local;
-        pts2d = [for (p = pts3d) [p[0], p[1]]];
-        cx = sum([for (p = pts3d) p[0]]) / n;
-        cy = sum([for (p = pts3d) p[1]]) / n;
-        c = [cx, cy];
+        segs = ps_face_segments(pts3d, "nonzero");
         union() {
-            for (i = [0:1:n-1]) {
+            for (s = segs) {
                 linear_extrude(height = thk)
-                    polygon(points = [c, pts2d[i], pts2d[(i+1)%n]]);
+                    polygon(points = s[0]);
             }
         }
     }

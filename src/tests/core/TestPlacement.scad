@@ -183,7 +183,7 @@ module test_seg_face_tris3__star_area_matches_segments() {
     // Pentagram-style self-intersecting face loop.
     pts3 = [[0,9,0], [-5,-5,0], [8,3,0], [-8,3,0], [5,-5,0]];
     tris = _ps_seg_face_tris3([0,1,2,3,4], pts3, 1e-9);
-    segs = ps_face_segments(pts3, "all", 1e-9);
+    segs = ps_face_segments(pts3, "evenodd", 1e-9);
     area_tris = _list_sum([
         for (t = tris)
             _tri2_area(
@@ -193,8 +193,8 @@ module test_seg_face_tris3__star_area_matches_segments() {
             )
     ]);
     area_segs = _list_sum([for (s = segs) abs(_ps_seg_poly_area2(s[0]))]);
-    assert(len(segs) > 1, "star face should segment into multiple simple loops");
-    assert(len(tris) > len(segs), "triangulation should produce multiple triangles over segments");
+    assert(len(segs) > 1, "star face should split into multiple even-odd regions");
+    assert(len(tris) >= 3, "triangulation should produce at least a few triangles");
     assert(abs(area_tris - area_segs) < 1e-6, str("star triangulation area mismatch tris=", area_tris, " segs=", area_segs));
 }
 

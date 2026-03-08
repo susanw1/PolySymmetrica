@@ -42,9 +42,11 @@ function _seg_mid2d(seg) =
 
 module _face_polygon_fill(poly, ir=IR, thk=0.02) {
     place_on_faces(poly, ir) {
-        color("lightblue")
-            linear_extrude(height=thk)
-                polygon(points = $ps_face_pts2d);
+        place_on_face_segments(mode="nonzero") {
+            color("lightblue")
+                linear_extrude(height=thk)
+                    polygon(points = $ps_seg_pts2d);
+        }
     }
     color("silver")
     place_on_edges(poly, ir) cube([$ps_edge_len, 0.8, 0.8], center=true);
@@ -92,9 +94,11 @@ module _face_geom_cut_stencil(poly, ir=IR, thk=0.4) {
                             text(str($ps_face_cut_idx), size=1.4, halign="center", valign="center");
             }
         } else {
-            color("gainsboro")
-                linear_extrude(height=thk, center=true)
-                    polygon(points = $ps_face_pts2d);
+            place_on_face_segments(mode="nonzero") {
+                color("gainsboro")
+                    linear_extrude(height=thk, center=true)
+                        polygon(points = $ps_seg_pts2d);
+            }
         }
     }
     color("silver")
