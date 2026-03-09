@@ -222,6 +222,59 @@ function _pts_radius2d(pts, centroid) =
     let(n = len(pts))
     sum([for (p = pts) norm([p[0] - centroid[0], p[1] - centroid[1]])]) / n;
 
+function _safe_at(v, i, dflt) =
+    (is_undef(i) || i < 0 || i >= len(v)) ? dflt : v[i];
+
+function _segmented_inset_loops2d(pts, insets, eps=1e-8) =
+    let(
+        segs = ps_face_segments([for (p = pts) [p[0], p[1], 0]], "nonzero", eps)
+    )
+    [
+        for (s = segs)
+            let(
+                s_pts = s[0],
+                s_edge_ids = s[2],
+                m = len(s_pts),
+                s_insets = [
+                    for (k = [0:1:m-1])
+                        let(seg = [s_pts[k], s_pts[(k+1)%m]])
+                        _ps_seg_is_parent_edge(seg, pts, eps)
+                            ? _safe_at(insets, _safe_at(s_edge_ids, k, 0), 0)
+                            : 0
+                ]
+            )
+            _offset_pts2d_inset_edges(s_pts, s_insets)
+    ];
+
+function _segmented_body_loops(pts, diheds, insets, eps=1e-8) =
+    let(
+        segs = ps_face_segments([for (p = pts) [p[0], p[1], 0]], "nonzero", eps)
+    )
+    [
+        for (s = segs)
+            let(
+                s_pts = s[0],
+                s_edge_ids = s[2],
+                m = len(s_pts),
+                s_insets = [
+                    for (k = [0:1:m-1])
+                        let(seg = [s_pts[k], s_pts[(k+1)%m]])
+                        _ps_seg_is_parent_edge(seg, pts, eps)
+                            ? _safe_at(insets, _safe_at(s_edge_ids, k, 0), 0)
+                            : 0
+                ],
+                s_diheds = [
+                    for (k = [0:1:m-1])
+                        let(seg = [s_pts[k], s_pts[(k+1)%m]])
+                        _ps_seg_is_parent_edge(seg, pts, eps)
+                            ? _safe_at(diheds, _safe_at(s_edge_ids, k, 0), 180)
+                            : 180
+                ],
+                s_top2d = _offset_pts2d_inset_edges(s_pts, s_insets)
+            )
+            [s_top2d, s_diheds]
+    ];
+
 
 // Bevel by constructing an inset bottom polygon and lofting.
 // Expects LHR/CW polygon order for pts and aligned dihedrals.
@@ -240,58 +293,80 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     insets = (is_undef(insets_override) || len(insets_override) != n)
         ? [for (k = [0:1:len(pts)-1]) _gap_inset(diheds[k], edge_inset)]
         : insets_override;
-    pts_gap = (edge_inset > 0) ? _offset_pts2d_inset_edges(pts, insets) : pts;
+    body_loops = (edge_inset > 0)
+        ? _segmented_body_loops(pts, diheds, insets, eps)
+        : [[pts, diheds]];
+    roof_loops = [for (bd = body_loops) bd[0]];
+    pts_gap = roof_loops[0];
     centroid = _pts_centroid2d(pts_gap);
     rad = _pts_radius2d(pts_gap, centroid);
 
     base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z; // base Z coord
     ramped_thk = face_thk - top_thk; // actual thickness of ramped part
-    top = [for (p = pts_gap) [p[0], p[1], base_z_eff + ramped_thk]];
-    bottom2d = _bottom_pts2d_from_bevel(pts_gap, diheds, ramped_thk);
-    bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
-    points = concat(top, bottom);
-    faces = concat(
-        // top face: already LHR (clockwise from outside, +Z)
-        [ [for (i = [0:1:n-1]) i] ],
-        // bottom face: reverse to keep LHR (clockwise from outside, -Z)
-        [ [for (i = [0:1:n-1]) (2*n-1-i)] ],
-        // side faces: use opposite edge direction to the top/bottom faces
-        [for (i = [0:1:n-1]) [ (i+1)%n, i, n + i ]],
-        [for (i = [0:1:n-1]) [ (i+1)%n, n + i, n + (i+1)%n ]]
-    );
-//    echo("points", points, "faces", faces);
     color(len(pts) == 3 ? "white" : "red") {
         // ramped part
-        polyhedron(points = points, faces = faces, convexity = 2);
+        for (bd = body_loops) {
+            loop2d = bd[0];
+            loop_diheds = bd[1];
+            m = len(loop2d);
+            top = [for (p = loop2d) [p[0], p[1], base_z_eff + ramped_thk]];
+            bottom2d = _bottom_pts2d_from_bevel(loop2d, loop_diheds, ramped_thk);
+            bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
+            points = concat(top, bottom);
+            faces = concat(
+                [[for (i = [0:1:m-1]) i]],
+                [[for (i = [0:1:m-1]) (2*m-1-i)]],
+                [for (i = [0:1:m-1]) [(i+1)%m, i, m + i]],
+                [for (i = [0:1:m-1]) [(i+1)%m, m + i, m + (i+1)%m]]
+            );
+            polyhedron(points = points, faces = faces, convexity = 2);
+        }
 
-        // flat roof part
-        translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk) ps_polygon(points = pts_gap);
+        // flat roof part: segment self-intersecting loops before insetting.
+        translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk)
+            union() {
+                for (loop = roof_loops)
+                    ps_polygon(points = loop, mode = "nonzero");
+            }
 
         // top pillow part
         if (rad > pillow_min_rad) {
-            // Cheap convex "pillow" by hulling two inset offsets at different heights.
-            hull() {
-                translate([0, 0, base_z_eff + face_thk])
-                    linear_extrude(height = 0.01)
-                        offset(delta = -pillow_inset)
-                            ps_polygon(points = pts_gap);
-                translate([0, 0, base_z_eff + face_thk + pillow_thk])
-                    linear_extrude(height = 0.01)
-                        offset(delta = -(pillow_inset + pillow_ramp))
-                            ps_polygon(points = pts_gap);
+            // Build the pillow from the same simple loops as the face body/roof.
+            for (loop = roof_loops) {
+                loop_centroid = _pts_centroid2d(loop);
+                loop_rad = _pts_radius2d(loop, loop_centroid);
+                if (loop_rad > pillow_inset + pillow_ramp + eps) {
+                    s0 = max(0, 1 - pillow_inset / loop_rad);
+                    s1 = max(0, 1 - (pillow_inset + pillow_ramp) / loop_rad);
+                    p0 = [for (p = loop) [
+                        loop_centroid[0] + (p[0] - loop_centroid[0]) * s0,
+                        loop_centroid[1] + (p[1] - loop_centroid[1]) * s0
+                    ]];
+                    scale_xy = s0 <= eps ? 0 : (s1 / s0);
+                    translate([0, 0, base_z_eff + face_thk])
+                        linear_extrude(height = pillow_thk, scale = scale_xy)
+                            ps_polygon(points = p0, mode = "nonzero");
+                }
             }
         }
     }
 
     // Conditionally clears the airspace above the face, to remove material from the face-mount above the face
     if (clear_space) {
-        color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height) ps_polygon(points = pts_gap);
+        color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height)
+            union() {
+                for (loop = roof_loops)
+                    ps_polygon(points = loop, mode = "nonzero");
+            }
     }
 }
 
 
 
-difference() {
-    translate([0,0,-5]) cube(20);
-    face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
-}
+// Please keep this:
+//difference() {
+//    translate([0,0,-5]) cube(20);
+//
+//    !face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
+    !face_plate(0, [for (i=[0:4]) [10*cos(-144*i), 10*sin(-144*i)]], face_thk=1.2, diheds=[60,80,100,120,140], insets_override=undef, clear_space=false);
+//}

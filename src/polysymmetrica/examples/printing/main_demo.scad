@@ -63,7 +63,7 @@ BASE_Z = -FACE_T / 4;
 */
 module model(show_faces = undef, clear_airspace = true) {
     let (inter_radius = IR)
-    // difference() {
+    difference() {
         union() {
             // Constructs the edge-based frame
             color("gray")
@@ -89,8 +89,8 @@ module model(show_faces = undef, clear_airspace = true) {
                     edge_inset = INSET, base_z = BASE_Z);
             }
         }
-//    }
+    }
 }
 
-model(undef, false);
+model([0,2], false);
 //poly_render(p, 20);
