@@ -198,6 +198,46 @@ module test_seg_face_tris3__star_area_matches_segments() {
     assert(abs(area_tris - area_segs) < 1e-6, str("star triangulation area mismatch tris=", area_tris, " segs=", area_segs));
 }
 
+module test_ps_face_visible_segments__cube_face_unchanged() {
+    p = hexahedron();
+    place_on_faces(p) {
+        if ($ps_face_idx == 0) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            area_face = abs(_ps_seg_poly_area2($ps_face_pts2d));
+            area_vis = _list_sum([for (s = vis) abs(_ps_seg_poly_area2(s[0]))]);
+            assert_int_eq(len(vis), 1, "cube face should keep one visible cell");
+            assert(abs(area_vis - area_face) < 1e-6, str("cube visible area mismatch face=", area_face, " vis=", area_vis));
+            assert_int_eq(len(vis[0][2]), len(vis[0][0]), "cube visible edge-id count");
+            assert_int_eq(len(vis[0][3]), len(vis[0][0]), "cube visible edge-kind count");
+            assert(sum([for (k = vis[0][3]) (k == "parent") ? 1 : 0]) == len(vis[0][0]), "cube visible cell edges should all be parent");
+        }
+    }
+}
+
+module test_ps_face_visible_segments__star_antiprism_side_reduced() {
+    p = poly_antiprism(5, 2);
+    faces = poly_faces(p);
+    tri_faces = [for (i = [0:1:len(faces)-1]) if (len(faces[i]) == 3) i];
+    target = tri_faces[0];
+    place_on_faces(p) {
+        if ($ps_face_idx == target) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            area_face = abs(_ps_seg_poly_area2($ps_face_pts2d));
+            area_vis = _list_sum([for (s = vis) abs(_ps_seg_poly_area2(s[0]))]);
+            assert(len(vis) >= 1, "star antiprism side should keep at least one visible cell");
+            assert(area_vis > 1e-6, "star antiprism visible area should stay positive");
+            assert(area_vis < area_face - 1e-6, str("star antiprism side should lose hidden area face=", area_face, " vis=", area_vis));
+            assert(
+                sum([
+                    for (s = vis)
+                        sum([for (k = s[3]) (k == "cut") ? 1 : 0])
+                ]) > 0,
+                "star antiprism visible cells should include cut edges"
+            );
+        }
+    }
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -210,4 +250,6 @@ module run_TestPlacement() {
     test_seg_cycle_probe_point__concave_inside();
     test_seg_face_tris3__concave_area_preserved();
     test_seg_face_tris3__star_area_matches_segments();
+    test_ps_face_visible_segments__cube_face_unchanged();
+    test_ps_face_visible_segments__star_antiprism_side_reduced();
 }

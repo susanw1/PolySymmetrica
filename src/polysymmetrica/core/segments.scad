@@ -177,7 +177,7 @@ function _ps_seg_extract_cycles(nodes, hedges, input_area_sign, hi=0, visited=un
         area = _ps_seg_poly_area2(pts2d),
         keep = (len(hs) >= 3) && (len(ns) >= 3) && (abs(area) > eps),
         edge_ids = [for (hidx = hs) hedges[hidx][3]],
-        kinds = [for (_k = edge_ids) "parent"],
+        kinds = [for (hidx = hs) (len(hedges[hidx]) > 4 ? hedges[hidx][4] : "parent")],
         cyc = [pts2d, pts3d, edge_ids, kinds, ns],
         vis2 = (len(hs) == 0) ? _ps_list_set(vis, hi, true) : _ps_seg_set_true_many(vis, hs),
         cycles2 = keep ? concat(cycles, [cyc]) : cycles
@@ -249,6 +249,19 @@ function _ps_seg_point_seg_dist(pt, a, b, eps=1e-12) =
         q = [a[0] + t * ab[0], a[1] + t * ab[1]]
     )
     norm([pt[0] - q[0], pt[1] - q[1]]);
+
+function _ps_seg_point_param_on_segment(pt, a, b, eps=1e-9) =
+    let(
+        dx = b[0] - a[0],
+        dy = b[1] - a[1],
+        den = dx * dx + dy * dy,
+        apx = pt[0] - a[0],
+        apy = pt[1] - a[1],
+        cross = abs(apx * dy - apy * dx),
+        t = (den <= eps) ? undef : ((apx * dx + apy * dy) / den),
+        L = sqrt(max(den, 0))
+    )
+    (is_undef(t) || cross > eps * max(1, L) || t < -eps || t > 1 + eps) ? undef : t;
 
 function _ps_seg_point_on_poly_boundary(pt, poly, eps=1e-9) =
     max([
@@ -327,12 +340,12 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
             [
                 for (si = [0:1:len(segs)-1])
                     let(s = segs[si])
-                    [s[0], s[1], si, s[2], s[3], s[4]]
+                    [s[0], s[1], si, s[2], "parent", s[3], s[4]]
             ],
             [
                 for (si = [0:1:len(segs)-1])
                     let(s = segs[si])
-                    [s[1], s[0], si, s[2], s[4], s[3]]
+                    [s[1], s[0], si, s[2], "parent", s[4], s[3]]
             ]
         ),
         outer2d = [for (p = face_pts3d_local) [p[0], p[1]]],
@@ -574,6 +587,157 @@ function _ps_seg_plane_edge_hit(a, b, eps=1e-8) =
     )
     (t < -eps || t > 1 + eps) ? undef : p;
 
+function _ps_seg_interp2(a, b, t) =
+    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+function _ps_seg_source_segments2d(poly2d, cut_segs2d) =
+    concat(
+        [
+            for (i = [0:1:len(poly2d)-1])
+                [poly2d[i], poly2d[(i+1)%len(poly2d)], true, i]
+        ],
+        [
+            for (i = [0:1:len(cut_segs2d)-1])
+                [cut_segs2d[i][0], cut_segs2d[i][1], false, i]
+        ]
+    );
+
+function _ps_seg_hits_on_segments2d(src_segs, eps=1e-9) =
+    [
+        for (i = [0:1:len(src_segs)-1])
+            for (j = [i+1:1:len(src_segs)-1])
+                let(
+                    s0 = src_segs[i],
+                    s1 = src_segs[j],
+                    a0 = s0[0], b0 = s0[1],
+                    a1 = s1[0], b1 = s1[1],
+                    hit = _ps_seg_proper_intersection(
+                        [a0[0], a0[1], 0], [b0[0], b0[1], 0],
+                        [a1[0], a1[1], 0], [b1[0], b1[1], 0],
+                        eps
+                    ),
+                    t_a0_on_1 = _ps_seg_point_param_on_segment(a0, a1, b1, eps),
+                    t_b0_on_1 = _ps_seg_point_param_on_segment(b0, a1, b1, eps),
+                    t_a1_on_0 = _ps_seg_point_param_on_segment(a1, a0, b0, eps),
+                    t_b1_on_0 = _ps_seg_point_param_on_segment(b1, a0, b0, eps)
+                ) each concat(
+                    !is_undef(hit) ? [[i, hit[0], j, hit[1], hit[2]]] : [],
+                    (!is_undef(t_a0_on_1) && t_a0_on_1 > eps && t_a0_on_1 < 1 - eps) ? [[i, 0, j, t_a0_on_1, [a0[0], a0[1], 0]]] : [],
+                    (!is_undef(t_b0_on_1) && t_b0_on_1 > eps && t_b0_on_1 < 1 - eps) ? [[i, 1, j, t_b0_on_1, [b0[0], b0[1], 0]]] : [],
+                    (!is_undef(t_a1_on_0) && t_a1_on_0 > eps && t_a1_on_0 < 1 - eps) ? [[i, t_a1_on_0, j, 0, [a1[0], a1[1], 0]]] : [],
+                    (!is_undef(t_b1_on_0) && t_b1_on_0 > eps && t_b1_on_0 < 1 - eps) ? [[i, t_b1_on_0, j, 1, [b1[0], b1[1], 0]]] : []
+                )
+    ];
+
+function _ps_seg_src_ts(src_segs, hits, eps=1e-9) =
+    [
+        for (i = [0:1:len(src_segs)-1])
+            _ps_seg_sort_uniq(
+                concat(
+                    [0, 1],
+                    [for (h = hits) if (h[0] == i) h[1]],
+                    [for (h = hits) if (h[2] == i) h[3]]
+                ),
+                eps
+            )
+    ];
+
+function _ps_seg_nodes_from_src(src_segs, src_ts) =
+    [
+        for (si = [0:1:len(src_segs)-1])
+            let(
+                a = src_segs[si][0],
+                b = src_segs[si][1],
+                ts = src_ts[si]
+            )
+            for (t = ts)
+                [_ps_seg_interp2(a, b, t)[0], _ps_seg_interp2(a, b, t)[1], 0]
+    ];
+
+function _ps_seg_subsegments_from_src(src_segs, src_ts, nodes, eps=1e-9) =
+    [
+        for (si = [0:1:len(src_segs)-1])
+            let(
+                s = src_segs[si],
+                a = s[0],
+                b = s[1],
+                ts = src_ts[si]
+            )
+            for (k = [0:1:len(ts)-2])
+                let(
+                    t0 = ts[k],
+                    t1 = ts[k+1],
+                    p0 = [_ps_seg_interp2(a, b, t0)[0], _ps_seg_interp2(a, b, t0)[1], 0],
+                    p1 = [_ps_seg_interp2(a, b, t1)[0], _ps_seg_interp2(a, b, t1)[1], 0],
+                    u = _ps_seg_node_index(nodes, p0, eps),
+                    v = _ps_seg_node_index(nodes, p1, eps)
+                )
+                if (!is_undef(u) && !is_undef(v) && u != v && (t1 - t0) > eps)
+                    [u, v, si, s[2], s[3], t0, t1]
+    ];
+
+function _ps_seg_split_simple_loop(poly2d, cut_segs2d, eps=1e-8) =
+    (len(poly2d) < 3) ? [] :
+    let(
+        src = _ps_seg_source_segments2d(poly2d, cut_segs2d),
+        hits = _ps_seg_hits_on_segments2d(src, eps),
+        src_ts = _ps_seg_src_ts(src, hits, eps),
+        nodes = _ps_seg_unique_nodes(_ps_seg_nodes_from_src(src, src_ts), eps),
+        segs = _ps_seg_subsegments_from_src(src, src_ts, nodes, eps),
+        hedges = concat(
+            [for (si = [0:1:len(segs)-1]) let(s = segs[si]) [s[0], s[1], si, s[4], s[3] ? "parent" : "cut", s[5], s[6]]],
+            [for (si = [0:1:len(segs)-1]) let(s = segs[si]) [s[1], s[0], si, s[4], s[3] ? "parent" : "cut", s[6], s[5]]]
+        ),
+        input_area = _ps_seg_poly_area2(poly2d),
+        input_sign = (input_area >= 0) ? 1 : -1,
+        cycles = _ps_seg_extract_cycles(nodes, hedges, input_sign, 0, undef, [], eps),
+        cycles_u = _ps_seg_dedupe_cycles(cycles),
+        filtered = [
+            for (c = cycles_u)
+                let(
+                    pts2d = c[0],
+                    pts3d = c[1],
+                    edge_ids = c[2],
+                    kinds = c[3],
+                    probe = _ps_seg_cycle_probe_point(pts2d, eps),
+                    inside = _ps_seg_point_in_poly_evenodd(probe, poly2d, eps)
+                )
+                if (inside) [pts2d, pts3d, edge_ids, kinds]
+        ]
+    )
+    (len(filtered) == 0) ? [[poly2d, [for (p = poly2d) [p[0], p[1], 0]], [for (i = [0:1:len(poly2d)-1]) i], [for (_i = [0:1:len(poly2d)-1]) "parent"]]] : filtered;
+
+function _ps_seg_tri_z_at_xy(pt2d, tri, eps=1e-9) =
+    let(
+        a = tri[0],
+        b = tri[1],
+        c = tri[2],
+        ax = a[0], ay = a[1], az = a[2],
+        bx = b[0], by = b[1], bz = b[2],
+        cx = c[0], cy = c[1], cz = c[2],
+        px = pt2d[0], py = pt2d[1],
+        den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+    )
+    (abs(den) <= eps) ? undef :
+    let(
+        u = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / den,
+        v = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / den,
+        w = 1 - u - v
+    )
+    ((u < -eps) || (v < -eps) || (w < -eps)) ? undef : (u * az + v * bz + w * cz);
+
+function _ps_seg_pt_occluded(pt2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero") =
+    len([
+        for (fj = [0:1:len(poly_faces_idx)-1])
+            if (fj != face_idx)
+                let(
+                    tris3 = _ps_seg_face_tris3(poly_faces_idx[fj], poly_verts_local, eps, mode)
+                )
+                for (tri = tris3)
+                    let(z = _ps_seg_tri_z_at_xy(pt2d, tri, eps))
+                    if (!is_undef(z) && z > eps) 1
+    ]) > 0;
+
 function _ps_seg_tri_plane_segment(a, b, c, eps=1e-8) =
     let(
         raw_pts = [
@@ -590,13 +754,26 @@ function _ps_seg_tri_plane_segment(a, b, c, eps=1e-8) =
     (is_undef(pair)) ? undef :
     [[pair[0][0], pair[0][1]], [pair[1][0], pair[1][1]]];
 
-// Compute local 2D cut segments formed by intersections of other faces with this face plane.
-// Inputs are expected from place_on_faces(...):
-// - face_pts2d: current face loop in local 2D
-// - face_idx: current face index
-// - poly_faces_idx: full poly faces as index loops
-// - poly_verts_local: full poly vertices in current face-local coordinates
-function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, filter_parent=true) =
+function _ps_seg_cut_dihed_from_tri(tri, eps=1e-9) =
+    let(
+        a = tri[0],
+        b = tri[1],
+        c = tri[2],
+        n = v_norm(v_cross(b - a, c - a)),
+        nz = min(1, max(-1, abs(n[2])))
+    )
+    180 - acos(nz);
+
+function _ps_seg_cut_entries_dedupe(entries, eps=1e-8, i=0, acc=[]) =
+    (i >= len(entries)) ? acc :
+    let(
+        e = entries[i],
+        hit = len([for (a = acc) if (_ps_seg2_eq(a[0], e[0], eps)) 1]) > 0,
+        acc2 = hit ? acc : concat(acc, [e])
+    )
+    _ps_seg_cut_entries_dedupe(entries, eps, i + 1, acc2);
+
+function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, filter_parent=true) =
     (is_undef(face_pts2d) || is_undef(poly_faces_idx) || is_undef(poly_verts_local)) ? [] :
     let(
         raw = [
@@ -608,22 +785,52 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
                     )
                     for (tri = tris3)
                         let(
-                            a = tri[0],
-                            b = tri[1],
-                            c = tri[2],
-                            seg = _ps_seg_tri_plane_segment(a, b, c, eps)
+                            seg = _ps_seg_tri_plane_segment(tri[0], tri[1], tri[2], eps),
+                            dihed = _ps_seg_cut_dihed_from_tri(tri, eps)
                         )
                         if (!is_undef(seg) && norm([seg[1][0]-seg[0][0], seg[1][1]-seg[0][1]]) > eps)
-                            seg
+                            [seg, fj, dihed]
         ],
-        uniq = _ps_seg_dedupe_segments(raw, eps),
+        uniq = _ps_seg_cut_entries_dedupe(raw, eps),
         out = [
-            for (s = uniq)
-                if (!(filter_parent && _ps_seg_is_parent_edge(s, face_pts2d, eps)))
-                    s
+            for (e = uniq)
+                if (!(filter_parent && _ps_seg_is_parent_edge(e[0], face_pts2d, eps)))
+                    e
         ]
     )
     out;
+
+// Compute local 2D cut segments formed by intersections of other faces with this face plane.
+// Inputs are expected from place_on_faces(...):
+// - face_pts2d: current face loop in local 2D
+// - face_idx: current face index
+// - poly_faces_idx: full poly faces as index loops
+// - poly_verts_local: full poly vertices in current face-local coordinates
+function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, filter_parent=true) =
+    [for (e = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, filter_parent)) e[0]];
+
+// Split the current face by geometry-derived cut segments and keep only the
+// cells that are actually visible from the face-local +Z side.
+//
+// Returns:
+//   [[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds], ...]
+function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
+    let(
+        base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
+        cut_segs = ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, filter_parent)
+    )
+    [
+        for (base = base_segs)
+            let(
+                cells = _ps_seg_split_simple_loop(base[0], cut_segs, eps)
+            )
+            for (cell = cells)
+                let(
+                    probe = _ps_seg_cycle_probe_point(cell[0], eps),
+                    hidden = _ps_seg_pt_occluded(probe, face_idx, poly_faces_idx, poly_verts_local, eps, mode)
+                )
+                if (!hidden) cell
+    ];
 
 // Iterate geometry-derived cut segments for current face.
 module place_on_face_geom_cut_segments(eps=1e-8, filter_parent=true) {
@@ -637,6 +844,27 @@ module place_on_face_geom_cut_segments(eps=1e-8, filter_parent=true) {
         $ps_face_cut_count = len(segs);
         $ps_face_cut_segment2d_local = segs[si];
         $ps_face_cut_segments2d_local = segs;
+        children();
+    }
+}
+
+// Iterate the retained visible face cells for the current face.
+module place_on_face_visible_segments(mode="nonzero", eps=1e-8, filter_parent=true) {
+    assert(!is_undef($ps_face_pts2d), "place_on_face_visible_segments: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_idx), "place_on_face_visible_segments: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "place_on_face_visible_segments: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "place_on_face_visible_segments: requires place_on_faces context ($ps_poly_verts_local)");
+
+    segs = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
+    for (si = [0:1:len(segs)-1]) {
+        s = segs[si];
+        $ps_vis_seg_idx = si;
+        $ps_vis_seg_count = len(segs);
+        $ps_vis_seg_vertex_count = len(s[0]);
+        $ps_vis_seg_pts2d = s[0];
+        $ps_vis_seg_pts3d_local = s[1];
+        $ps_vis_seg_edge_ids = s[2];
+        $ps_vis_seg_edge_kinds = s[3];
         children();
     }
 }
@@ -680,4 +908,22 @@ module face_cut_stencil(face_thk, kerf=0.2, extend=0.5, z_pad=0.2, eps=1e-8, fil
         for (s = segs)
             _ps_face_cut_strip(s, face_thk, kerf, extend, z_pad, eps);
     }
+}
+
+// Extruded keep-mask built from the visible cells of the current face.
+// Use this in intersection() with a finished face body to keep only printable
+// face pieces instead of subtracting an oversized stencil hull.
+module face_visible_mask(face_thk, z_pad=0.2, mode="nonzero", eps=1e-8, filter_parent=true) {
+    assert(face_thk > 0, "face_visible_mask: face_thk must be > 0");
+    assert(!is_undef($ps_face_pts2d), "face_visible_mask: requires place_on_faces context");
+    assert(!is_undef($ps_face_idx), "face_visible_mask: requires place_on_faces context");
+    assert(!is_undef($ps_poly_faces_idx), "face_visible_mask: requires place_on_faces context");
+    assert(!is_undef($ps_poly_verts_local), "face_visible_mask: requires place_on_faces context");
+
+    segs = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
+    linear_extrude(height = face_thk + 2 * z_pad, center = true)
+        union() {
+            for (s = segs)
+                polygon(points = s[0]);
+        }
 }
