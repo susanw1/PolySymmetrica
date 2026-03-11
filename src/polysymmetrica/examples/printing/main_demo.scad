@@ -85,12 +85,12 @@ module model(show_faces = undef, clear_airspace = true) {
         place_on_faces(p, IR) {
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
-                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace, 
-                    edge_inset = INSET, base_z = BASE_Z);
+                face_plate_visible($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
+                    edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6);
             }
         }
     }
 }
 
-model([0,2], false);
+model(undef, true);
 //poly_render(p, 20);
