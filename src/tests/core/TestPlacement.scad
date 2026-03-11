@@ -238,6 +238,24 @@ module test_ps_face_visible_segments__star_antiprism_side_reduced() {
     }
 }
 
+module test_ps_face_visible_segments__cells_preserve_parent_winding() {
+    p = poly_antiprism(5, 2);
+    faces = poly_faces(p);
+    tri_faces = [for (i = [0:1:len(faces)-1]) if (len(faces[i]) == 3) i];
+    target = tri_faces[0];
+    place_on_faces(p) {
+        if ($ps_face_idx == target) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            parent_sign = (_ps_seg_poly_area2($ps_face_pts2d) >= 0) ? 1 : -1;
+            for (s = vis)
+                assert(
+                    _ps_seg_poly_area2(s[0]) * parent_sign > 1e-9,
+                    str("visible cell winding mismatch parent=", $ps_face_idx, " area=", _ps_seg_poly_area2(s[0]))
+                );
+        }
+    }
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -252,4 +270,5 @@ module run_TestPlacement() {
     test_seg_face_tris3__star_area_matches_segments();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
+    test_ps_face_visible_segments__cells_preserve_parent_winding();
 }

@@ -240,6 +240,21 @@ function _ps_seg_point_in_poly_nonzero(pt, poly, eps=1e-9) =
     )
     wn != 0;
 
+function _ps_seg_reverse_keep_first(list) =
+    (len(list) <= 1) ? list : concat([list[0]], [for (i = [len(list)-1:-1:1]) list[i]]);
+
+function _ps_seg_orient_cell(cell, target_sign, eps=1e-9) =
+    let(
+        area = _ps_seg_poly_area2(cell[0]),
+        same = (abs(area) <= eps) || (area * target_sign > 0)
+    )
+    same ? cell : [
+        _ps_seg_reverse_keep_first(cell[0]),
+        _ps_seg_reverse_keep_first(cell[1]),
+        _ps_reverse(cell[2]),
+        _ps_reverse(cell[3])
+    ];
+
 function _ps_seg_point_seg_dist(pt, a, b, eps=1e-12) =
     let(
         ab = [b[0] - a[0], b[1] - a[1]],
@@ -817,7 +832,8 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
 function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     let(
         base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
-        cut_segs = ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, filter_parent)
+        cut_segs = ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, filter_parent),
+        target_sign = (_ps_seg_poly_area2(face_pts2d) >= 0) ? 1 : -1
     )
     [
         for (base = base_segs)
@@ -829,7 +845,7 @@ function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_ver
                     probe = _ps_seg_cycle_probe_point(cell[0], eps),
                     hidden = _ps_seg_pt_occluded(probe, face_idx, poly_faces_idx, poly_verts_local, eps, mode)
                 )
-                if (!hidden) cell
+                if (!hidden) _ps_seg_orient_cell(cell, target_sign, eps)
     ];
 
 // Iterate geometry-derived cut segments for current face.
