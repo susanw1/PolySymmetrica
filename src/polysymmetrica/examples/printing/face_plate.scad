@@ -297,6 +297,41 @@ module _poly_loft_loops(loop_top2d, loop_bottom2d, z_top, z_bottom, eps=1e-8) {
     );
 }
 
+module _render_body_loops(body_loops, base_z_eff, ramped_thk) {
+    for (bd = body_loops) {
+        loop2d = bd[0];
+        loop_diheds = bd[1];
+        m = len(loop2d);
+        top = [for (p = loop2d) [p[0], p[1], base_z_eff + ramped_thk]];
+        bottom2d = _bottom_pts2d_from_bevel(loop2d, loop_diheds, ramped_thk);
+        bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
+        points = concat(top, bottom);
+        faces = concat(
+            [[for (i = [0:1:m-1]) i]],
+            [[for (i = [0:1:m-1]) (2 * m - 1 - i)]],
+            [for (i = [0:1:m-1]) [(i + 1) % m, i, m + i]],
+            [for (i = [0:1:m-1]) [(i + 1) % m, m + i, m + (i + 1) % m]]
+        );
+        polyhedron(points = points, faces = faces, convexity = 2);
+    }
+}
+
+module _render_roof_loops(roof_loops, z0, top_thk) {
+    translate([0, 0, z0]) linear_extrude(top_thk)
+        union() {
+            for (loop = roof_loops)
+                ps_polygon(points = loop, mode = "nonzero");
+        }
+}
+
+module _render_clearance_loops(roof_loops, z0, clear_height) {
+    color("magenta") translate([0, 0, z0]) linear_extrude(height = clear_height)
+        union() {
+            for (loop = roof_loops)
+                ps_polygon(points = loop, mode = "nonzero");
+        }
+}
+
 
 // Bevel by constructing an inset bottom polygon and lofting.
 // Expects LHR/CW polygon order for pts and aligned dihedrals.
@@ -326,30 +361,8 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z; // base Z coord
     ramped_thk = face_thk - top_thk; // actual thickness of ramped part
     color(len(pts) == 3 ? "white" : "red") {
-        // ramped part
-        for (bd = body_loops) {
-            loop2d = bd[0];
-            loop_diheds = bd[1];
-            m = len(loop2d);
-            top = [for (p = loop2d) [p[0], p[1], base_z_eff + ramped_thk]];
-            bottom2d = _bottom_pts2d_from_bevel(loop2d, loop_diheds, ramped_thk);
-            bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
-            points = concat(top, bottom);
-            faces = concat(
-                [[for (i = [0:1:m-1]) i]],
-                [[for (i = [0:1:m-1]) (2*m-1-i)]],
-                [for (i = [0:1:m-1]) [(i+1)%m, i, m + i]],
-                [for (i = [0:1:m-1]) [(i+1)%m, m + i, m + (i+1)%m]]
-            );
-            polyhedron(points = points, faces = faces, convexity = 2);
-        }
-
-        // flat roof part: segment self-intersecting loops before insetting.
-        translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk)
-            union() {
-                for (loop = roof_loops)
-                    ps_polygon(points = loop, mode = "nonzero");
-            }
+        _render_body_loops(body_loops, base_z_eff, ramped_thk);
+        _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
 
         // top pillow part
         if (rad > pillow_min_rad) {
@@ -375,11 +388,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 
     // Conditionally clears the airspace above the face, to remove material from the face-mount above the face
     if (clear_space) {
-        color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height)
-            union() {
-                for (loop = roof_loops)
-                    ps_polygon(points = loop, mode = "nonzero");
-            }
+        _render_clearance_loops(roof_loops, base_z_eff + face_thk - eps, clear_height);
     }
 }
 
@@ -467,28 +476,8 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
         ramped_thk = face_thk - top_thk;
         color(len(pts) == 4 ? "white" : "red") {
-            for (bd = body_loops) {
-                loop2d = bd[0];
-                loop_diheds = bd[1];
-                m = len(loop2d);
-                top = [for (p = loop2d) [p[0], p[1], base_z_eff + ramped_thk]];
-                bottom2d = _bottom_pts2d_from_bevel(loop2d, loop_diheds, ramped_thk);
-                bottom = [for (p = bottom2d) [p[0], p[1], base_z_eff]];
-                points = concat(top, bottom);
-                faces = concat(
-                    [[for (i = [0:1:m-1]) i]],
-                    [[for (i = [0:1:m-1]) (2*m-1-i)]],
-                    [for (i = [0:1:m-1]) [(i+1)%m, i, m + i]],
-                    [for (i = [0:1:m-1]) [(i+1)%m, m + i, m + (i+1)%m]]
-                );
-                polyhedron(points = points, faces = faces, convexity = 2);
-            }
-
-            translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk)
-                union() {
-                    for (loop = roof_loops)
-                        ps_polygon(points = loop, mode = "nonzero");
-                }
+            _render_body_loops(body_loops, base_z_eff, ramped_thk);
+            _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
 
             if (rad > pillow_min_rad) {
                 for (ci = [0:1:len(vis_cells)-1]) {
@@ -509,24 +498,19 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
                             _poly_loft_loops(p0, p1, 0, pillow_thk, eps);
                 }
             }
-       // }
 
-        if (clear_space) {
-            color("magenta") translate([0, 0, base_z_eff + face_thk - eps]) linear_extrude(height = clear_height)
-                union() {
-                    for (loop = roof_loops)
-                        ps_polygon(points = loop, mode = "nonzero");
-                }
+            if (clear_space)
+                _render_clearance_loops(roof_loops, base_z_eff + face_thk - eps, clear_height);
         }
     }
 }
 
 
 
-// Please keep this:
-//difference() {
-//    translate([0,0,-5]) cube(20);
-//
-//    !face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
-    !face_plate(0, [for (i=[0:4]) [10*cos(-144*i), 10*sin(-144*i)]], face_thk=1.2, diheds=[60,80,100,120,140], insets_override=undef, clear_space=false);
-//}
+// Example verifying face correctly subtracts from cube:
+difference() {
+    translate([0,0,-5]) cube(20);
+
+    *face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
+    #face_plate(0, [for (i=[0:4]) [10*cos(-144*i), 10*sin(-144*i)]], face_thk=1.2, diheds=[60,80,100,120,140], insets_override=undef, clear_space=false);
+}

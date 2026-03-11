@@ -92,6 +92,12 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
   - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
+## Session Notes (Printing Face Segmentation)
+- `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
+- Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
+- `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
+- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
+
 ## Session Notes (Printing / Visible Face Pieces)
 - `face_plate.scad` now handles self-intersecting faces by first segmenting the 2D loop into simple loops and then building body/roof/clearance/pillow from those loops. Do not regress to lofting or hulling the raw self-intersecting loop.
 - For star/self-intersecting pillows, `hull()` convexifies the shape and is wrong. Use topology-preserving segmented loops plus loft/extrude instead.
