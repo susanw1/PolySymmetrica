@@ -256,6 +256,24 @@ module test_ps_face_visible_segments__cells_preserve_parent_winding() {
     }
 }
 
+module test_ps_face_geom_cut_segments__respects_fill_mode() {
+    // Target square in z=0 plane plus a star-shaped cutter face tilted through the plane.
+    target = [[-6,-6], [6,-6], [6,6], [-6,6]];
+    faces = [
+        [0,1,2,3],
+        [4,5,6,7,8]
+    ];
+    star_xy = [for (i = [0:1:4]) [10*cos(-144*i), 10*sin(-144*i)]];
+    verts_local = concat(
+        [for (p = target) [p[0], p[1], 0]],
+        [for (p = star_xy) [p[0], p[1], p[1] / 6]]
+    );
+    segs_evenodd = ps_face_geom_cut_segments(target, 0, faces, verts_local, 1e-8, "evenodd", true);
+    segs_nonzero = ps_face_geom_cut_segments(target, 0, faces, verts_local, 1e-8, "nonzero", true);
+    assert(len(segs_evenodd) > 0, "synthetic star cutter should generate some cut geometry");
+    assert(len(segs_nonzero) > len(segs_evenodd), str("nonzero star cutter should yield more cut segments than evenodd evenodd=", len(segs_evenodd), " nonzero=", len(segs_nonzero)));
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -271,4 +289,5 @@ module run_TestPlacement() {
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
+    test_ps_face_geom_cut_segments__respects_fill_mode();
 }

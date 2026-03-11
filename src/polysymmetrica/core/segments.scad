@@ -788,7 +788,7 @@ function _ps_seg_cut_entries_dedupe(entries, eps=1e-8, i=0, acc=[]) =
     )
     _ps_seg_cut_entries_dedupe(entries, eps, i + 1, acc2);
 
-function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, filter_parent=true) =
+function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     (is_undef(face_pts2d) || is_undef(poly_faces_idx) || is_undef(poly_verts_local)) ? [] :
     let(
         raw = [
@@ -796,7 +796,7 @@ function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_ver
                 if (fj != face_idx)
                     let(
                         f = poly_faces_idx[fj],
-                        tris3 = _ps_seg_face_tris3(f, poly_verts_local, eps)
+                        tris3 = _ps_seg_face_tris3(f, poly_verts_local, eps, mode)
                     )
                     for (tri = tris3)
                         let(
@@ -821,8 +821,9 @@ function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_ver
 // - face_idx: current face index
 // - poly_faces_idx: full poly faces as index loops
 // - poly_verts_local: full poly vertices in current face-local coordinates
-function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, filter_parent=true) =
-    [for (e = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, filter_parent)) e[0]];
+// - mode: face fill rule to use when triangulating cutter faces ("evenodd" | "nonzero")
+function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
+    [for (e = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent)) e[0]];
 
 // Split the current face by geometry-derived cut segments and keep only the
 // cells that are actually visible from the face-local +Z side.
@@ -832,7 +833,7 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
 function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     let(
         base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
-        cut_segs = ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, filter_parent),
+        cut_segs = ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent),
         target_sign = (_ps_seg_poly_area2(face_pts2d) >= 0) ? 1 : -1
     )
     [
@@ -849,12 +850,12 @@ function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_ver
     ];
 
 // Iterate geometry-derived cut segments for current face.
-module place_on_face_geom_cut_segments(eps=1e-8, filter_parent=true) {
+module place_on_face_geom_cut_segments(mode="nonzero", eps=1e-8, filter_parent=true) {
     assert(!is_undef($ps_face_pts2d), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_face_pts2d)");
     assert(!is_undef($ps_face_idx), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_face_idx)");
     assert(!is_undef($ps_poly_faces_idx), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_poly_faces_idx)");
     assert(!is_undef($ps_poly_verts_local), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_poly_verts_local)");
-    segs = ps_face_geom_cut_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, filter_parent);
+    segs = ps_face_geom_cut_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
     for (si = [0:1:len(segs)-1]) {
         $ps_face_cut_idx = si;
         $ps_face_cut_count = len(segs);
@@ -912,14 +913,14 @@ module _ps_face_cut_strip(seg2d, face_thk, kerf=0.2, extend=0.5, z_pad=0.2, eps=
 
 // Build a subtraction body from geometry-derived face cut segments.
 // Use inside place_on_faces(...), typically in difference() with a face plate/face polygon.
-module face_cut_stencil(face_thk, kerf=0.2, extend=0.5, z_pad=0.2, eps=1e-8, filter_parent=true) {
+module face_cut_stencil(face_thk, kerf=0.2, extend=0.5, z_pad=0.2, mode="nonzero", eps=1e-8, filter_parent=true) {
     assert(face_thk > 0, "face_cut_stencil: face_thk must be > 0");
     assert(!is_undef($ps_face_pts2d), "face_cut_stencil: requires place_on_faces context");
     assert(!is_undef($ps_face_idx), "face_cut_stencil: requires place_on_faces context");
     assert(!is_undef($ps_poly_faces_idx), "face_cut_stencil: requires place_on_faces context");
     assert(!is_undef($ps_poly_verts_local), "face_cut_stencil: requires place_on_faces context");
 
-    segs = ps_face_geom_cut_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, filter_parent);
+    segs = ps_face_geom_cut_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
     union() {
         for (s = segs)
             _ps_face_cut_strip(s, face_thk, kerf, extend, z_pad, eps);
