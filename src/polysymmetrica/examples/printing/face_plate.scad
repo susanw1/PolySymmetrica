@@ -430,7 +430,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
     insets = (is_undef(insets_override) || len(insets_override) != n)
         ? [for (k = [0:1:len(pts)-1]) _gap_inset(diheds[k], edge_inset)]
         : insets_override;
-    cut_entries = ps_face_geom_cut_entries(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, true);
+    cut_entries = ps_face_geom_cut_entries(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
     cut_segs = [for (e = cut_entries) e[0]];
 
     if (len(cut_segs) == 0) {
@@ -466,7 +466,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
 
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
         ramped_thk = face_thk - top_thk;
-       // color(len(pts) == 4 ? "green" : "red") {
+        color(len(pts) == 4 ? "white" : "red") {
             for (bd = body_loops) {
                 loop2d = bd[0];
                 loop_diheds = bd[1];
@@ -484,7 +484,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
                 polyhedron(points = points, faces = faces, convexity = 2);
             }
 
-            color("red") translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk)
+            translate([0, 0, base_z_eff + ramped_thk]) linear_extrude(top_thk)
                 union() {
                     for (loop = roof_loops)
                         ps_polygon(points = loop, mode = "nonzero");
@@ -505,7 +505,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
                             (_safe_at(kinds, k, "cut") == "parent") ? (pillow_inset + pillow_ramp) : pillow_ramp
                     ]);
                     if (len(p0) >= 3 && len(p1) == len(p0))
-                        color("blue") translate([0, 0, base_z_eff + face_thk])
+                        translate([0, 0, base_z_eff + face_thk])
                             _poly_loft_loops(p0, p1, 0, pillow_thk, eps);
                 }
             }
