@@ -19,11 +19,14 @@
 // - `poly_pyramid(...)` is the first direct Johnson-oriented constructor here;
 //   it reuses the same {n,p} polygon helpers as prisms/antiprisms.
 // - `poly_cupola(...)` builds exact n-gonal cupolae with unit top/base/side edges.
+// - `poly_rotunda(...)` is currently the exact pentagonal rotunda, built as a
+//   slice of the unit-edge icosidodecahedron.
 
 use <funcs.scad>
 use <cleanup.scad>
 use <transform.scad>
 use <validate.scad>
+use <../models/archimedians_all.scad>
 
 function _ps_face_drop_by_idx_list(faces, idxs) =
     [for (fi = [0:1:len(faces)-1]) if (!_ps_list_contains(idxs, fi)) faces[fi]];
@@ -263,6 +266,13 @@ function _ps_clip_face_to_halfspace(face_pts, plane_pt, plane_n, keep="above", e
     )
     (len(cleaned) >= 3) ? cleaned : [];
 
+function _ps_poly_uniform_scale(poly, s) =
+    [
+        [for (v = poly_verts(poly)) v * s],
+        poly_faces(poly),
+        poly_e_over_ir(poly)
+    ];
+
 function _ps_poly_from_face_points_preserve_scale(faces_pts_all, eps=1e-8) =
     let(
         all_pts = [for (fp = faces_pts_all) for (p = fp) p],
@@ -409,6 +419,28 @@ function poly_cupola(n=3, edge=1, height=undef, height_scale=1) =
         e_over_ir = edge / ir
     )
     make_poly(verts, faces, e_over_ir);
+
+function _ps_first_face_of_arity(poly, arity, who) =
+    let(
+        faces = poly_faces(poly),
+        idxs = [for (i = [0:1:len(faces)-1]) if (len(faces[i]) == arity) i],
+        _0 = assert(len(idxs) > 0, str(who, ": no face of arity ", arity, " found"))
+    )
+    idxs[0];
+
+// Exact pentagonal rotunda (J6), constructed as one capped half of an
+// icosidodecahedron sliced through the origin by a pentagon-face normal.
+function poly_rotunda(edge=1) =
+    let(
+        _0 = assert(edge > 0, "poly_rotunda: edge must be > 0"),
+        base = icosidodecahedron(),
+        fi = _ps_first_face_of_arity(base, 5, "poly_rotunda"),
+        face = poly_faces(base)[fi],
+        n = ps_face_normal(poly_verts(base), face),
+        half = poly_slice(base, [0,0,0], n, keep="above", cap=true, cleanup=true),
+        p = (abs(edge - 1) < 1e-12) ? half : _ps_poly_uniform_scale(half, edge)
+    )
+    p;
 
 // Attach p2 onto p1 by aligning selected planar faces and removing the seam faces.
 function poly_attach(

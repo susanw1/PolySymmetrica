@@ -25,6 +25,9 @@ function j3_triangular_cupola() = poly_cupola(3);
 function j4_square_cupola() = poly_cupola(4);
 function j5_pentagonal_cupola() = poly_cupola(5);
 
+// J6: exact pentagonal rotunda.
+function j6_pentagonal_rotunda() = poly_rotunda();
+
 // J40: elongated pentagonal orthocupolarotunda (imported coords; preview-only).
 // Faces are reoriented outward for LHR compatibility.
 function j40_elongated_pentagonal_orthocupolarotunda_approx() =
@@ -121,5 +124,6 @@ function johnsons_all() = [
     ["j3_triangular_cupola", function() j3_triangular_cupola()],
     ["j4_square_cupola", function() j4_square_cupola()],
     ["j5_pentagonal_cupola", function() j5_pentagonal_cupola()],
+    ["j6_pentagonal_rotunda", function() j6_pentagonal_rotunda()],
     ["j40_elongated_pentagonal_orthocupolarotunda_approx", function() j40_elongated_pentagonal_orthocupolarotunda_approx()]
 ];

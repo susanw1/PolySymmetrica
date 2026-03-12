@@ -131,6 +131,18 @@ module test_poly_cupola__pentagonal_counts_match_j5() {
     assert_int_eq(len(poly_edges(q)), 25, "J5 wrapper edge count");
 }
 
+module test_poly_rotunda__counts_match_j6() {
+    p = poly_rotunda();
+    q = j6_pentagonal_rotunda();
+    assert_true(poly_valid(p, "closed"), "pentagonal rotunda should be closed");
+    assert_int_eq(len(poly_verts(p)), 20, "pentagonal rotunda vertex count");
+    assert_int_eq(len(poly_faces(p)), 17, "pentagonal rotunda face count");
+    assert_int_eq(len(poly_edges(p)), 35, "pentagonal rotunda edge count");
+    assert_int_eq(len(poly_verts(q)), 20, "J6 wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 17, "J6 wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 35, "J6 wrapper edge count");
+}
+
 module run_TestConstruction() {
     test_poly_boundary_loops__cube_missing_one_face();
     test_poly_delete_faces__cube_missing_one_face_open();
@@ -144,6 +156,7 @@ module run_TestConstruction() {
     test_poly_cupola__triangular_counts_match_j3();
     test_poly_cupola__square_counts_match_j4();
     test_poly_cupola__pentagonal_counts_match_j5();
+    test_poly_rotunda__counts_match_j6();
 }
 
 run_TestConstruction();

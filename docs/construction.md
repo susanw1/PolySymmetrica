@@ -15,6 +15,7 @@ poly_cap_loops(poly, loops=undef, cleanup=true, cleanup_eps=1e-8)
 poly_slice(poly, plane_pt, plane_n, keep="above", cap=true, cleanup=true, cleanup_eps=1e-8)
 poly_pyramid(n=4, p=1, edge=1, height=undef, height_scale=1)
 poly_cupola(n=3, edge=1, height=undef, height_scale=1)
+poly_rotunda(edge=1)
 poly_attach(p1, p2, f1=0, f2=0, rotate_step=0, scale_mode="fit_edge", mirror=false, eps=1e-8, cleanup=true, cleanup_eps=1e-8)
 ```
 
@@ -35,6 +36,7 @@ The first direct Johnson-oriented constructor now also lives here:
 
 5. build a regular/star pyramid from a `{n,p}` base.
 6. build an exact n-gonal cupola from concentric top/base polygons.
+7. build an exact pentagonal rotunda as a slice of an Archimedean parent.
 
 That keeps the topology changes visible and makes later Johnson/cupola/pyramid
 operations easier to reason about.
@@ -171,6 +173,31 @@ Examples:
 j3 = poly_cupola(3);
 j4 = poly_cupola(4);
 j5 = poly_cupola(5);
+```
+
+### `poly_rotunda(...)`
+
+Builds the exact pentagonal rotunda (Johnson J6).
+
+Current implementation:
+
+- starts from the exact unit-edge `icosidodecahedron()`
+- finds a pentagonal face
+- slices through the origin using that pentagon-face normal
+- caps the resulting decagonal opening
+
+The result is one exact half of the icosidodecahedron, i.e. the pentagonal
+rotunda.
+
+Parameters:
+
+- `edge`: uniform scale factor for the final rotunda edge length
+
+Example:
+
+```scad
+j6 = poly_rotunda();
+j6_big = poly_rotunda(edge=2);
 ```
 
 ### `poly_attach(...)`
