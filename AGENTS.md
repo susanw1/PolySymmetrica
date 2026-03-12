@@ -98,6 +98,14 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
 - For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
 
+## Session Notes (Construction Toolkit)
+- Johnson-style construction should build on explicit topology tools first: delete faces, recover boundary loops, then cap them. Keep “repair” semantics visible instead of burying them in magical element-deletion helpers.
+- `core/construction.scad` now starts with:
+  - `poly_delete_faces(...)`
+  - `poly_boundary_loops(...)`
+  - `poly_cap_loops(...)`
+- Boundary detection there uses undirected edge multiplicity (`ps_face_has_edge(...) == 1`) and then keeps the directed occurrence from the surviving face. It is intentionally simple and reliable rather than optimized.
+
 ## Session Notes (Printing / Visible Face Pieces)
 - `face_plate.scad` now handles self-intersecting faces by first segmenting the 2D loop into simple loops and then building body/roof/clearance/pillow from those loops. Do not regress to lofting or hulling the raw self-intersecting loop.
 - For star/self-intersecting pillows, `hull()` convexifies the shape and is wrong. Use topology-preserving segmented loops plus loft/extrude instead.

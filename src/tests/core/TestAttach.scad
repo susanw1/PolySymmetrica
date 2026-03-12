@@ -100,3 +100,5 @@ module run_TestAttach() {
     test_poly_attach__multi_face_list();
     test_poly_attach__mirror_flag_changes_result();
 }
+
+run_TestAttach();

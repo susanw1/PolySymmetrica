@@ -45,3 +45,5 @@ module run_TestRender() {
     test_ps_render_mesh__always_triangulates_cube();
     test_ps_render_mesh__auto_triangulates_star_faces();
 }
+
+run_TestRender();

@@ -75,3 +75,4 @@ module run_TestCleanup() {
     test_cleanup_regression__truncate_preserves_e_over_ir();
 }
 
+run_TestCleanup();

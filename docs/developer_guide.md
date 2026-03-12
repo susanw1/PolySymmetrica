@@ -61,6 +61,7 @@ PolySymmetrica/
 │   │   │   ├─ transform_util.scad  # shared transform helpers
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
+│   │   │   ├─ construction.scad    # delete/cap/slice construction helpers
 │   │   │   ├─ attach.scad          # face-to-face poly attachment
 │   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
@@ -70,7 +71,7 @@ PolySymmetrica/
 │   │   │   ├─ platonics_all.scad
 │   │   │   ├─ archimedians_all.scad
 │   │   │   ├─ catalans_all.scad
-│   │   │   ├─ johnson_all.scad
+│   │   │   ├─ johnsons_all.scad
 │   │   │   ├─ tetrahedron.scad
 │   │   │   ├─ octahedron.scad
 │   │   │   └─ icosahedron.scad
@@ -102,6 +103,7 @@ Related deep-dive notes:
 - [Prisms and antiprisms](prisms.md)
 - [Params overrides](params_overrides.md)
 - [Face attachment](attach.md)
+- [Construction helpers](construction.md)
 
 ---
 

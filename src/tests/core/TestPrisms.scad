@@ -143,3 +143,5 @@ module run_TestPrisms() {
     test_poly_star_antiprism__counts_and_validity();
     test_poly_star_prism__dual_and_rectify_validity();
 }
+
+run_TestPrisms();
