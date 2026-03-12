@@ -95,6 +95,42 @@ module test_poly_pyramid__pentagonal_counts_match_j2() {
     assert_int_eq(len(poly_edges(q)), 10, "J2 wrapper edge count");
 }
 
+module test_poly_cupola__triangular_counts_match_j3() {
+    p = poly_cupola(3);
+    q = j3_triangular_cupola();
+    assert_true(poly_valid(p, "closed"), "triangular cupola should be closed");
+    assert_int_eq(len(poly_verts(p)), 9, "triangular cupola vertex count");
+    assert_int_eq(len(poly_faces(p)), 8, "triangular cupola face count");
+    assert_int_eq(len(poly_edges(p)), 15, "triangular cupola edge count");
+    assert_int_eq(len(poly_verts(q)), 9, "J3 wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 8, "J3 wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 15, "J3 wrapper edge count");
+}
+
+module test_poly_cupola__square_counts_match_j4() {
+    p = poly_cupola(4);
+    q = j4_square_cupola();
+    assert_true(poly_valid(p, "closed"), "square cupola should be closed");
+    assert_int_eq(len(poly_verts(p)), 12, "square cupola vertex count");
+    assert_int_eq(len(poly_faces(p)), 10, "square cupola face count");
+    assert_int_eq(len(poly_edges(p)), 20, "square cupola edge count");
+    assert_int_eq(len(poly_verts(q)), 12, "J4 wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 10, "J4 wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 20, "J4 wrapper edge count");
+}
+
+module test_poly_cupola__pentagonal_counts_match_j5() {
+    p = poly_cupola(5);
+    q = j5_pentagonal_cupola();
+    assert_true(poly_valid(p, "closed"), "pentagonal cupola should be closed");
+    assert_int_eq(len(poly_verts(p)), 15, "pentagonal cupola vertex count");
+    assert_int_eq(len(poly_faces(p)), 12, "pentagonal cupola face count");
+    assert_int_eq(len(poly_edges(p)), 25, "pentagonal cupola edge count");
+    assert_int_eq(len(poly_verts(q)), 15, "J5 wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 12, "J5 wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 25, "J5 wrapper edge count");
+}
+
 module run_TestConstruction() {
     test_poly_boundary_loops__cube_missing_one_face();
     test_poly_delete_faces__cube_missing_one_face_open();
@@ -105,6 +141,9 @@ module run_TestConstruction() {
     test_poly_slice__cube_midplane_capped();
     test_poly_pyramid__square_counts_match_j1();
     test_poly_pyramid__pentagonal_counts_match_j2();
+    test_poly_cupola__triangular_counts_match_j3();
+    test_poly_cupola__square_counts_match_j4();
+    test_poly_cupola__pentagonal_counts_match_j5();
 }
 
 run_TestConstruction();

@@ -92,6 +92,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `src/polysymmetrica/core/attach.scad` was deleted; construction is now the single home for attach/slice/cap workflows.
 - Generic `{n,p}` polygon/polygram helpers were hoisted into `core/funcs.scad` so prisms/antiprisms and future Johnson constructors share one geometry basis.
 - `poly_pyramid(n, p, edge, height=undef, height_scale=1)` defaults to the regular-equal-edge height when `height` is omitted; this now backs exact `j1_square_pyramid()` and `j2_pentagonal_pyramid()`.
+- `poly_cupola(n, edge, height=undef, height_scale=1)` now provides exact J3/J4/J5 cupolae from a direct concentric-polygon construction; `j3_triangular_cupola()`, `j4_square_cupola()`, and `j5_pentagonal_cupola()` are wrappers onto it.
 - `models/johnsons_all.scad` now exports `johnsons_all()` as `[name, fn]` like the other aggregate model files, though the set is still mixed exact/approximate/WIP.
 - `src/polysymmetrica/examples/basics/main_johnsons.scad` is the current runnable Johnson/construction demo surface; keep new direct constructors visible there as they are added.
 

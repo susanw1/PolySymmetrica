@@ -29,7 +29,10 @@ for (j = with_index(johnsons)) {
 constructors = [
     ["poly_pyramid(4)", function() poly_pyramid(4)],
     ["poly_pyramid(5)", function() poly_pyramid(5)],
-    ["poly_pyramid(5,2)", function() poly_pyramid(5, 2)]
+    ["poly_pyramid(5,2)", function() poly_pyramid(5, 2)],
+    ["poly_cupola(3)", function() poly_cupola(3)],
+    ["poly_cupola(4)", function() poly_cupola(4)],
+    ["poly_cupola(5)", function() poly_cupola(5)]
 ];
 
 for (c = with_index(constructors)) {

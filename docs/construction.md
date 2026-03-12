@@ -14,6 +14,7 @@ poly_boundary_loops(poly)
 poly_cap_loops(poly, loops=undef, cleanup=true, cleanup_eps=1e-8)
 poly_slice(poly, plane_pt, plane_n, keep="above", cap=true, cleanup=true, cleanup_eps=1e-8)
 poly_pyramid(n=4, p=1, edge=1, height=undef, height_scale=1)
+poly_cupola(n=3, edge=1, height=undef, height_scale=1)
 poly_attach(p1, p2, f1=0, f2=0, rotate_step=0, scale_mode="fit_edge", mirror=false, eps=1e-8, cleanup=true, cleanup_eps=1e-8)
 ```
 
@@ -33,6 +34,7 @@ wrappers would need anyway:
 The first direct Johnson-oriented constructor now also lives here:
 
 5. build a regular/star pyramid from a `{n,p}` base.
+6. build an exact n-gonal cupola from concentric top/base polygons.
 
 That keeps the topology changes visible and makes later Johnson/cupola/pyramid
 operations easier to reason about.
@@ -139,6 +141,37 @@ star = poly_pyramid(5, 2);
 Runnable demo:
 
 - `src/polysymmetrica/examples/basics/main_johnsons.scad`
+
+### `poly_cupola(...)`
+
+Builds an exact n-gonal cupola with:
+
+- a top n-gon,
+- a base 2n-gon,
+- alternating square and triangular side faces.
+
+Parameters:
+
+- `n`: top polygon arity
+- `edge`: common target edge length
+- `height`: explicit cupola height
+- `height_scale`: multiplier on the chosen height
+
+If `height=undef`, the constructor solves the exact cupola height from the
+apothem difference between the top n-gon and the base 2n-gon. This gives the
+exact Johnson cupolae:
+
+- `poly_cupola(3)` => J3 triangular cupola
+- `poly_cupola(4)` => J4 square cupola
+- `poly_cupola(5)` => J5 pentagonal cupola
+
+Examples:
+
+```scad
+j3 = poly_cupola(3);
+j4 = poly_cupola(4);
+j5 = poly_cupola(5);
+```
 
 ### `poly_attach(...)`
 

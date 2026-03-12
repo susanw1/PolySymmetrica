@@ -18,6 +18,7 @@
 //   so callers do not need to determine the boundary-loop orientation.
 // - `poly_pyramid(...)` is the first direct Johnson-oriented constructor here;
 //   it reuses the same {n,p} polygon helpers as prisms/antiprisms.
+// - `poly_cupola(...)` builds exact n-gonal cupolae with unit top/base/side edges.
 
 use <funcs.scad>
 use <cleanup.scad>
@@ -202,6 +203,23 @@ function _ps_pyramid_height(edge, radius, height, height_scale) =
     )
     h_base * height_scale;
 
+function _ps_cupola_height(n, edge, height, height_scale) =
+    let(
+        r_bot = _ps_polygram_radius(2 * n, 1, edge),
+        r_top = _ps_polygram_radius(n, 1, edge),
+        a_bot = r_bot * cos(90 / n),
+        a_top = r_top * cos(180 / n),
+        d = a_bot - a_top,
+        h_base = is_undef(height)
+            ? let(
+                h2 = edge * edge - d * d,
+                _ok = assert(h2 > 0, "poly_cupola: invalid n/edge for regular side faces")
+            )
+            sqrt(h2)
+            : height
+    )
+    h_base * height_scale;
+
 function _ps_points_eq3(a, b, eps) =
     ps_point_eq(a, b, eps);
 
@@ -330,6 +348,60 @@ function poly_pyramid(n=4, p=1, edge=1, height=undef, height_scale=1) =
                     b = cyc[(k+1) % n_eff]
                 )
                 [a, ai, b]
+            ]
+        ),
+        faces = ps_orient_all_faces_outward(verts, faces_raw),
+        ir = _ps_poly_ir(verts, faces),
+        e_over_ir = edge / ir
+    )
+    make_poly(verts, faces, e_over_ir);
+
+// Exact n-gonal cupola with unit top/base/side edges.
+//
+// - top face: n-gon
+// - base face: 2n-gon
+// - side faces: alternating n squares and n triangles
+//
+// Parameters:
+// - n: top polygon arity (n >= 3)
+// - edge: common target edge length
+// - height: explicit cupola height (undef => solve exact regular height)
+// - height_scale: multiplier applied to chosen height
+function poly_cupola(n=3, edge=1, height=undef, height_scale=1) =
+    let(
+        _n_ok = assert(abs(n - round(n)) < 1e-9 && round(n) >= 3, "poly_cupola: n must be an integer >= 3"),
+        n_eff = round(n),
+        _e_ok = assert(edge > 0, "poly_cupola: edge must be > 0"),
+        _hs_ok = assert(height_scale > 0, "poly_cupola: height_scale must be > 0"),
+        r_bot = _ps_polygram_radius(2 * n_eff, 1, edge),
+        r_top = _ps_polygram_radius(n_eff, 1, edge),
+        h = _ps_cupola_height(n_eff, edge, height, height_scale),
+        _h_ok = assert(h > 0, "poly_cupola: height must be > 0"),
+        z0 = -h / 2,
+        z1 = h / 2,
+        bottom = _ps_ngon_ring(2 * n_eff, r_bot, z0, 0),
+        top = _ps_ngon_ring(n_eff, r_top, z1, -90 / n_eff),
+        verts = concat(bottom, top),
+        ti = 2 * n_eff,
+        faces_raw = concat(
+            [[for (k = [0:1:2*n_eff-1]) k]],
+            [[for (k = [0:1:n_eff-1]) ti + k]],
+            [for (k = [0:1:n_eff-1])
+                let(
+                    b0 = (2 * k) % (2 * n_eff),
+                    b1 = (2 * k + 1) % (2 * n_eff),
+                    t0 = ti + k,
+                    t1 = ti + ((k + 1) % n_eff)
+                )
+                [b0, b1, t1, t0]
+            ],
+            [for (k = [0:1:n_eff-1])
+                let(
+                    bm = (2 * k - 1 + 2 * n_eff) % (2 * n_eff),
+                    b0 = (2 * k) % (2 * n_eff),
+                    t0 = ti + k
+                )
+                [bm, b0, t0]
             ]
         ),
         faces = ps_orient_all_faces_outward(verts, faces_raw),
