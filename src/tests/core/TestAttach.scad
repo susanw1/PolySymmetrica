@@ -1,5 +1,5 @@
 use <../../polysymmetrica/core/funcs.scad>
-use <../../polysymmetrica/core/attach.scad>
+use <../../polysymmetrica/core/construction.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
 

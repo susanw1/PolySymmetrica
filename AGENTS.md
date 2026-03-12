@@ -104,7 +104,10 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `poly_delete_faces(...)`
   - `poly_boundary_loops(...)`
   - `poly_cap_loops(...)`
+  - `poly_slice(...)`
+  - `poly_attach(...)`
 - Boundary detection there uses undirected edge multiplicity (`ps_face_has_edge(...) == 1`) and then keeps the directed occurrence from the surviving face. It is intentionally simple and reliable rather than optimized.
+- `poly_attach(...)` now lives in `core/construction.scad`; do not reintroduce a separate `core/attach.scad` split unless there is a very strong reason.
 
 ## Session Notes (Printing / Visible Face Pieces)
 - `face_plate.scad` now handles self-intersecting faces by first segmenting the 2D loop into simple loops and then building body/roof/clearance/pillow from those loops. Do not regress to lofting or hulling the raw self-intersecting loop.

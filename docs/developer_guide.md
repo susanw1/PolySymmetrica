@@ -62,7 +62,7 @@ PolySymmetrica/
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
 │   │   │   ├─ construction.scad    # delete/cap/slice construction helpers
-│   │   │   ├─ attach.scad          # face-to-face poly attachment
+│   │   │   ├─ construction.scad    # slice/cap/attach construction helpers
 │   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
