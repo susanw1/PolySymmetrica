@@ -5,31 +5,20 @@
 // SPDX-License-Identifier: MIT
 
 use <../core/funcs.scad>
+use <../core/construction.scad>
 
 // *** WARNING! *** 
 // These definitions are currently for experimentation only, to verify correct behaviour on non-uniform
 // shapes! One day we will have a complete list of all the johnsons, created with construction.
 // Even the names here are just placeholders.
 
-// J1: square pyramid (unit edge length, LHR orientation).
+// J1: square pyramid.
 function j1_square_pyramid() =
-    let(h = sqrt(2) / 2)
-    make_poly(
-        [
-            [ 0.5,  0.5, 0],  // 0
-            [-0.5,  0.5, 0],  // 1
-            [-0.5, -0.5, 0],  // 2
-            [ 0.5, -0.5, 0],  // 3
-            [ 0,    0,   h]   // 4 apex
-        ],
-        [
-            [0, 1, 2, 3],  // base (outside faces -Z)
-            [0, 4, 1],
-            [1, 4, 2],
-            [2, 4, 3],
-            [3, 4, 0]
-        ]
-    );
+    poly_pyramid(4);
+
+// J2: pentagonal pyramid.
+function j2_pentagonal_pyramid() =
+    poly_pyramid(5);
 
 // J3: triangular cupola (approximate coords; preview-only).
 // Not unit-edge; intended for placement/orientation experiments.
@@ -146,3 +135,16 @@ function j40_elongated_pentagonal_orthocupolarotunda_approx() =
         faces = ps_orient_all_faces_outward(verts, faces_raw)
     )
     make_poly(verts, faces);
+
+/**
+Return current Johnson previews as [[name, fn], ...],
+where fn is a zero-arg function returning the poly.
+
+These are still a mixed set of exact constructors and approximate placeholders.
+*/
+function johnsons_all() = [
+    ["j1_square_pyramid", function() j1_square_pyramid()],
+    ["j2_pentagonal_pyramid", function() j2_pentagonal_pyramid()],
+    ["j3_triangular_cupola_approx", function() j3_triangular_cupola_approx()],
+    ["j40_elongated_pentagonal_orthocupolarotunda_approx", function() j40_elongated_pentagonal_orthocupolarotunda_approx()]
+];

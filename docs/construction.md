@@ -13,6 +13,8 @@ poly_delete_faces(poly, fids, cap=false, cleanup=true, cleanup_eps=1e-8)
 poly_boundary_loops(poly)
 poly_cap_loops(poly, loops=undef, cleanup=true, cleanup_eps=1e-8)
 poly_slice(poly, plane_pt, plane_n, keep="above", cap=true, cleanup=true, cleanup_eps=1e-8)
+poly_pyramid(n=4, p=1, edge=1, height=undef, height_scale=1)
+poly_attach(p1, p2, f1=0, f2=0, rotate_step=0, scale_mode="fit_edge", mirror=false, eps=1e-8, cleanup=true, cleanup_eps=1e-8)
 ```
 
 ## Design Intent
@@ -27,6 +29,10 @@ wrappers would need anyway:
 2. recover open boundary loops,
 3. cap selected loops,
 4. slice by a plane and optionally cap the result.
+
+The first direct Johnson-oriented constructor now also lives here:
+
+5. build a regular/star pyramid from a `{n,p}` base.
 
 That keeps the topology changes visible and makes later Johnson/cupola/pyramid
 operations easier to reason about.
@@ -106,6 +112,39 @@ Example:
 top_half_open  = poly_slice(hexahedron(), [0,0,0], [0,0,1], keep="above", cap=false);
 top_half_closed = poly_slice(hexahedron(), [0,0,0], [0,0,1], keep="above", cap=true);
 ```
+
+### `poly_pyramid(...)`
+
+Builds a regular or star pyramid over a `{n,p}` base.
+
+Parameters:
+
+- `n`: number of base vertices
+- `p`: polygon step (`p=1` for an ordinary pyramid)
+- `edge`: base edge length
+- `height`: explicit apex-to-base-plane height
+- `height_scale`: multiplier on the chosen height
+
+If `height=undef`, the constructor solves the apex height so that the side edges
+match `edge`. That gives the exact Johnson J1/J2 forms for `n=4` and `n=5`.
+
+Examples:
+
+```scad
+j1 = poly_pyramid(4);
+j2 = poly_pyramid(5);
+star = poly_pyramid(5, 2);
+```
+
+Runnable demo:
+
+- `src/polysymmetrica/examples/basics/main_johnsons.scad`
+
+### `poly_attach(...)`
+
+`poly_attach(...)` is also part of the construction layer and is documented in
+[attach.md](attach.md). It is expected to work together with slicing, capping,
+and later cap/belt constructors for Johnson-style assemblies.
 
 ## Current Assumptions
 

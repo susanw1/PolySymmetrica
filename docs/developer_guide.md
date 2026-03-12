@@ -434,7 +434,7 @@ Tetrahedron is self-dual.
 platonics_all();      // [["tetrahedron", fn], ...]
 archimedians_all();   // 13 Archimedeans as [name, fn]
 catalans_all();       // Catalan duals as [name, fn]
-johnsons_all();       // early previews (approx / WIP)
+johnsons_all();       // current Johnson previews as [name, fn]
 ```
 
 ---

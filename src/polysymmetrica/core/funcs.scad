@@ -251,6 +251,51 @@ function _ps_sort(list, acc=[]) =
     _ps_sort(_ps_remove_first(list, mn), concat(acc, [mn]));
 
 ///////////////////////////////////////
+// ---- Polygon/polygram helpers ----
+// Euclidean gcd for integer validation.
+function _ps_gcd(a, b) =
+    let(ai = abs(round(a)), bi = abs(round(b)))
+    (bi == 0) ? ai : _ps_gcd(bi, ai % bi);
+
+// Validate Schläfli-like polygon params {n,p} for single-cycle polygrams.
+function _ps_validate_np(n, p, who) =
+    let(
+        n_i = round(n),
+        p_i = round(p),
+        _n_int = assert(abs(n - n_i) < 1e-9, str(who, ": n must be an integer")),
+        _p_int = assert(abs(p - p_i) < 1e-9, str(who, ": p must be an integer")),
+        _n_ok = assert(n_i >= 3, str(who, ": n must be >= 3")),
+        _p_ok = assert(p_i >= 1 && (2 * p_i) < n_i, str(who, ": p must satisfy 1 <= p < n/2")),
+        _cop = assert(_ps_gcd(n_i, p_i) == 1, str(who, ": n and p must be coprime"))
+    )
+    [n_i, p_i];
+
+// Circumradius for regular/star polygon {n,p} with edge/chord length `edge`.
+function _ps_polygram_radius(n, p, edge) =
+    edge / (2 * sin(180 * p / n));
+
+// Backward-compatible regular n-gon helper ({n,1}).
+function _ps_ngon_radius(n, edge) =
+    _ps_polygram_radius(n, 1, edge);
+
+// Single-cycle vertex order for {n,p}.
+function _ps_polygram_cycle(n, p) =
+    [for (k = [0:1:n-1]) (k * p) % n];
+
+// n-gon/polygram support ring at fixed z.
+function _ps_ngon_ring(n, radius, z, phase=0) =
+    [for (k = [0:1:n-1]) [radius * cos(360 * k / n + phase), radius * sin(360 * k / n + phase), z]];
+
+// Inter-radius from the minimum edge-midpoint radius of an explicit verts/faces mesh.
+function _ps_poly_ir(verts, faces) =
+    let(
+        edges = _ps_edges_from_faces(faces),
+        mids = [for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)],
+        ir = min(mids),
+        _ok = assert(ir > 0, "poly: inter-radius must be > 0")
+    ) ir;
+
+///////////////////////////////////////
 // ---- Linear algebra helpers ----
 function _ps_det3(m) =
     m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) -

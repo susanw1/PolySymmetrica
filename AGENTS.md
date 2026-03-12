@@ -75,11 +75,25 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - `classify.scad` now uses `_ps_*_keys_from(...)` forms directly; legacy wrapper variants were removed as dead code.
 - Keep debug/probe and generated artifacts in `/tmp`; do not leave temporary `.scad` probes in repo root.
-- `poly_attach(...)` lives in `core/attach.scad` and requires `poly_valid(..., "closed")` for both inputs.
+- `poly_attach(...)` lives in `core/construction.scad` and requires `poly_valid(..., "closed")` for both inputs.
   It aligns two selected planar faces (same arity), drops seam faces, then always seam-merges via `poly_cleanup(...)`.
   Use `rotate_step` for cyclic vertex correspondence and `scale_mode="fit_edge"` when input face sizes differ.
   `f1` now accepts either a scalar face index or a list (`f1=[...]`) to attach one copy of `p2` per listed face in a single pass.
   Attach mapping now defaults to chirality-preserving orientation (`mirror=false`); legacy reflected behavior is opt-in via `mirror=true`.
+
+## Session Notes (Construction Layer)
+- Construction primitives now live in `src/polysymmetrica/core/construction.scad`, including:
+  - `poly_delete_faces(...)`
+  - `poly_boundary_loops(...)`
+  - `poly_cap_loops(...)`
+  - `poly_slice(...)`
+  - `poly_attach(...)`
+  - `poly_pyramid(...)`
+- `src/polysymmetrica/core/attach.scad` was deleted; construction is now the single home for attach/slice/cap workflows.
+- Generic `{n,p}` polygon/polygram helpers were hoisted into `core/funcs.scad` so prisms/antiprisms and future Johnson constructors share one geometry basis.
+- `poly_pyramid(n, p, edge, height=undef, height_scale=1)` defaults to the regular-equal-edge height when `height` is omitted; this now backs exact `j1_square_pyramid()` and `j2_pentagonal_pyramid()`.
+- `models/johnsons_all.scad` now exports `johnsons_all()` as `[name, fn]` like the other aggregate model files, though the set is still mixed exact/approximate/WIP.
+- `src/polysymmetrica/examples/basics/main_johnsons.scad` is the current runnable Johnson/construction demo surface; keep new direct constructors visible there as they are added.
 
 ## Session Notes (Non-Planar Face Frames)
 - `place_on_faces(...)` now uses a frame normal intended for placement (`ps_face_frame_normal(...)`) rather than relying only on the first triangle normal.

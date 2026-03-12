@@ -2,6 +2,7 @@ use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/construction.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
+use <../../polysymmetrica/models/johnsons_all.scad>
 
 module assert_int_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
@@ -70,6 +71,30 @@ module test_poly_slice__cube_midplane_capped() {
     assert_int_eq(len(poly_edges(p)), 12, "cube mid-slice capped edge count");
 }
 
+module test_poly_pyramid__square_counts_match_j1() {
+    p = poly_pyramid(4);
+    q = j1_square_pyramid();
+    assert_true(poly_valid(p, "closed"), "square pyramid should be closed");
+    assert_int_eq(len(poly_verts(p)), 5, "square pyramid vertex count");
+    assert_int_eq(len(poly_faces(p)), 5, "square pyramid face count");
+    assert_int_eq(len(poly_edges(p)), 8, "square pyramid edge count");
+    assert_int_eq(len(poly_verts(q)), 5, "J1 wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 5, "J1 wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 8, "J1 wrapper edge count");
+}
+
+module test_poly_pyramid__pentagonal_counts_match_j2() {
+    p = poly_pyramid(5);
+    q = j2_pentagonal_pyramid();
+    assert_true(poly_valid(p, "closed"), "pentagonal pyramid should be closed");
+    assert_int_eq(len(poly_verts(p)), 6, "pentagonal pyramid vertex count");
+    assert_int_eq(len(poly_faces(p)), 6, "pentagonal pyramid face count");
+    assert_int_eq(len(poly_edges(p)), 10, "pentagonal pyramid edge count");
+    assert_int_eq(len(poly_verts(q)), 6, "J2 wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 6, "J2 wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 10, "J2 wrapper edge count");
+}
+
 module run_TestConstruction() {
     test_poly_boundary_loops__cube_missing_one_face();
     test_poly_delete_faces__cube_missing_one_face_open();
@@ -78,6 +103,8 @@ module run_TestConstruction() {
     test_poly_boundary_loops__cube_missing_two_faces();
     test_poly_slice__cube_midplane_open();
     test_poly_slice__cube_midplane_capped();
+    test_poly_pyramid__square_counts_match_j1();
+    test_poly_pyramid__pentagonal_counts_match_j2();
 }
 
 run_TestConstruction();

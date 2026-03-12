@@ -16,6 +16,8 @@
 //   boundary loops, then adds caps over those loops.
 // - Cap winding is normalized through `poly_cleanup(..., fix_winding=true)`,
 //   so callers do not need to determine the boundary-loop orientation.
+// - `poly_pyramid(...)` is the first direct Johnson-oriented constructor here;
+//   it reuses the same {n,p} polygon helpers as prisms/antiprisms.
 
 use <funcs.scad>
 use <cleanup.scad>
@@ -188,6 +190,18 @@ function _ps_clip_edge_point(a, b, da, db, eps=1e-12) =
     let(den = da - db)
     (abs(den) <= eps) ? a : (a + (da / den) * (b - a));
 
+function _ps_pyramid_height(edge, radius, height, height_scale) =
+    let(
+        h_base = is_undef(height)
+            ? let(
+                h2 = edge * edge - radius * radius,
+                _ok = assert(h2 > 0, "poly_pyramid: invalid n/p/edge for regular side edges")
+            )
+            sqrt(h2)
+            : height
+    )
+    h_base * height_scale;
+
 function _ps_points_eq3(a, b, eps) =
     ps_point_eq(a, b, eps);
 
@@ -284,6 +298,45 @@ function poly_slice(
     cap
         ? poly_cap_loops(p_norm, cleanup=cleanup, cleanup_eps=cleanup_eps)
         : p_norm;
+
+// Regular/star pyramid with {n,p} base and a single apex.
+//
+// - n: number of base sides
+// - p: polygon step (1 <= p < n/2, gcd(n,p)=1). p=1 => ordinary pyramid.
+// - edge: target base edge length; with height=undef this is also the side edge length.
+// - height: explicit apex-to-base-plane height (undef => solve regular side edges)
+// - height_scale: multiplier applied to the chosen base height
+function poly_pyramid(n=4, p=1, edge=1, height=undef, height_scale=1) =
+    let(
+        np = _ps_validate_np(n, p, "poly_pyramid"),
+        n_eff = np[0],
+        p_eff = np[1],
+        _e_ok = assert(edge > 0, "poly_pyramid: edge must be > 0"),
+        _hs_ok = assert(height_scale > 0, "poly_pyramid: height_scale must be > 0"),
+        r = _ps_polygram_radius(n_eff, p_eff, edge),
+        h = _ps_pyramid_height(edge, r, height, height_scale),
+        _h_ok = assert(h > 0, "poly_pyramid: height must be > 0"),
+        z0 = -h / 2,
+        apex = [0, 0, h / 2],
+        base = _ps_ngon_ring(n_eff, r, z0, 0),
+        cyc = _ps_polygram_cycle(n_eff, p_eff),
+        verts = concat(base, [apex]),
+        ai = n_eff,
+        faces_raw = concat(
+            [[for (k = [0:1:n_eff-1]) cyc[k]]],
+            [for (k = [0:1:n_eff-1])
+                let(
+                    a = cyc[k],
+                    b = cyc[(k+1) % n_eff]
+                )
+                [a, ai, b]
+            ]
+        ),
+        faces = ps_orient_all_faces_outward(verts, faces_raw),
+        ir = _ps_poly_ir(verts, faces),
+        e_over_ir = edge / ir
+    )
+    make_poly(verts, faces, e_over_ir);
 
 // Attach p2 onto p1 by aligning selected planar faces and removing the seam faces.
 function poly_attach(
