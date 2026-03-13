@@ -278,7 +278,7 @@ function _ps_poly_uniform_scale(poly, s) =
         poly_e_over_ir(poly)
     ];
 
-function _ps_poly_from_face_points_preserve_scale(faces_pts_all, eps=1e-8) =
+function _ps_poly_from_face_points_preserve_scale(faces_pts_all, e_over_ir, eps=1e-8) =
     let(
         all_pts = [for (fp = faces_pts_all) for (p = fp) p],
         uniq_verts = _ps_unique_points(all_pts, eps),
@@ -288,7 +288,7 @@ function _ps_poly_from_face_points_preserve_scale(faces_pts_all, eps=1e-8) =
         _0 = assert(len(faces_keep) > 0, "slice: no faces remain after clipping"),
         faces_out = ps_orient_all_faces_outward(uniq_verts, faces_keep)
     )
-    make_poly(uniq_verts, faces_out);
+    [uniq_verts, faces_out, e_over_ir];
 
 // Slice a closed polyhedron by a plane and keep one side.
 // plane is given as point+normal; `keep` is "above" or "below" relative to the normal.
@@ -315,12 +315,12 @@ function poly_slice(
                 _ps_clip_face_to_halfspace(face_pts, plane_pt, n_hat, keep, cleanup_eps)
         ],
         keep_faces = [for (fp = clipped_faces) if (len(fp) >= 3) fp],
-        p_open = _ps_poly_from_face_points_preserve_scale(keep_faces, cleanup_eps),
+        p_open = _ps_poly_from_face_points_preserve_scale(keep_faces, poly_e_over_ir(poly), cleanup_eps),
         p_norm = cleanup
             ? poly_cleanup(
                 p_open,
                 eps=cleanup_eps,
-                fix_winding=false,
+                fix_winding=true,
                 drop_degenerate=true,
                 triangulate_nonplanar=false,
                 merge_vertices=true,

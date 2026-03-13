@@ -21,13 +21,13 @@ function ps_clamp(x, lo, hi) = min(max(x, lo), hi);
 function make_poly(verts, faces, e_over_ir=undef) =
     let(
         // Validation
-        _0 = assert(len(verts) >= 4, "Polyhedron must have at least 4 vertices"),
-        _1 = assert(len(faces) >= 4, "Polyhedron must have at least 4 faces"),
+        _0 = assert(len(verts) >= 3, "Polyhedron must have at least 3 vertices"),
+        _1 = assert(len(faces) >= 1, "Polyhedron must have at least 1 face"),
         _2 = assert(ps_faces_valid(verts, faces), "Invalid face indices"),
 
         // Auto-compute if not provided
         edges = _ps_edges_from_faces(faces),
-        _3 = assert(len(edges) >= 6, "Polyhedron must have at least 6 edges"),
+        _3 = assert(len(edges) >= 1, "Polyhedron must have at least 1 edge"),
         center = _ps_poly_mid_center(verts, faces),
         verts_centered = [for (v = verts) v - center],
 

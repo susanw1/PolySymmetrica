@@ -127,6 +127,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Boundary detection there uses undirected edge multiplicity (`ps_face_has_edge(...) == 1`) and then keeps the directed occurrence from the surviving face. It is intentionally simple and reliable rather than optimized.
 - `poly_attach(...)` now lives in `core/construction.scad`; do not reintroduce a separate `core/attach.scad` split unless there is a very strong reason.
 - `make_poly(...)` and `_ps_poly_ir(...)` now recenter geometry by the mean edge-midpoint center before computing/storing `e_over_ir`. This is required for asymmetric construction/transform outputs (e.g. elongated Johnsons, non-uniform truncations) to keep descriptor scaling meaningful.
+- Open construction shells are now valid poly descriptors for internal workflows. `make_poly(...)` no longer insists on 4 faces / 6 edges, which lets `poly_slice(..., cap=true)` keep a 3-face intermediate shell alive until capping closes it.
 - Construction editing APIs should reject non-integer face IDs up front. Do not silently `round()` computed/parameterized face indices before validating them, or topology can be corrupted without any error.
 
 ## Session Notes (Printing / Visible Face Pieces)

@@ -71,6 +71,25 @@ module test_poly_slice__cube_midplane_capped() {
     assert_int_eq(len(poly_edges(p)), 12, "cube mid-slice capped edge count");
 }
 
+module test_poly_slice__tetra_near_vertex_open_allows_three_face_shell() {
+    n = v_norm([1,1,1]);
+    p = poly_slice(tetrahedron(), 0.6 * n, n, keep="above", cap=false);
+    loops = poly_boundary_loops(p);
+    assert_false(poly_valid(p, "closed"), "tetra near-vertex open slice should be open");
+    assert_int_eq(len(poly_faces(p)), 3, "tetra near-vertex open slice face count");
+    assert_int_eq(len(poly_edges(p)), 6, "tetra near-vertex open slice edge count");
+    assert_int_eq(len(loops), 1, "tetra near-vertex open slice boundary loop count");
+    assert_int_eq(len(loops[0]), 3, "tetra near-vertex open slice loop arity");
+}
+
+module test_poly_slice__tetra_near_vertex_capped_recovers_closed_mesh() {
+    n = v_norm([1,1,1]);
+    p = poly_slice(tetrahedron(), 0.6 * n, n, keep="above", cap=true);
+    assert_true(poly_valid(p, "closed"), "tetra near-vertex capped slice should be closed");
+    assert_int_eq(len(poly_faces(p)), 4, "tetra near-vertex capped slice face count");
+    assert_int_eq(len(poly_edges(p)), 6, "tetra near-vertex capped slice edge count");
+}
+
 module test_poly_pyramid__square_counts_match_j1() {
     p = poly_pyramid(4);
     q = j1_square_pyramid();
@@ -175,6 +194,8 @@ module run_TestConstruction() {
     test_poly_boundary_loops__cube_missing_two_faces();
     test_poly_slice__cube_midplane_open();
     test_poly_slice__cube_midplane_capped();
+    test_poly_slice__tetra_near_vertex_open_allows_three_face_shell();
+    test_poly_slice__tetra_near_vertex_capped_recovers_closed_mesh();
     test_poly_pyramid__square_counts_match_j1();
     test_poly_pyramid__pentagonal_counts_match_j2();
     test_poly_cupola__triangular_counts_match_j3();
