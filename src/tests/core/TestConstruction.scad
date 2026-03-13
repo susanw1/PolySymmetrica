@@ -143,6 +143,30 @@ module test_poly_rotunda__counts_match_j6() {
     assert_int_eq(len(poly_edges(q)), 35, "J6 wrapper edge count");
 }
 
+module test_poly_elongate__triangular_cupola_counts() {
+    p = poly_elongate(j3_triangular_cupola(), f=0);
+    q = elongated_triangular_cupola();
+    assert_true(poly_valid(p, "closed"), "elongated triangular cupola should be closed");
+    assert_int_eq(len(poly_verts(p)), 15, "elongated triangular cupola vertex count");
+    assert_int_eq(len(poly_faces(p)), 14, "elongated triangular cupola face count");
+    assert_int_eq(len(poly_edges(p)), 27, "elongated triangular cupola edge count");
+    assert_int_eq(len(poly_verts(q)), 15, "elongated triangular cupola wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 14, "elongated triangular cupola wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 27, "elongated triangular cupola wrapper edge count");
+}
+
+module test_poly_gyroelongate__triangular_cupola_counts() {
+    p = poly_gyroelongate(j3_triangular_cupola(), f=0);
+    q = gyroelongated_triangular_cupola();
+    assert_true(poly_valid(p, "closed"), "gyroelongated triangular cupola should be closed");
+    assert_int_eq(len(poly_verts(p)), 15, "gyroelongated triangular cupola vertex count");
+    assert_int_eq(len(poly_faces(p)), 20, "gyroelongated triangular cupola face count");
+    assert_int_eq(len(poly_edges(p)), 33, "gyroelongated triangular cupola edge count");
+    assert_int_eq(len(poly_verts(q)), 15, "gyroelongated triangular cupola wrapper vertex count");
+    assert_int_eq(len(poly_faces(q)), 20, "gyroelongated triangular cupola wrapper face count");
+    assert_int_eq(len(poly_edges(q)), 33, "gyroelongated triangular cupola wrapper edge count");
+}
+
 module run_TestConstruction() {
     test_poly_boundary_loops__cube_missing_one_face();
     test_poly_delete_faces__cube_missing_one_face_open();
@@ -157,6 +181,8 @@ module run_TestConstruction() {
     test_poly_cupola__square_counts_match_j4();
     test_poly_cupola__pentagonal_counts_match_j5();
     test_poly_rotunda__counts_match_j6();
+    test_poly_elongate__triangular_cupola_counts();
+    test_poly_gyroelongate__triangular_cupola_counts();
 }
 
 run_TestConstruction();

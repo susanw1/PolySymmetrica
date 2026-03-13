@@ -21,12 +21,15 @@
 // - `poly_cupola(...)` builds exact n-gonal cupolae with unit top/base/side edges.
 // - `poly_rotunda(...)` is currently the exact pentagonal rotunda, built as a
 //   slice of the unit-edge icosidodecahedron.
+// - `poly_elongate(...)` / `poly_gyroelongate(...)` attach prism/antiprism belts
+//   onto a chosen face of an existing poly.
 
 use <funcs.scad>
 use <cleanup.scad>
 use <transform.scad>
 use <validate.scad>
 use <../models/archimedians_all.scad>
+use <prisms.scad>
 
 function _ps_face_drop_by_idx_list(faces, idxs) =
     [for (fi = [0:1:len(faces)-1]) if (!_ps_list_contains(idxs, fi)) faces[fi]];
@@ -428,6 +431,16 @@ function _ps_first_face_of_arity(poly, arity, who) =
     )
     idxs[0];
 
+function _ps_face_mean_edge_len(poly, fi, who) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        _0 = assert(fi >= 0 && fi < len(faces), str(who, ": face index out of range")),
+        face = faces[fi],
+        _1 = assert(len(face) >= 3, str(who, ": selected face arity must be >= 3"))
+    )
+    _ps_face_avg_edge_len(verts, face);
+
 // Exact pentagonal rotunda (J6), constructed as one capped half of an
 // icosidodecahedron sliced through the origin by a pentagon-face normal.
 function poly_rotunda(edge=1) =
@@ -441,6 +454,65 @@ function poly_rotunda(edge=1) =
         p = (abs(edge - 1) < 1e-12) ? half : _ps_poly_uniform_scale(half, edge)
     )
     p;
+
+// Attach a prism belt to a selected face.
+// This is the construction primitive behind elongated Johnson solids.
+function poly_elongate(
+    poly,
+    f=0,
+    height=undef,
+    height_scale=1,
+    rotate_step=0,
+    eps=1e-8,
+    cleanup=true,
+    cleanup_eps=1e-8
+) =
+    let(
+        f0 = is_list(f) ? f[0] : f,
+        edge = _ps_face_mean_edge_len(poly, f0, "poly_elongate"),
+        n = len(poly_faces(poly)[f0]),
+        belt = poly_prism(n, edge=edge, height=height, height_scale=height_scale)
+    )
+    poly_attach(
+        poly, belt,
+        f1=f, f2=0,
+        rotate_step=rotate_step,
+        scale_mode="fit_edge",
+        mirror=false,
+        eps=eps,
+        cleanup=cleanup,
+        cleanup_eps=cleanup_eps
+    );
+
+// Attach an antiprism belt to a selected face.
+// This is the construction primitive behind gyroelongated Johnson solids.
+function poly_gyroelongate(
+    poly,
+    f=0,
+    angle=0,
+    height=undef,
+    height_scale=1,
+    rotate_step=0,
+    eps=1e-8,
+    cleanup=true,
+    cleanup_eps=1e-8
+) =
+    let(
+        f0 = is_list(f) ? f[0] : f,
+        edge = _ps_face_mean_edge_len(poly, f0, "poly_gyroelongate"),
+        n = len(poly_faces(poly)[f0]),
+        belt = poly_antiprism(n, edge=edge, angle=angle, height=height, height_scale=height_scale)
+    )
+    poly_attach(
+        poly, belt,
+        f1=f, f2=0,
+        rotate_step=rotate_step,
+        scale_mode="fit_edge",
+        mirror=false,
+        eps=eps,
+        cleanup=cleanup,
+        cleanup_eps=cleanup_eps
+    );
 
 // Attach p2 onto p1 by aligning selected planar faces and removing the seam faces.
 function poly_attach(

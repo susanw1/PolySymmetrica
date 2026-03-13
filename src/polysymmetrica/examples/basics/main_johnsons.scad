@@ -33,7 +33,9 @@ constructors = [
     ["poly_cupola(3)", function() poly_cupola(3)],
     ["poly_cupola(4)", function() poly_cupola(4)],
     ["poly_cupola(5)", function() poly_cupola(5)],
-    ["poly_rotunda()", function() poly_rotunda()]
+    ["poly_rotunda()", function() poly_rotunda()],
+    ["poly_elongate(cupola3)", function() poly_elongate(poly_cupola(3), f=0)],
+    ["poly_gyroelongate(cupola3)", function() poly_gyroelongate(poly_cupola(3), f=0)]
 ];
 
 for (c = with_index(constructors)) {

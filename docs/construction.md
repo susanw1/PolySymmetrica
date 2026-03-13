@@ -16,6 +16,8 @@ poly_slice(poly, plane_pt, plane_n, keep="above", cap=true, cleanup=true, cleanu
 poly_pyramid(n=4, p=1, edge=1, height=undef, height_scale=1)
 poly_cupola(n=3, edge=1, height=undef, height_scale=1)
 poly_rotunda(edge=1)
+poly_elongate(poly, f=0, height=undef, height_scale=1, rotate_step=0, eps=1e-8, cleanup=true, cleanup_eps=1e-8)
+poly_gyroelongate(poly, f=0, angle=0, height=undef, height_scale=1, rotate_step=0, eps=1e-8, cleanup=true, cleanup_eps=1e-8)
 poly_attach(p1, p2, f1=0, f2=0, rotate_step=0, scale_mode="fit_edge", mirror=false, eps=1e-8, cleanup=true, cleanup_eps=1e-8)
 ```
 
@@ -37,6 +39,7 @@ The first direct Johnson-oriented constructor now also lives here:
 5. build a regular/star pyramid from a `{n,p}` base.
 6. build an exact n-gonal cupola from concentric top/base polygons.
 7. build an exact pentagonal rotunda as a slice of an Archimedean parent.
+8. insert prism/antiprism belts as elongation wrappers over existing solids.
 
 That keeps the topology changes visible and makes later Johnson/cupola/pyramid
 operations easier to reason about.
@@ -198,6 +201,43 @@ Example:
 ```scad
 j6 = poly_rotunda();
 j6_big = poly_rotunda(edge=2);
+```
+
+### `poly_elongate(...)`
+
+Attaches a prism belt to a selected face of an existing polyhedron.
+
+Current behavior:
+
+- inspects the selected face arity and mean edge length
+- builds a matching `poly_prism(...)`
+- attaches it with `poly_attach(...)`
+
+This is the construction primitive behind elongated Johnson-style solids.
+
+Example:
+
+```scad
+e3 = poly_elongate(poly_cupola(3), f=0);
+e4 = poly_elongate(poly_cupola(4), f=0);
+```
+
+### `poly_gyroelongate(...)`
+
+Attaches an antiprism belt to a selected face of an existing polyhedron.
+
+Current behavior:
+
+- inspects the selected face arity and mean edge length
+- builds a matching `poly_antiprism(...)`
+- attaches it with `poly_attach(...)`
+
+This is the construction primitive behind gyroelongated Johnson-style solids.
+
+Example:
+
+```scad
+g3 = poly_gyroelongate(poly_cupola(3), f=0);
 ```
 
 ### `poly_attach(...)`
