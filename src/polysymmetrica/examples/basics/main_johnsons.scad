@@ -44,8 +44,8 @@ for (j = with_index(johnsons)) {
 //    p = c[1][1]();
 //
 //    translate([spacing_x * i, spacing_y, 0]) demo(p, name = name);
-//    translate([spacing_x * i, spacing_y + label_y, label_z])
+//    translate([spacing_x * i, spacing_y - label_y, label_z])
 //        rotate([0, 0, -90])
 //            linear_extrude(height = label_height)
-//                text(name, size = label_size, halign = "left", valign = "center");
+//                text(name, size = label_size, halign = "right", valign = "center");
 //}
