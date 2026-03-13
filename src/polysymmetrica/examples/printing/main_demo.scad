@@ -5,10 +5,11 @@ use <../../core/truncation.scad>
 use <../../core/render.scad>
 use <../../core/classify.scad>
 use <../../core/prisms.scad>
-use <../../core/attach.scad>
+use <../../core/construction.scad>
 
 use <../../models/platonics_all.scad>
 use <../../models/archimedians_all.scad>
+use <../../models/johnsons_all.scad>
 
 use <edge_seg.scad>
 use <face_plate.scad>
@@ -33,7 +34,13 @@ IR = 20 * SC;
 //];
 
 //p = poly_cantellate(poly_antiprism(6), params_overrides=AP_CANT_ROWS);
-p = poly_antiprism(5, 2);
+//p = poly_prism(5);
+//p = poly_antiprism(5);
+//p = poly_prism(n=5, p=2);
+p = poly_antiprism(n=5, p=2, angle = 0);
+
+//p = j1_square_pyramid();
+//p = poly_dual(j2_pentagonal_pyramid());
 
 EDGE_T = 3.5 * SC; // 3.5
 FACE_T = 1.6 * SC; // 1.6 * SC;
@@ -92,5 +99,5 @@ module model(show_faces = undef, clear_airspace = true) {
     }
 }
 
-model(undef, true);
+model();
 //poly_render(p, 20);

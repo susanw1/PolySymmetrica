@@ -1,5 +1,5 @@
 use <../../polysymmetrica/core/funcs.scad>
-use <../../polysymmetrica/core/attach.scad>
+use <../../polysymmetrica/core/construction.scad>
 use <../../polysymmetrica/core/validate.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
 
@@ -100,3 +100,5 @@ module run_TestAttach() {
     test_poly_attach__multi_face_list();
     test_poly_attach__mirror_flag_changes_result();
 }
+
+run_TestAttach();

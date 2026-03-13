@@ -5,63 +5,36 @@
 // SPDX-License-Identifier: MIT
 
 use <../core/funcs.scad>
+use <../core/construction.scad>
 
 // *** WARNING! *** 
 // These definitions are currently for experimentation only, to verify correct behaviour on non-uniform
 // shapes! One day we will have a complete list of all the johnsons, created with construction.
 // Even the names here are just placeholders.
 
-// J1: square pyramid (unit edge length, LHR orientation).
+// J1: square pyramid.
 function j1_square_pyramid() =
-    let(h = sqrt(2) / 2)
-    make_poly(
-        [
-            [ 0.5,  0.5, 0],  // 0
-            [-0.5,  0.5, 0],  // 1
-            [-0.5, -0.5, 0],  // 2
-            [ 0.5, -0.5, 0],  // 3
-            [ 0,    0,   h]   // 4 apex
-        ],
-        [
-            [0, 1, 2, 3],  // base (outside faces -Z)
-            [0, 4, 1],
-            [1, 4, 2],
-            [2, 4, 3],
-            [3, 4, 0]
-        ]
-    );
+    poly_pyramid(4);
 
-// J3: triangular cupola (approximate coords; preview-only).
-// Not unit-edge; intended for placement/orientation experiments.
-function j3_triangular_cupola_approx() =
-    let(
-        r = 1,
-        s = sqrt(3) / 2,
-        h = 0.6,
-        verts = [
-            [ r, 0, 0],           // 0
-            [ r/2, s, 0],         // 1
-            [-r/2, s, 0],         // 2
-            [-r, 0, 0],           // 3
-            [-r/2, -s, 0],        // 4
-            [ r/2, -s, 0],        // 5
-            [ r, 0, h],           // 6 (top)
-            [-r/2, s, h],         // 7 (top)
-            [-r/2, -s, h]         // 8 (top)
-        ],
-        faces_raw = [
-            [6, 8, 7],            // top triangle (LHR)
-            [0, 1, 2, 3, 4, 5],   // bottom hex (LHR from below)
-            [6, 1, 0, 5],         // square
-            [7, 3, 2, 1],         // square
-            [8, 5, 4, 3],         // square
-            [6, 7, 1],            // triangle
-            [7, 8, 3],            // triangle
-            [8, 6, 5]             // triangle
-        ],
-        faces = ps_orient_all_faces_outward(verts, faces_raw)
-    )
-    make_poly(verts, faces);
+// J2: pentagonal pyramid.
+function j2_pentagonal_pyramid() =
+    poly_pyramid(5);
+
+// J3/J4/J5: exact cupolae.
+function j3_triangular_cupola() = poly_cupola(3);
+function j4_square_cupola() = poly_cupola(4);
+function j5_pentagonal_cupola() = poly_cupola(5);
+
+// J6: exact pentagonal rotunda.
+function j6_pentagonal_rotunda() = poly_rotunda();
+
+// J18/J19/J20: exact elongated cupolae via prism belts.
+function j18_elongated_triangular_cupola() = poly_elongate(j3_triangular_cupola(), f=0);
+function j19_elongated_square_cupola() = poly_elongate(j4_square_cupola(), f=0);
+function j20_elongated_pentagonal_cupola() = poly_elongate(j5_pentagonal_cupola(), f=0);
+
+// J22: exact gyroelongated triangular cupola via antiprism belt.
+function j22_gyroelongated_triangular_cupola() = poly_gyroelongate(j3_triangular_cupola(), f=0);
 
 // J40: elongated pentagonal orthocupolarotunda (imported coords; preview-only).
 // Faces are reoriented outward for LHR compatibility.
@@ -146,3 +119,23 @@ function j40_elongated_pentagonal_orthocupolarotunda_approx() =
         faces = ps_orient_all_faces_outward(verts, faces_raw)
     )
     make_poly(verts, faces);
+
+/**
+Return current Johnson previews as [[name, fn], ...],
+where fn is a zero-arg function returning the poly.
+
+These are still a mixed set of exact constructors and approximate placeholders.
+*/
+function johnsons_all() = [
+    ["j1_square_pyramid", function() j1_square_pyramid()],
+    ["j2_pentagonal_pyramid", function() j2_pentagonal_pyramid()],
+    ["j3_triangular_cupola", function() j3_triangular_cupola()],
+    ["j4_square_cupola", function() j4_square_cupola()],
+    ["j5_pentagonal_cupola", function() j5_pentagonal_cupola()],
+    ["j6_pentagonal_rotunda", function() j6_pentagonal_rotunda()],
+    ["j18_elongated_triangular_cupola", function() j18_elongated_triangular_cupola()],
+    ["j19_elongated_square_cupola", function() j19_elongated_square_cupola()],
+    ["j20_elongated_pentagonal_cupola", function() j20_elongated_pentagonal_cupola()],
+    ["j22_gyroelongated_triangular_cupola", function() j22_gyroelongated_triangular_cupola()],
+    ["j40_elongated_pentagonal_orthocupolarotunda_approx", function() j40_elongated_pentagonal_orthocupolarotunda_approx()]
+];

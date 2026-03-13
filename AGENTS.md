@@ -75,11 +75,29 @@ This repo is OpenSCAD-first; there is no separate build system.
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - `classify.scad` now uses `_ps_*_keys_from(...)` forms directly; legacy wrapper variants were removed as dead code.
 - Keep debug/probe and generated artifacts in `/tmp`; do not leave temporary `.scad` probes in repo root.
-- `poly_attach(...)` lives in `core/attach.scad` and requires `poly_valid(..., "closed")` for both inputs.
+- `poly_attach(...)` lives in `core/construction.scad` and requires `poly_valid(..., "closed")` for both inputs.
   It aligns two selected planar faces (same arity), drops seam faces, then always seam-merges via `poly_cleanup(...)`.
   Use `rotate_step` for cyclic vertex correspondence and `scale_mode="fit_edge"` when input face sizes differ.
   `f1` now accepts either a scalar face index or a list (`f1=[...]`) to attach one copy of `p2` per listed face in a single pass.
   Attach mapping now defaults to chirality-preserving orientation (`mirror=false`); legacy reflected behavior is opt-in via `mirror=true`.
+
+## Session Notes (Construction Layer)
+- Construction primitives now live in `src/polysymmetrica/core/construction.scad`, including:
+  - `poly_delete_faces(...)`
+  - `poly_boundary_loops(...)`
+  - `poly_cap_loops(...)`
+  - `poly_slice(...)`
+  - `poly_attach(...)`
+  - `poly_pyramid(...)`
+- `src/polysymmetrica/core/attach.scad` was deleted; construction is now the single home for attach/slice/cap workflows.
+- Generic `{n,p}` polygon/polygram helpers were hoisted into `core/funcs.scad` so prisms/antiprisms and future Johnson constructors share one geometry basis.
+- `poly_pyramid(n, p, edge, height=undef, height_scale=1)` defaults to the regular-equal-edge height when `height` is omitted; this now backs exact `j1_square_pyramid()` and `j2_pentagonal_pyramid()`.
+- `poly_cupola(n, edge, height=undef, height_scale=1)` now provides exact J3/J4/J5 cupolae from a direct concentric-polygon construction; `j3_triangular_cupola()`, `j4_square_cupola()`, and `j5_pentagonal_cupola()` are wrappers onto it.
+- `poly_rotunda(edge=1)` now provides exact J6 by slicing `icosidodecahedron()` through the origin using a pentagon-face normal and capping the decagonal cut.
+- `poly_elongate(...)` and `poly_gyroelongate(...)` are thin construction wrappers over `poly_attach(...)` plus `poly_prism(...)` / `poly_antiprism(...)`; current exact exemplars are elongated cupolae and a gyroelongated triangular cupola.
+- `models/johnsons_all.scad` now exports `johnsons_all()` as `[name, fn]` like the other aggregate model files, though the set is still mixed exact/approximate/WIP.
+- Public Johnson model wrappers in `models/johnsons_all.scad` should use `jNN_*` names consistently; keep descriptive names for generic construction helpers, not the model surface.
+- `src/polysymmetrica/examples/basics/main_johnsons.scad` is the current runnable Johnson/construction demo surface; keep new direct constructors visible there as they are added.
 
 ## Session Notes (Non-Planar Face Frames)
 - `place_on_faces(...)` now uses a frame normal intended for placement (`ps_face_frame_normal(...)`) rather than relying only on the first triangle normal.
@@ -97,6 +115,20 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
 - For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
+
+## Session Notes (Construction Toolkit)
+- Johnson-style construction should build on explicit topology tools first: delete faces, recover boundary loops, then cap them. Keep “repair” semantics visible instead of burying them in magical element-deletion helpers.
+- `core/construction.scad` now starts with:
+  - `poly_delete_faces(...)`
+  - `poly_boundary_loops(...)`
+  - `poly_cap_loops(...)`
+  - `poly_slice(...)`
+  - `poly_attach(...)`
+- Boundary detection there uses undirected edge multiplicity (`ps_face_has_edge(...) == 1`) and then keeps the directed occurrence from the surviving face. It is intentionally simple and reliable rather than optimized.
+- `poly_attach(...)` now lives in `core/construction.scad`; do not reintroduce a separate `core/attach.scad` split unless there is a very strong reason.
+- `make_poly(...)` and `_ps_poly_ir(...)` now recenter geometry by the mean edge-midpoint center before computing/storing `e_over_ir`. This is required for asymmetric construction/transform outputs (e.g. elongated Johnsons, non-uniform truncations) to keep descriptor scaling meaningful.
+- Open construction shells are now valid poly descriptors for internal workflows. `make_poly(...)` no longer insists on 4 faces / 6 edges, which lets `poly_slice(..., cap=true)` keep a 3-face intermediate shell alive until capping closes it.
+- Construction editing APIs should reject non-integer face IDs up front. Do not silently `round()` computed/parameterized face indices before validating them, or topology can be corrupted without any error.
 
 ## Session Notes (Printing / Visible Face Pieces)
 - `face_plate.scad` now handles self-intersecting faces by first segmenting the 2D loop into simple loops and then building body/roof/clearance/pillow from those loops. Do not regress to lofting or hulling the raw self-intersecting loop.

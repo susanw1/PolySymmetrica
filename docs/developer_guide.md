@@ -61,7 +61,8 @@ PolySymmetrica/
 │   │   │   ├─ transform_util.scad  # shared transform helpers
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
-│   │   │   ├─ attach.scad          # face-to-face poly attachment
+│   │   │   ├─ construction.scad    # delete/cap/slice construction helpers
+│   │   │   ├─ construction.scad    # slice/cap/attach construction helpers
 │   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
@@ -70,7 +71,7 @@ PolySymmetrica/
 │   │   │   ├─ platonics_all.scad
 │   │   │   ├─ archimedians_all.scad
 │   │   │   ├─ catalans_all.scad
-│   │   │   ├─ johnson_all.scad
+│   │   │   ├─ johnsons_all.scad
 │   │   │   ├─ tetrahedron.scad
 │   │   │   ├─ octahedron.scad
 │   │   │   └─ icosahedron.scad
@@ -102,6 +103,7 @@ Related deep-dive notes:
 - [Prisms and antiprisms](prisms.md)
 - [Params overrides](params_overrides.md)
 - [Face attachment](attach.md)
+- [Construction helpers](construction.md)
 
 ---
 
@@ -432,7 +434,7 @@ Tetrahedron is self-dual.
 platonics_all();      // [["tetrahedron", fn], ...]
 archimedians_all();   // 13 Archimedeans as [name, fn]
 catalans_all();       // Catalan duals as [name, fn]
-johnsons_all();       // early previews (approx / WIP)
+johnsons_all();       // current Johnson previews as [name, fn]
 ```
 
 ---

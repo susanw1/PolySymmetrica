@@ -291,3 +291,5 @@ module run_TestPlacement() {
     test_ps_face_visible_segments__cells_preserve_parent_winding();
     test_ps_face_geom_cut_segments__respects_fill_mode();
 }
+
+run_TestPlacement();

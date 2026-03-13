@@ -2,7 +2,7 @@
 
 `poly_attach` attaches one closed polyhedron to another by aligning a selected face from each, removing those seam faces, and welding the seam.
 
-Implemented in: `src/polysymmetrica/core/attach.scad`
+Implemented in: `src/polysymmetrica/core/construction.scad`
 
 ## API
 
@@ -56,7 +56,7 @@ poly_attach(
 Basic usage:
 
 ```scad
-use <../src/polysymmetrica/core/attach.scad>
+use <../src/polysymmetrica/core/construction.scad>
 use <../src/polysymmetrica/models/platonics_all.scad>
 
 q = poly_attach(hexahedron(), hexahedron(), f1=0, f2=0);

@@ -198,3 +198,5 @@ module run_TestDuals() {
     test_poly_dual__dual_dual_face_match_octa();
     test_poly_dual__empty_params_overrides_noop();
 }
+
+run_TestDuals();

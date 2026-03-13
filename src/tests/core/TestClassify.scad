@@ -104,3 +104,5 @@ module run_TestClassify() {
     test_classify__detail_refines_faces();
     test_classify__group_by_key_composite();
 }
+
+run_TestClassify();
