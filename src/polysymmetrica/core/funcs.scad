@@ -28,11 +28,13 @@ function make_poly(verts, faces, e_over_ir=undef) =
         // Auto-compute if not provided
         edges = _ps_edges_from_faces(faces),
         _3 = assert(len(edges) >= 6, "Polyhedron must have at least 6 edges"),
+        center = _ps_poly_mid_center(verts, faces),
+        verts_centered = [for (v = verts) v - center],
 
         // compute ir from min edge-midradius, not just the first edge
         mids = [
             for (e = edges)
-                norm((verts[e[0]] + verts[e[1]]) / 2)
+                norm((verts_centered[e[0]] + verts_centered[e[1]]) / 2)
         ],
         ir = min(mids),
         _ir_ok = assert(ir > 0, "make_poly: inter-radius (min edge-midradius) must be positive"),
@@ -42,12 +44,12 @@ function make_poly(verts, faces, e_over_ir=undef) =
         e_ir  = edges[ei_ir],
 
         computed_e_over_ir = is_undef(e_over_ir)
-            ? norm(verts[e_ir[1]] - verts[e_ir[0]]) / ir
+            ? norm(verts_centered[e_ir[1]] - verts_centered[e_ir[0]]) / ir
             : e_over_ir,
         
         _5 = assert(computed_e_over_ir > 0, "e_over_ir must be positive")
     )
-    [verts, faces, computed_e_over_ir];
+    [verts_centered, faces, computed_e_over_ir];
 
 // Fix face winding so each undirected edge appears in opposite directions.
 function poly_fix_winding(poly) =
@@ -287,10 +289,20 @@ function _ps_ngon_ring(n, radius, z, phase=0) =
     [for (k = [0:1:n-1]) [radius * cos(360 * k / n + phase), radius * sin(360 * k / n + phase), z]];
 
 // Inter-radius from the minimum edge-midpoint radius of an explicit verts/faces mesh.
+function _ps_poly_mid_center(verts, faces) =
+    let(
+        edges = _ps_edges_from_faces(faces),
+        mids = [for (e = edges) (verts[e[0]] + verts[e[1]]) / 2],
+        _ok = assert(len(mids) > 0, "poly: edge-midpoint center requires at least one edge")
+    )
+    v_scale(v_sum(mids), 1 / len(mids));
+
 function _ps_poly_ir(verts, faces) =
     let(
         edges = _ps_edges_from_faces(faces),
-        mids = [for (e = edges) norm((verts[e[0]] + verts[e[1]]) / 2)],
+        center = _ps_poly_mid_center(verts, faces),
+        verts_centered = [for (v = verts) v - center],
+        mids = [for (e = edges) norm((verts_centered[e[0]] + verts_centered[e[1]]) / 2)],
         ir = min(mids),
         _ok = assert(ir > 0, "poly: inter-radius must be > 0")
     ) ir;

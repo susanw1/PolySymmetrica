@@ -96,6 +96,18 @@ module test_make_poly__valid_tetra_computes_e_over_ir() {
     assert(poly_e_over_ir(p) > 0, "e_over_ir > 0");
 }
 
+module test_make_poly__recenters_off_origin_mesh_by_edge_midpoints() {
+    base = hexahedron();
+    shift = [3, -2, 5];
+    verts = [for (v = poly_verts(base)) v + shift];
+    faces = poly_faces(base);
+    p = make_poly(verts, faces);
+    mids = [for (e = poly_edges(p)) (poly_verts(p)[e[0]] + poly_verts(p)[e[1]]) / 2];
+    mid_avg = v_scale(v_sum(mids), 1 / len(mids));
+    assert_vec3_near(mid_avg, [0,0,0], 1e-9, "make_poly recenter by edge-midpoints");
+    assert_near(poly_e_over_ir(p), poly_e_over_ir(base), 1e-9, "make_poly preserves e_over_ir under translation");
+}
+
 // --- poly_fix_winding ---
 module test_poly_fix_winding__repairs_edge_dirs() {
     verts = [[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]];
@@ -358,7 +370,8 @@ module test_poly_face_center__matches_centroid_for_triangle() {
     faces = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
     p = make_poly(verts, faces, 1);
     c = poly_face_center(p, 0, 1);
-    assert_vec3_near(c, [2/3,2/3,0], 1e-12, "face center");
+    expect = ps_face_centroid(poly_verts(p), poly_faces(p)[0]);
+    assert_vec3_near(c, expect, 1e-12, "face center");
 }
 
 module test_poly_face_axes__orthonormalish() {
@@ -612,6 +625,7 @@ module run_TestFuncs() {
     test_all_indices_in_range__true_false();
     test_all_faces_valid__true_false();
     test_make_poly__valid_tetra_computes_e_over_ir();
+    test_make_poly__recenters_off_origin_mesh_by_edge_midpoints();
     test_poly_fix_winding__repairs_edge_dirs();
 
     test_v_ops__dot_cross_norm();
