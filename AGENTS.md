@@ -96,6 +96,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `poly_rotunda(edge=1)` now provides exact J6 by slicing `icosidodecahedron()` through the origin using a pentagon-face normal and capping the decagonal cut.
 - `poly_elongate(...)` and `poly_gyroelongate(...)` are thin construction wrappers over `poly_attach(...)` plus `poly_prism(...)` / `poly_antiprism(...)`; current exact exemplars are elongated cupolae and a gyroelongated triangular cupola.
 - `models/johnsons_all.scad` now exports `johnsons_all()` as `[name, fn]` like the other aggregate model files, though the set is still mixed exact/approximate/WIP.
+- Public Johnson model wrappers in `models/johnsons_all.scad` should use `jNN_*` names consistently; keep descriptive names for generic construction helpers, not the model surface.
 - `src/polysymmetrica/examples/basics/main_johnsons.scad` is the current runnable Johnson/construction demo surface; keep new direct constructors visible there as they are added.
 
 ## Session Notes (Non-Planar Face Frames)
@@ -125,6 +126,7 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `poly_attach(...)`
 - Boundary detection there uses undirected edge multiplicity (`ps_face_has_edge(...) == 1`) and then keeps the directed occurrence from the surviving face. It is intentionally simple and reliable rather than optimized.
 - `poly_attach(...)` now lives in `core/construction.scad`; do not reintroduce a separate `core/attach.scad` split unless there is a very strong reason.
+- Construction editing APIs should reject non-integer face IDs up front. Do not silently `round()` computed/parameterized face indices before validating them, or topology can be corrupted without any error.
 
 ## Session Notes (Printing / Visible Face Pieces)
 - `face_plate.scad` now handles self-intersecting faces by first segmenting the 2D loop into simple loops and then building body/roof/clearance/pillow from those loops. Do not regress to lofting or hulling the raw self-intersecting loop.

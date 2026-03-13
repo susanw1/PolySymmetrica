@@ -169,10 +169,12 @@ function poly_cap_loops(poly, loops=undef, cleanup=true, cleanup_eps=1e-8) =
 function poly_delete_faces(poly, fids, cap=false, cleanup=true, cleanup_eps=1e-8) =
     let(
         fids_raw = is_list(fids) ? fids : [fids],
+        fids_non_int = [for (fi = fids_raw) if (abs(fi - round(fi)) > 1e-9) fi],
+        _0 = assert(len(fids_non_int) == 0, "delete_faces: face indices must be integers"),
         fids_int = [for (fi = fids_raw) round(fi)],
         faces0 = poly_faces(poly),
         bad = [for (fi = fids_int) if (fi < 0 || fi >= len(faces0)) fi],
-        _0 = assert(len(bad) == 0, "delete_faces: face index out of range"),
+        _1 = assert(len(bad) == 0, "delete_faces: face index out of range"),
         faces1 = _ps_face_drop_by_idx_list(faces0, fids_int),
         p1 = [poly_verts(poly), faces1, poly_e_over_ir(poly)]
     )

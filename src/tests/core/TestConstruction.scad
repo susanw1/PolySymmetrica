@@ -145,7 +145,7 @@ module test_poly_rotunda__counts_match_j6() {
 
 module test_poly_elongate__triangular_cupola_counts() {
     p = poly_elongate(j3_triangular_cupola(), f=0);
-    q = elongated_triangular_cupola();
+    q = j18_elongated_triangular_cupola();
     assert_true(poly_valid(p, "closed"), "elongated triangular cupola should be closed");
     assert_int_eq(len(poly_verts(p)), 15, "elongated triangular cupola vertex count");
     assert_int_eq(len(poly_faces(p)), 14, "elongated triangular cupola face count");
@@ -157,7 +157,7 @@ module test_poly_elongate__triangular_cupola_counts() {
 
 module test_poly_gyroelongate__triangular_cupola_counts() {
     p = poly_gyroelongate(j3_triangular_cupola(), f=0);
-    q = gyroelongated_triangular_cupola();
+    q = j22_gyroelongated_triangular_cupola();
     assert_true(poly_valid(p, "closed"), "gyroelongated triangular cupola should be closed");
     assert_int_eq(len(poly_verts(p)), 15, "gyroelongated triangular cupola vertex count");
     assert_int_eq(len(poly_faces(p)), 20, "gyroelongated triangular cupola face count");

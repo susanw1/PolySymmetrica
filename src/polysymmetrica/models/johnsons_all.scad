@@ -28,13 +28,13 @@ function j5_pentagonal_cupola() = poly_cupola(5);
 // J6: exact pentagonal rotunda.
 function j6_pentagonal_rotunda() = poly_rotunda();
 
-// Exact elongated cupolae via prism belts.
-function elongated_triangular_cupola() = poly_elongate(j3_triangular_cupola(), f=0);
-function elongated_square_cupola() = poly_elongate(j4_square_cupola(), f=0);
-function elongated_pentagonal_cupola() = poly_elongate(j5_pentagonal_cupola(), f=0);
+// J18/J19/J20: exact elongated cupolae via prism belts.
+function j18_elongated_triangular_cupola() = poly_elongate(j3_triangular_cupola(), f=0);
+function j19_elongated_square_cupola() = poly_elongate(j4_square_cupola(), f=0);
+function j20_elongated_pentagonal_cupola() = poly_elongate(j5_pentagonal_cupola(), f=0);
 
-// Example gyroelongated cupola via antiprism belt.
-function gyroelongated_triangular_cupola() = poly_gyroelongate(j3_triangular_cupola(), f=0);
+// J22: exact gyroelongated triangular cupola via antiprism belt.
+function j22_gyroelongated_triangular_cupola() = poly_gyroelongate(j3_triangular_cupola(), f=0);
 
 // J40: elongated pentagonal orthocupolarotunda (imported coords; preview-only).
 // Faces are reoriented outward for LHR compatibility.
@@ -133,9 +133,9 @@ function johnsons_all() = [
     ["j4_square_cupola", function() j4_square_cupola()],
     ["j5_pentagonal_cupola", function() j5_pentagonal_cupola()],
     ["j6_pentagonal_rotunda", function() j6_pentagonal_rotunda()],
-    ["elongated_triangular_cupola", function() elongated_triangular_cupola()],
-    ["elongated_square_cupola", function() elongated_square_cupola()],
-    ["elongated_pentagonal_cupola", function() elongated_pentagonal_cupola()],
-    ["gyroelongated_triangular_cupola", function() gyroelongated_triangular_cupola()],
+    ["j18_elongated_triangular_cupola", function() j18_elongated_triangular_cupola()],
+    ["j19_elongated_square_cupola", function() j19_elongated_square_cupola()],
+    ["j20_elongated_pentagonal_cupola", function() j20_elongated_pentagonal_cupola()],
+    ["j22_gyroelongated_triangular_cupola", function() j22_gyroelongated_triangular_cupola()],
     ["j40_elongated_pentagonal_orthocupolarotunda_approx", function() j40_elongated_pentagonal_orthocupolarotunda_approx()]
 ];
