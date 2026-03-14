@@ -788,6 +788,35 @@ function _ps_seg_cut_entries_dedupe(entries, eps=1e-8, i=0, acc=[]) =
     )
     _ps_seg_cut_entries_dedupe(entries, eps, i + 1, acc2);
 
+function _ps_seg_merge_face_cut_group(group, eps=1e-8) =
+    (len(group) <= 1) ? group :
+    let(
+        pts = [for (g = group) each [g[0][0], g[0][1]]],
+        pair = _ps_seg_farthest_pair(pts),
+        line_ok = is_undef(pair) ? false : (
+            max([
+                for (p = pts)
+                    abs(_ps_seg_orient2(pair[0], pair[1], p))
+            ]) <= eps
+        )
+    )
+    line_ok
+        ? [[[pair[0], pair[1]], group[0][1], max([for (g = group) g[2]])]]
+        : group;
+
+function _ps_seg_merge_face_cut_entries(entries, eps=1e-8, i=0, done=[], acc=[]) =
+    (i >= len(entries)) ? acc :
+    let(
+        e = entries[i],
+        fj = e[1],
+        seen = len([for (d = done) if (d == fj) 1]) > 0,
+        group = [for (g = entries) if (g[1] == fj) g],
+        merged = _ps_seg_merge_face_cut_group(group, eps),
+        done2 = seen ? done : concat(done, [fj]),
+        acc2 = seen ? acc : concat(acc, merged)
+    )
+    _ps_seg_merge_face_cut_entries(entries, eps, i + 1, done2, acc2);
+
 function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     (is_undef(face_pts2d) || is_undef(poly_faces_idx) || is_undef(poly_verts_local)) ? [] :
     let(
@@ -807,8 +836,9 @@ function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_ver
                             [seg, fj, dihed]
         ],
         uniq = _ps_seg_cut_entries_dedupe(raw, eps),
+        merged = _ps_seg_merge_face_cut_entries(uniq, eps),
         out = [
-            for (e = uniq)
+            for (e = merged)
                 if (!(filter_parent && _ps_seg_is_parent_edge(e[0], face_pts2d, eps)))
                     e
         ]
@@ -833,20 +863,41 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
 function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     let(
         base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
-        cut_segs = ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent),
+        cut_entries = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent),
+        cut_segs = [for (e = cut_entries) e[0]],
         target_sign = (_ps_seg_poly_area2(face_pts2d) >= 0) ? 1 : -1
     )
     [
         for (base = base_segs)
             let(
-                cells = _ps_seg_split_simple_loop(base[0], cut_segs, eps)
+                cells = _ps_seg_split_simple_loop(base[0], cut_segs, eps),
+                vis_mask = [
+                    for (cell = cells)
+                        let(
+                            probe = _ps_seg_cycle_probe_point(cell[0], eps),
+                            hidden = _ps_seg_pt_occluded(probe, face_idx, poly_faces_idx, poly_verts_local, eps, mode)
+                        )
+                        !hidden
+                ],
+                all_visible = (len(vis_mask) > 0) && (min([for (v = vis_mask) v ? 1 : 0]) == 1),
+                hidden_idxs = [for (ci = [0:1:len(cells)-1]) if (!vis_mask[ci]) ci],
+                hidden_interior_only =
+                    (len(hidden_idxs) > 0) &&
+                    (min([
+                        for (ci = hidden_idxs)
+                            sum([for (k = cells[ci][3]) (k == "parent") ? 1 : 0])
+                    ]) == 0),
+                cut_counts = [for (cell = cells) sum([for (k = cell[3]) (k == "cut") ? 1 : 0])]
             )
-            for (cell = cells)
-                let(
-                    probe = _ps_seg_cycle_probe_point(cell[0], eps),
-                    hidden = _ps_seg_pt_occluded(probe, face_idx, poly_faces_idx, poly_verts_local, eps, mode)
-                )
-                if (!hidden) _ps_seg_orient_cell(cell, target_sign, eps)
+            each (
+                (
+                    (all_visible || hidden_interior_only)
+                    ? [_ps_seg_orient_cell(base, target_sign, eps)]
+                    : [
+                        for (ci = [0:1:len(cells)-1])
+                            if (vis_mask[ci]) _ps_seg_orient_cell(cells[ci], target_sign, eps)
+                    ])
+            )
     ];
 
 // Iterate geometry-derived cut segments for current face.

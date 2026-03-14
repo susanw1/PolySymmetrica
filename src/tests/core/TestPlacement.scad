@@ -238,6 +238,21 @@ module test_ps_face_visible_segments__star_antiprism_side_reduced() {
     }
 }
 
+module test_ps_face_visible_segments__star_prism_side_keeps_two_side_quads() {
+    p = poly_prism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            assert_int_eq(len(vis), 2, "star prism side should keep two visible side panels");
+            for (s = vis) {
+                assert_int_eq(len(s[0]), 4, "each star prism side panel should be a quad");
+                assert(abs(_ps_seg_poly_area2(s[0])) > 1e-6, "star prism side panel visible area should stay positive");
+                assert(sum([for (k = s[3]) (k == "cut") ? 1 : 0]) >= 1, "star prism side panels should include cut edges");
+            }
+        }
+    }
+}
+
 module test_ps_face_visible_segments__cells_preserve_parent_winding() {
     p = poly_antiprism(5, 2);
     faces = poly_faces(p);
@@ -270,8 +285,12 @@ module test_ps_face_geom_cut_segments__respects_fill_mode() {
     );
     segs_evenodd = ps_face_geom_cut_segments(target, 0, faces, verts_local, 1e-8, "evenodd", true);
     segs_nonzero = ps_face_geom_cut_segments(target, 0, faces, verts_local, 1e-8, "nonzero", true);
+    len_evenodd = norm(segs_evenodd[0][1] - segs_evenodd[0][0]);
+    len_nonzero = norm(segs_nonzero[0][1] - segs_nonzero[0][0]);
     assert(len(segs_evenodd) > 0, "synthetic star cutter should generate some cut geometry");
-    assert(len(segs_nonzero) > len(segs_evenodd), str("nonzero star cutter should yield more cut segments than evenodd evenodd=", len(segs_evenodd), " nonzero=", len(segs_nonzero)));
+    assert(len(segs_nonzero) > 0, "synthetic star cutter should generate some nonzero cut geometry");
+    assert(segs_nonzero[0] != segs_evenodd[0], str("nonzero and evenodd cut segments should differ evenodd=", segs_evenodd, " nonzero=", segs_nonzero));
+    assert(len_nonzero > len_evenodd + 1e-6, str("nonzero star cutter should span a longer merged cut evenodd=", len_evenodd, " nonzero=", len_nonzero));
 }
 
 module run_TestPlacement() {
@@ -288,6 +307,7 @@ module run_TestPlacement() {
     test_seg_face_tris3__star_area_matches_segments();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
+    test_ps_face_visible_segments__star_prism_side_keeps_two_side_quads();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
     test_ps_face_geom_cut_segments__respects_fill_mode();
 }

@@ -39,7 +39,7 @@ IR = 20 * SC;
 //p = poly_prism(n=5, p=2);
 p = poly_antiprism(n=5, p=2, angle = 0);
 
-//p = j1_square_pyramid();
+//p = j1_square_pyramid();l
 //p = poly_dual(j2_pentagonal_pyramid());
 
 EDGE_T = 3.5 * SC; // 3.5

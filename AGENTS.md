@@ -138,6 +138,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `place_on_face_visible_segments(...)`
   - `face_visible_mask(...)`
 - This path works by splitting a face by geometry-derived cut segments, then discarding cells occluded by other local triangles. It is preferable to `hull() face_cut_stencil(...)` for printing because it avoids magic-number cutters and over-subtraction.
+- If cut lines split a face but every child cell remains visible, keep the original unsplit face cell.
+- Star-prism side faces should resolve to the two visible side panels after spike occlusion; do not collapse that case to a single octagon or center strip.
 - When splitting a simple face by cut segments, do not require child cell winding to match the outer boundary. The traversal can yield mixed orientation for valid cells.
 - Endpoint-on-boundary intersections matter for cut segmentation. A strict interior/interior-only segment intersection test will miss essential split nodes.
 

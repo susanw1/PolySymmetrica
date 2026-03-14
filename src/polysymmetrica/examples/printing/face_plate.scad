@@ -475,7 +475,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
 
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
         ramped_thk = face_thk - top_thk;
-        color(len(pts) == 4 ? "white" : "red") {
+        color(len(pts) == 3 ? "white" : "red") {
             _render_body_loops(body_loops, base_z_eff, ramped_thk);
             _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
 
