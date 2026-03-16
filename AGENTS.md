@@ -110,6 +110,10 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
   - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
+## Session Notes (Printing Segmentation)
+- The more robust printing model is to clip the already-built full `face_plate(...)` solid by per-cell masks from `ps_face_visible_segments(...)`, not to rebuild each visible cell as an independent face. That preserves original parent-edge bevel geometry on star-prism side faces.
+- Cut-edge beveling for segmented printable pieces remains unresolved: the attempted wedge-subtraction path did not yet produce the intended outward-opening V on sharp star-prism cuts, so the stable baseline is currently full-face clipping plus vertical cut clearance only.
+
 ## Session Notes (Printing Face Segmentation)
 - `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
 - Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.

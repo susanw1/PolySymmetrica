@@ -360,7 +360,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 
     base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z; // base Z coord
     ramped_thk = face_thk - top_thk; // actual thickness of ramped part
-    color(len(pts) == 3 ? "white" : "red") {
+    color(len(pts) == 4 ? "white" : "red") {
         _render_body_loops(body_loops, base_z_eff, ramped_thk);
         _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
 
@@ -392,30 +392,25 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     }
 }
 
-function _body_loops_from_visible_cells(cells, diheds, insets, cut_entries, edge_inset) =
-    [
-        for (c = cells)
-            let(
-                s_pts = c[0],
-                s_edge_ids = c[2],
-                s_kinds = c[3],
-                m = len(s_pts),
-                s_insets = [
-                    for (k = [0:1:m-1])
-                        (_safe_at(s_kinds, k, "cut") == "parent")
-                            ? _safe_at(insets, _safe_at(s_edge_ids, k, 0), 0)
-                            : 0
-                ],
-                s_diheds = [
-                    for (k = [0:1:m-1])
-                        (_safe_at(s_kinds, k, "cut") == "parent")
-                            ? _safe_at(diheds, _safe_at(s_edge_ids, k, 0), 180)
-                            : _safe_at(_safe_at(cut_entries, _safe_at(s_edge_ids, k, 0), [undef, undef, 180]), 2, 180)
-                ],
-                s_top2d = _offset_pts2d_inset_edges(s_pts, s_insets)
-            )
-            [s_top2d, s_diheds]
-    ];
+function _visible_cell_mask_loop(cell, cut_clearance) =
+    let(
+        s_pts = cell[0],
+        s_kinds = cell[3],
+        m = len(s_pts),
+        insets = [
+            for (k = [0:1:m-1])
+                (_safe_at(s_kinds, k, "cut") == "parent") ? 0 : cut_clearance
+        ]
+    )
+    _offset_pts2d_inset_edges(s_pts, insets);
+
+module _visible_cell_mask(cell, cut_clearance, z0, z1) {
+    loop = _visible_cell_mask_loop(cell, cut_clearance);
+    if (len(loop) >= 3)
+        translate([0, 0, z0])
+            linear_extrude(height = z1 - z0)
+                ps_polygon(points = loop, mode = "nonzero");
+}
 
 // Visible-face variant for printing segmented parts directly.
 // If there are no geometry cut segments, it falls back to the normal face_plate
@@ -435,12 +430,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
     assert(!is_undef($ps_poly_faces_idx), "face_plate_visible: requires place_on_faces context");
     assert(!is_undef($ps_poly_verts_local), "face_plate_visible: requires place_on_faces context");
 
-    n = len(pts);
-    insets = (is_undef(insets_override) || len(insets_override) != n)
-        ? [for (k = [0:1:len(pts)-1]) _gap_inset(diheds[k], edge_inset)]
-        : insets_override;
-    cut_entries = ps_face_geom_cut_entries(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
-    cut_segs = [for (e = cut_entries) e[0]];
+    cut_segs = ps_face_geom_cut_segments(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
 
     if (len(cut_segs) == 0) {
         face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
@@ -456,51 +446,27 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
         );
     } else {
         vis_cells = ps_face_visible_segments(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
-        body_loops = (edge_inset > 0)
-            ? _body_loops_from_visible_cells(vis_cells, diheds, insets, cut_entries, edge_inset)
-            : [
-                for (c = vis_cells)
-                    [c[0], [
-                        for (k = [0:1:len(c[0])-1])
-                            (_safe_at(c[3], k, "cut") == "parent")
-                                ? _safe_at(diheds, _safe_at(c[2], k, 0), 180)
-                                : 180
-                    ]]
-            ];
-
-        roof_loops = [for (bd = body_loops) bd[0]];
-        pts_gap = roof_loops[0];
-        centroid = _pts_centroid2d(pts_gap);
-        rad = _pts_radius2d(pts_gap, centroid);
-
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
-        ramped_thk = face_thk - top_thk;
-        color(len(pts) == 3 ? "white" : "red") {
-            _render_body_loops(body_loops, base_z_eff, ramped_thk);
-            _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
-
-            if (rad > pillow_min_rad) {
-                for (ci = [0:1:len(vis_cells)-1]) {
-                    cell = vis_cells[ci];
-                    loop = roof_loops[ci];
-                    m = len(loop);
-                    kinds = cell[3];
-                    p0 = _offset_pts2d_inset_edges(loop, [
-                        for (k = [0:1:m-1])
-                            (_safe_at(kinds, k, "cut") == "parent") ? pillow_inset : 0
-                    ]);
-                    p1 = _offset_pts2d_inset_edges(loop, [
-                        for (k = [0:1:m-1])
-                            (_safe_at(kinds, k, "cut") == "parent") ? (pillow_inset + pillow_ramp) : pillow_ramp
-                    ]);
-                    if (len(p0) >= 3 && len(p1) == len(p0))
-                        translate([0, 0, base_z_eff + face_thk])
-                            _poly_loft_loops(p0, p1, 0, pillow_thk, eps);
+        z0 = base_z_eff - max(clear_height, face_thk + pillow_thk + clear_height);
+        z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
+        cut_clearance = edge_inset / 2;
+        union() {
+            for (cell = vis_cells) {
+                intersection() {
+                    face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
+                        edge_inset = edge_inset,
+                        pillow_min_rad = pillow_min_rad,
+                        pillow_inset = pillow_inset,
+                        pillow_ramp = pillow_ramp,
+                        pillow_thk = pillow_thk,
+                        top_thk = top_thk,
+                        base_z = base_z,
+                        clear_height = clear_height,
+                        eps = eps
+                    );
+                    _visible_cell_mask(cell, cut_clearance, z0, z1);
                 }
             }
-
-            if (clear_space)
-                _render_clearance_loops(roof_loops, base_z_eff + face_thk - eps, clear_height);
         }
     }
 }
