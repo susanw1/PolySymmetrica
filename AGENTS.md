@@ -122,8 +122,10 @@ This repo is OpenSCAD-first; there is no separate build system.
 - The stable baseline for segmented printing remains: full child geometry clipped by visible-cell volumes. Optional cut-band subtraction is exposed in core but should stay opt-in until the join geometry is proven robust.
 - `examples/printing/face_plate.scad` now exposes that same choice via `face_plate_visible(..., seg_apply_cut_bands=...)`, but default behavior must remain the stable baseline.
 - Important ownership rule: when `apply_cut_bands=true`, cut-edge clearance should come from the cut-band subtraction, not from also shrinking the visible-cell mask. Avoid double-applying cut-edge retreat.
-- Current unresolved issue is specifically the cut-band **cross-section profile**. The abstraction is now correct (face-local region volumes + optional profiled cut bands), but a profile that collapses to `u=0` through the upper region produces the wrong blunt 90-degree cut on star-prism joins.
-- Next iterations should change only the profile shape in `core/face_regions.scad`, preferably expressed against explicit `z_below/z_above` extent data, not rework wrappers or push more logic back into `face_plate.scad`.
+- Consumer rule: the core cut-band helpers expect the full intended join clearance. Do not halve `edge_inset` before passing it in; the core geometry already distributes that clearance across the two neighboring pieces.
+- The default generic cut-band path in `core/face_regions.scad` should be driven by the actual cutter-face normal and the true face/cutter bisector, not by the older symmetric `abs(z)` slope approximation. That gives the cut-edge sign/orientation from geometry instead of a scalar guess.
+- Keep the consumer simple: `examples/printing/face_plate.scad` should prefer the generic dihedral/extent-based cut-band volume from `core/face_regions.scad`. A face-plate-specific cut profile override proved to be overfitting and made the `7/3` star-prism joins worse.
+- If cut-band joins still need tuning, change the generic cut-band geometry in `core/face_regions.scad`; do not reintroduce example-specific profile logic into `face_plate.scad`.
 
 ## Session Notes (Printing Segmentation Metadata)
 - `face_plate_visible(...)` is currently on the stable baseline: clip the full `face_plate(...)` solid by visible-cell masks. This preserves original face-edge bevels; cut-edge relief is still a separate unresolved layer.

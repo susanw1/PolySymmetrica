@@ -140,6 +140,53 @@ function ps_face_cut_inset_at_z(cut_dihed, z, cut_clearance=0) =
     )
     cut_clearance / 2 + abs(z) * max(0, slope);
 
+function ps_face_cut_inset_at_z_linear(cut_dihed, z, cut_clearance=0) =
+    let(
+        join_dihed = ps_face_cut_join_dihed(cut_dihed),
+        slope = tan((join_dihed - 180) / 2)
+    )
+    cut_clearance / 2 + z * slope;
+
+function ps_face_cut_profile2d_linear(z0, z1, cut_dihed, cut_clearance=0) =
+    let(
+        z_min = min(z0, z1),
+        z_max = max(z0, z1),
+        spans_zero = (z_min < 0) && (z_max > 0)
+    )
+    spans_zero
+        ? [
+            [ps_face_cut_inset_at_z_linear(cut_dihed, z_min, cut_clearance), z_min],
+            [ps_face_cut_inset_at_z_linear(cut_dihed, 0, cut_clearance), 0],
+            [ps_face_cut_inset_at_z_linear(cut_dihed, z_max, cut_clearance), z_max]
+        ]
+        : [
+            [ps_face_cut_inset_at_z_linear(cut_dihed, z_min, cut_clearance), z_min],
+            [ps_face_cut_inset_at_z_linear(cut_dihed, z_max, cut_clearance), z_max]
+        ];
+
+function ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance=0, eps=1e-9) =
+    let(
+        z_min = min(z0, z1),
+        z_max = max(z0, z1),
+        spans_zero = (z_min < 0) && (z_max > 0),
+        n_xy = [cutter_n3[0], cutter_n3[1]],
+        n_use = (v_dot(n_xy, inward_n) > 0) ? -cutter_n3 : cutter_n3,
+        b = v_norm([n_use[0], n_use[1], 1 + n_use[2]]),
+        b_u = v_dot([b[0], b[1]], inward_n),
+        b_z = b[2],
+        slope = (abs(b_u) <= eps) ? 0 : (-b_z / b_u)
+    )
+    spans_zero
+        ? [
+            [cut_clearance / 2 + slope * z_min, z_min],
+            [cut_clearance / 2, 0],
+            [cut_clearance / 2 + slope * z_max, z_max]
+        ]
+        : [
+            [cut_clearance / 2 + slope * z_min, z_min],
+            [cut_clearance / 2 + slope * z_max, z_max]
+        ];
+
 function ps_face_cut_profile2d_stratified(spec, cut_dihed, cut_clearance=0) =
     let(
         z_base = spec[0],
@@ -157,6 +204,14 @@ function ps_face_cut_profile2d_stratified(spec, cut_dihed, cut_clearance=0) =
         [0, z_roof_top],
         [u_pillow_top, z_pillow_top]
     ];
+
+function _ps_fr_cut_profile_from_spec(spec, cut_dihed, cut_clearance=0) =
+    is_undef(spec) ? undef :
+    (is_string(spec[0]) && spec[0] == "linear")
+        ? ps_face_cut_profile2d_linear(spec[1], spec[2], cut_dihed, cut_clearance)
+        : (is_string(spec[0]) && spec[0] == "stratified")
+            ? ps_face_cut_profile2d_stratified(spec[1], cut_dihed, cut_clearance)
+            : ps_face_cut_profile2d_stratified(spec, cut_dihed, cut_clearance);
 
 function ps_face_visible_cell_mask_loop(cell, cut_clearance=0) =
     let(
@@ -309,12 +364,14 @@ module ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=
             perp0 = v_norm([-e[1], e[0]]);
             mid = (a + b) / 2;
             inward_n = (v_dot(perp0, probe - mid) < 0) ? -perp0 : perp0;
+            cutter_f = $ps_poly_faces_idx[entries[cid][1]];
+            cutter_n3 = ps_face_frame_normal($ps_poly_verts_local, cutter_f);
             if (!is_undef(cut_profile2d))
                 ps_face_cut_band_volume_profiled([a, b], inward_n, cut_profile2d, along_pad, eps);
             else if (!is_undef(cut_profile_spec))
-                ps_face_cut_band_volume_profiled([a, b], inward_n, ps_face_cut_profile2d_stratified(cut_profile_spec, entries[cid][2], cut_clearance), along_pad, eps);
+                ps_face_cut_band_volume_profiled([a, b], inward_n, _ps_fr_cut_profile_from_spec(cut_profile_spec, entries[cid][2], cut_clearance), along_pad, eps);
             else
-                ps_face_cut_band_volume([a, b], inward_n, entries[cid][2], z0, z1, cut_clearance, along_pad, eps);
+                ps_face_cut_band_volume_profiled([a, b], inward_n, ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance, eps), along_pad, eps);
         }
     }
 }
