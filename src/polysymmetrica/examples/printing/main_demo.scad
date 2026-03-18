@@ -36,8 +36,8 @@ IR = 20 * SC;
 //p = poly_cantellate(poly_antiprism(6), params_overrides=AP_CANT_ROWS);
 //p = poly_prism(5);
 //p = poly_antiprism(5);
-//p = poly_prism(n=5, p=2);
-p = poly_antiprism(n=5, p=2, angle = 0);
+p = poly_prism(n=7, p=2);
+//p = poly_antiprism(n=7, p=3, angle = 0);
 
 //p = j1_square_pyramid();l
 //p = poly_dual(j2_pentagonal_pyramid());
@@ -89,15 +89,16 @@ module model(show_faces = undef, clear_airspace = true) {
             }
         }
         // Constructs faces, removes them from frame to create face-fitting sockets.
-        place_on_faces(p, IR) {
+    !    place_on_faces(p, IR) {
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
                 face_plate_visible($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
-                    edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6);
+                    edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6,
+                    seg_apply_cut_bands = true, seg_along_pad = INSET);
             }
         }
     }
 }
 
-model();
+model([2:9], false);
 //poly_render(p, 20);

@@ -65,8 +65,8 @@ module test_ps_face_cut_profile2d_from_cutter_normal__includes_zero_when_spannin
     assert(len(prof) == 3, "normal-derived cut profile spanning z=0 should include face plane sample");
     assert_near(prof[1][0], 0.1, 1e-9, "middle inset should be half the requested clearance");
     assert_near(prof[1][1], 0, 1e-9, "middle sample should lie on the face plane");
-    assert(prof[0][0] < prof[1][0], "profile should open outward below the face plane");
-    assert(prof[2][0] > prof[1][0], "profile should move inward above the face plane");
+    assert(prof[0][0] > prof[1][0], "profile should widen away from the face plane below");
+    assert(prof[2][0] > prof[1][0], "profile should widen away from the face plane above");
 }
 
 module test_ps_face_visible_cell_mask_loop__cut_edges_pull_inward() {

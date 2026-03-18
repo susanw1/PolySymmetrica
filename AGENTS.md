@@ -19,6 +19,8 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Run all negative tests (expects each file in `src/tests/negative/` to fail):
   `src/tests/run_negative_all.sh`
 - Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
+- `openscad-nightly` is installed via snap on this machine, so it is sandboxed more tightly than the apt `openscad`. When feeding `openscad-nightly` a scratch `.scad`, prefer a repo-local `.tmp/` path over `/tmp`, otherwise snap confinement may block reading the input file.
+- This environment has `python3` available but not `python`. For quick probe-file generation or text rewriting, use `python3`.
 - Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
 - Process safety: never kill `openscad-nightly` broadly (`pkill openscad*` etc.). The user keeps an interactive `openscad-nightly` session running.
   Only target exact non-interactive command lines started for this task.
@@ -124,6 +126,9 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Important ownership rule: when `apply_cut_bands=true`, cut-edge clearance should come from the cut-band subtraction, not from also shrinking the visible-cell mask. Avoid double-applying cut-edge retreat.
 - Consumer rule: the core cut-band helpers expect the full intended join clearance. Do not halve `edge_inset` before passing it in; the core geometry already distributes that clearance across the two neighboring pieces.
 - The default generic cut-band path in `core/face_regions.scad` should be driven by the actual cutter-face normal and the true face/cutter bisector, not by the older symmetric `abs(z)` slope approximation. That gives the cut-edge sign/orientation from geometry instead of a scalar guess.
+- Watch for sign-crossing in profiled cut bands: if the profile changes side across z-levels, `_ps_fr_stack_quad_loops()` will build a twisted/hashed shell. The generic normal-derived cut profile should stay on the kept side of the cut edge and widen away from the face plane, not cross through the edge.
+- In practice this showed up on `poly_prism(n=7, p=2)`: the lower profile sample went negative while the middle/upper stayed positive. Probing the actual `ps_face_visible_segments(...)` cells and derived band loops in `.tmp/` is the fastest way to confirm whether a bad preview trace at `_ps_fr_stack_quad_loops()` is a geometry/profile issue rather than a winding bug.
+- `_ps_fr_stack_quad_loops()` should triangulate its side walls, not emit quads, because varying-width cut-band levels do not guarantee planar side faces. On `7/2` this combined with side-crossing profiles to produce the hashed artifact/trace at `face_regions.scad:317`.
 - Keep the consumer simple: `examples/printing/face_plate.scad` should prefer the generic dihedral/extent-based cut-band volume from `core/face_regions.scad`. A face-plate-specific cut profile override proved to be overfitting and made the `7/3` star-prism joins worse.
 - If cut-band joins still need tuning, change the generic cut-band geometry in `core/face_regions.scad`; do not reintroduce example-specific profile logic into `face_plate.scad`.
 

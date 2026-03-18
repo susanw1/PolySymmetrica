@@ -433,6 +433,8 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
         z0 = base_z_eff - max(clear_height, face_thk + pillow_thk + clear_height);
         z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
+        band_z0 = base_z_eff;
+        band_z1 = base_z_eff + face_thk + pillow_thk;
         // `edge_inset` is the intended total join clearance. The core cut-band
         // helpers already split that across the two neighboring pieces, so pass
         // the full value here rather than halving it again.
@@ -445,7 +447,9 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
             mode = "nonzero",
             eps = eps,
             filter_parent = true,
-            apply_cut_bands = seg_apply_cut_bands
+            apply_cut_bands = seg_apply_cut_bands,
+            band_z0 = band_z0,
+            band_z1 = band_z1
         )
             face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
                 edge_inset = edge_inset,
