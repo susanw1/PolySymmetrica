@@ -110,6 +110,30 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
   - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
+## Session Notes (Face Region Volumes)
+- `src/polysymmetrica/core/face_regions.scad` is the new home for local face-region and segmentation volume helpers.
+- These helpers are intentionally face-local: they depend on face geometry, cut geometry, and dihedral/2 rules, not on any global polyhedral centre convention.
+- Keep `examples/printing/face_plate.scad` thin. If segmented-face or printable join geometry needs more machinery, move that machinery into `core/face_regions.scad`, not back into the example.
+- Helper tests now live in `src/tests/core/TestFaceRegions.scad`, not under `src/tests/examples/`.
+- Generic child-clipping wrappers now live there too:
+  - `ps_clip_to_face_region(_ctx)`
+  - `ps_clip_to_visible_face_cell_ctx(...)`
+  - `ps_clip_to_visible_face_segments_ctx(...)`
+- The stable baseline for segmented printing remains: full child geometry clipped by visible-cell volumes. Optional cut-band subtraction is exposed in core but should stay opt-in until the join geometry is proven robust.
+- `examples/printing/face_plate.scad` now exposes that same choice via `face_plate_visible(..., seg_apply_cut_bands=...)`, but default behavior must remain the stable baseline.
+- Important ownership rule: when `apply_cut_bands=true`, cut-edge clearance should come from the cut-band subtraction, not from also shrinking the visible-cell mask. Avoid double-applying cut-edge retreat.
+- Current unresolved issue is specifically the cut-band **cross-section profile**. The abstraction is now correct (face-local region volumes + optional profiled cut bands), but a profile that collapses to `u=0` through the upper region produces the wrong blunt 90-degree cut on star-prism joins.
+- Next iterations should change only the profile shape in `core/face_regions.scad`, preferably expressed against explicit `z_below/z_above` extent data, not rework wrappers or push more logic back into `face_plate.scad`.
+
+## Session Notes (Printing Segmentation Metadata)
+- `face_plate_visible(...)` is currently on the stable baseline: clip the full `face_plate(...)` solid by visible-cell masks. This preserves original face-edge bevels; cut-edge relief is still a separate unresolved layer.
+- `ps_face_visible_segments(...)` now returns `cell_cut_entry_ids` as a fifth parallel vector alongside `cell_edge_kinds`. Values are `undef` for parent edges and stable indices into `ps_face_geom_cut_entries(...)` for cut edges.
+- `place_on_face_visible_segments(...)` exposes the same data as `$ps_vis_seg_cut_entry_ids`; `place_on_face_segments(...)` exposes `$ps_seg_cut_entry_ids`.
+- The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
+- Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
+- Failed keep-volume experiments should be deleted rather than left around dead. The current baseline is intentionally just full-face clipping by `_visible_cell_mask(...)`; plan B for future cut-edge relief is direct mesh clipping/splitting of the already-built face plate, not deeper `intersection()`/keep-volume CSG.
+- A clipped-loop attempt inside `face_plate_visible(...)` was also backed out. Even if it compiles, segmented-face join geometry should not be re-derived in the example layer. The next implementation should move into a core segmented-face clipping primitive and let `face_plate` remain a thin consumer.
+
 ## Session Notes (Printing Segmentation)
 - The more robust printing model is to clip the already-built full `face_plate(...)` solid by per-cell masks from `ps_face_visible_segments(...)`, not to rebuild each visible cell as an independent face. That preserves original parent-edge bevel geometry on star-prism side faces.
 - Cut-edge beveling for segmented printable pieces remains unresolved: the attempted wedge-subtraction path did not yet produce the intended outward-opening V on sharp star-prism cuts, so the stable baseline is currently full-face clipping plus vertical cut clearance only.

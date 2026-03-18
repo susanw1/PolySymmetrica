@@ -271,6 +271,62 @@ module test_ps_face_visible_segments__cells_preserve_parent_winding() {
     }
 }
 
+module test_ps_face_visible_segments__star_prism_cut_edges_reference_cut_entries() {
+    p = poly_prism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            assert(len(entries) > 0, "star prism side should have cut entries");
+            for (s = vis) {
+                assert_int_eq(len(s[3]), len(s[4]), "star prism visible edge kind/id arity");
+                for (k = [0:1:len(s[3])-1]) {
+                    if (s[3][k] == "cut") {
+                        cid = s[4][k];
+                        assert(!is_undef(cid), "star prism cut edge should carry cut-entry id");
+                        assert(cid >= 0 && cid < len(entries), str("star prism cut-entry id out of range cid=", cid, " len=", len(entries)));
+                    } else {
+                        assert(is_undef(s[4][k]), "star prism parent edge should not carry cut-entry id");
+                    }
+                }
+            }
+        }
+    }
+}
+
+module test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries() {
+    p = poly_antiprism(5, 2);
+    faces = poly_faces(p);
+    tri_faces = [for (i = [0:1:len(faces)-1]) if (len(faces[i]) == 3) i];
+    target = tri_faces[0];
+    place_on_faces(p) {
+        if ($ps_face_idx == target) {
+            entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            assert(len(entries) > 0, "star antiprism side should have cut entries");
+            assert(
+                sum([
+                    for (s = vis)
+                        sum([for (k = [0:1:len(s[3])-1]) (s[3][k] == "cut") ? 1 : 0])
+                ]) > 0,
+                "star antiprism visible cells should include cut edges"
+            );
+            for (s = vis) {
+                assert_int_eq(len(s[3]), len(s[4]), "star antiprism visible edge kind/id arity");
+                for (k = [0:1:len(s[3])-1]) {
+                    if (s[3][k] == "cut") {
+                        cid = s[4][k];
+                        assert(!is_undef(cid), "star antiprism cut edge should carry cut-entry id");
+                        assert(cid >= 0 && cid < len(entries), str("star antiprism cut-entry id out of range cid=", cid, " len=", len(entries)));
+                    } else {
+                        assert(is_undef(s[4][k]), "star antiprism parent edge should not carry cut-entry id");
+                    }
+                }
+            }
+        }
+    }
+}
+
 module test_ps_face_geom_cut_segments__respects_fill_mode() {
     // Target square in z=0 plane plus a star-shaped cutter face tilted through the plane.
     target = [[-6,-6], [6,-6], [6,6], [-6,6]];
@@ -309,6 +365,8 @@ module run_TestPlacement() {
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__star_prism_side_keeps_two_side_quads();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
+    test_ps_face_visible_segments__star_prism_cut_edges_reference_cut_entries();
+    test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries();
     test_ps_face_geom_cut_segments__respects_fill_mode();
 }
 

@@ -178,7 +178,12 @@ function _ps_seg_extract_cycles(nodes, hedges, input_area_sign, hi=0, visited=un
         keep = (len(hs) >= 3) && (len(ns) >= 3) && (abs(area) > eps),
         edge_ids = [for (hidx = hs) hedges[hidx][3]],
         kinds = [for (hidx = hs) (len(hedges[hidx]) > 4 ? hedges[hidx][4] : "parent")],
-        cyc = [pts2d, pts3d, edge_ids, kinds, ns],
+        cut_entry_ids = [
+            for (hidx = hs)
+                let(kind = (len(hedges[hidx]) > 4 ? hedges[hidx][4] : "parent"))
+                (kind == "cut") ? hedges[hidx][3] : undef
+        ],
+        cyc = [pts2d, pts3d, edge_ids, kinds, cut_entry_ids, ns],
         vis2 = (len(hs) == 0) ? _ps_list_set(vis, hi, true) : _ps_seg_set_true_many(vis, hs),
         cycles2 = keep ? concat(cycles, [cyc]) : cycles
     )
@@ -188,7 +193,7 @@ function _ps_seg_dedupe_cycles(cycles, i=0, keys=[], acc=[]) =
     (i >= len(cycles)) ? acc :
     let(
         c = cycles[i],
-        key = _ps_sort(c[4]),
+        key = _ps_sort(c[5]),
         seen = len([for (k = keys) if (k == key) 1]) > 0,
         keys2 = seen ? keys : concat(keys, [key]),
         acc2 = seen ? acc : concat(acc, [c])
@@ -252,7 +257,8 @@ function _ps_seg_orient_cell(cell, target_sign, eps=1e-9) =
         _ps_seg_reverse_keep_first(cell[0]),
         _ps_seg_reverse_keep_first(cell[1]),
         _ps_reverse(cell[2]),
-        _ps_reverse(cell[3])
+        _ps_reverse(cell[3]),
+        _ps_reverse(cell[4])
     ];
 
 function _ps_seg_point_seg_dist(pt, a, b, eps=1e-12) =
@@ -332,7 +338,9 @@ function _ps_seg_cycle_probe_point(poly, eps=1e-9) =
 // - "all": keep every extracted cycle (debug/inspection)
 //
 // Input:  face_pts3d_local = [[x,y,z], ...] in loop order.
-// Return: [[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]
+// Return:
+//   [[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds, seg_cut_entry_ids], ...]
+// where seg_cut_entry_ids is parallel to seg_edge_kinds and is undef for parent edges.
 function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
     let(n = len(face_pts3d_local))
     (n < 3) ? [] :
@@ -375,6 +383,7 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
                     pts3d = c[1],
                     edge_ids = c[2],
                     kinds = c[3],
+                    cut_entry_ids = c[4],
                     probe = _ps_seg_cycle_probe_point(pts2d, eps),
                     area_c = _ps_seg_poly_area2(pts2d),
                     cycle_sign_ok = (abs(input_area) <= eps) ? true : (area_c * input_sign > eps),
@@ -384,11 +393,11 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
                            (mode == "nonzero") ? in_nonzero :
                            in_evenodd
                 )
-                if (keep && ((mode == "nonzero") ? cycle_sign_ok : true)) [pts2d, pts3d, edge_ids, kinds]
+                if (keep && ((mode == "nonzero") ? cycle_sign_ok : true)) [pts2d, pts3d, edge_ids, kinds, cut_entry_ids]
         ]
     )
     (len(filtered) == 0)
-        ? [[[for (p = face_pts3d_local) [p[0], p[1]]], face_pts3d_local, [for (i = [0:1:n-1]) i], [for (_i = [0:1:n-1]) "parent"]]]
+        ? [[[for (p = face_pts3d_local) [p[0], p[1]]], face_pts3d_local, [for (i = [0:1:n-1]) i], [for (_i = [0:1:n-1]) "parent"], [for (_i = [0:1:n-1]) undef]]]
         : filtered;
 
 // Nested face-segment iterator. Call inside place_on_faces(...).
@@ -408,6 +417,7 @@ module place_on_face_segments(mode="evenodd", eps=1e-8) {
         $ps_seg_pts3d_local = s[1];
         $ps_seg_parent_face_edge_idx = s[2];
         $ps_seg_edge_kind = s[3];
+        $ps_seg_cut_entry_ids = s[4];
         $ps_face_has_segments = len(segs) > 1;
         children();
     }
@@ -714,13 +724,14 @@ function _ps_seg_split_simple_loop(poly2d, cut_segs2d, eps=1e-8) =
                     pts3d = c[1],
                     edge_ids = c[2],
                     kinds = c[3],
+                    cut_entry_ids = c[4],
                     probe = _ps_seg_cycle_probe_point(pts2d, eps),
                     inside = _ps_seg_point_in_poly_evenodd(probe, poly2d, eps)
                 )
-                if (inside) [pts2d, pts3d, edge_ids, kinds]
+                if (inside) [pts2d, pts3d, edge_ids, kinds, cut_entry_ids]
         ]
     )
-    (len(filtered) == 0) ? [[poly2d, [for (p = poly2d) [p[0], p[1], 0]], [for (i = [0:1:len(poly2d)-1]) i], [for (_i = [0:1:len(poly2d)-1]) "parent"]]] : filtered;
+    (len(filtered) == 0) ? [[poly2d, [for (p = poly2d) [p[0], p[1], 0]], [for (i = [0:1:len(poly2d)-1]) i], [for (_i = [0:1:len(poly2d)-1]) "parent"], [for (_i = [0:1:len(poly2d)-1]) undef]]] : filtered;
 
 function _ps_seg_tri_z_at_xy(pt2d, tri, eps=1e-9) =
     let(
@@ -859,7 +870,8 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
 // cells that are actually visible from the face-local +Z side.
 //
 // Returns:
-//   [[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds], ...]
+//   [[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds, cell_cut_entry_ids], ...]
+// where cell_cut_entry_ids is parallel to cell_edge_kinds and is undef for parent edges.
 function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     let(
         base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
@@ -933,6 +945,7 @@ module place_on_face_visible_segments(mode="nonzero", eps=1e-8, filter_parent=tr
         $ps_vis_seg_pts3d_local = s[1];
         $ps_vis_seg_edge_ids = s[2];
         $ps_vis_seg_edge_kinds = s[3];
+        $ps_vis_seg_cut_entry_ids = s[4];
         children();
     }
 }

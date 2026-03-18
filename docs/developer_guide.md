@@ -62,7 +62,7 @@ PolySymmetrica/
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
 │   │   │   ├─ construction.scad    # delete/cap/slice construction helpers
-│   │   │   ├─ construction.scad    # slice/cap/attach construction helpers
+│   │   │   ├─ face_regions.scad    # local face region and segmentation clip volumes
 │   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
@@ -90,6 +90,7 @@ PolySymmetrica/
     ├─ cantellation.md
     ├─ snubs.md
     ├─ attach.md
+    ├─ face_regions.md
     └─ images/
 ```
 
@@ -104,6 +105,7 @@ Related deep-dive notes:
 - [Params overrides](params_overrides.md)
 - [Face attachment](attach.md)
 - [Construction helpers](construction.md)
+- [Face region volumes](face_regions.md)
 
 ---
 

@@ -1,4 +1,5 @@
 use <../../core/funcs.scad>
+use <../../core/face_regions.scad>
 use <../../core/render.scad>
 use <../../core/segments.scad>
 use <../../core/validate.scad>
@@ -225,6 +226,9 @@ function _pts_radius2d(pts, centroid) =
 function _safe_at(v, i, dflt) =
     (is_undef(i) || i < 0 || i >= len(v)) ? dflt : v[i];
 
+// For a segmentation-cut edge, the printable pieces meet across the complement
+// of the cutter-face dihedral. This helper returns the effective piece-piece
+// join dihedral used by future cut-edge relief logic.
 function _segmented_inset_loops2d(pts, insets, eps=1e-8) =
     let(
         segs = ps_face_segments([for (p = pts) [p[0], p[1], 0]], "nonzero", eps)
@@ -275,7 +279,7 @@ function _segmented_body_loops(pts, diheds, insets, eps=1e-8) =
             [s_top2d, s_diheds]
     ];
 
-module _poly_loft_loops(loop_top2d, loop_bottom2d, z_top, z_bottom, eps=1e-8) {
+module _poly_loft_loops(loop_top2d, loop_bottom2d, z_top, z_bottom, eps=1e-8, cap_top=true, cap_bottom=true) {
     m = len(loop_top2d);
     assert(m >= 3, "_poly_loft_loops: need at least 3 points");
     assert(len(loop_bottom2d) == m, "_poly_loft_loops: loop sizes must match");
@@ -288,8 +292,8 @@ module _poly_loft_loops(loop_top2d, loop_bottom2d, z_top, z_bottom, eps=1e-8) {
     polyhedron(
         points = concat(top, bottom),
         faces = concat(
-            [for (t = top_tris) [t[0], t[1], t[2]]],
-            [for (t = bottom_tris) [2 * m - 1 - t[0], 2 * m - 1 - t[1], 2 * m - 1 - t[2]]],
+            cap_top ? [for (t = top_tris) [t[0], t[1], t[2]]] : [],
+            cap_bottom ? [for (t = bottom_tris) [2 * m - 1 - t[0], 2 * m - 1 - t[1], 2 * m - 1 - t[2]]] : [],
             [for (i = [0:1:m-1]) [(i+1)%m, i, m + i]],
             [for (i = [0:1:m-1]) [(i+1)%m, m + i, m + (i+1)%m]]
         ),
@@ -331,7 +335,6 @@ module _render_clearance_loops(roof_loops, z0, clear_height) {
                 ps_polygon(points = loop, mode = "nonzero");
         }
 }
-
 
 // Bevel by constructing an inset bottom polygon and lofting.
 // Expects LHR/CW polygon order for pts and aligned dihedrals.
@@ -392,26 +395,6 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     }
 }
 
-function _visible_cell_mask_loop(cell, cut_clearance) =
-    let(
-        s_pts = cell[0],
-        s_kinds = cell[3],
-        m = len(s_pts),
-        insets = [
-            for (k = [0:1:m-1])
-                (_safe_at(s_kinds, k, "cut") == "parent") ? 0 : cut_clearance
-        ]
-    )
-    _offset_pts2d_inset_edges(s_pts, insets);
-
-module _visible_cell_mask(cell, cut_clearance, z0, z1) {
-    loop = _visible_cell_mask_loop(cell, cut_clearance);
-    if (len(loop) >= 3)
-        translate([0, 0, z0])
-            linear_extrude(height = z1 - z0)
-                ps_polygon(points = loop, mode = "nonzero");
-}
-
 // Visible-face variant for printing segmented parts directly.
 // If there are no geometry cut segments, it falls back to the normal face_plate
 // path so regular/star faces keep their known-good bevel behaviour.
@@ -424,7 +407,9 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
     top_thk = FACE_PLATE_TOP_THK,
     base_z = undef,
     clear_height = FACE_PLATE_CLEAR_HEIGHT,
-    eps = 1e-4
+    eps = 1e-4,
+    seg_apply_cut_bands = false,
+    seg_along_pad = undef
 ) {
     assert(!is_undef($ps_face_idx), "face_plate_visible: requires place_on_faces context");
     assert(!is_undef($ps_poly_faces_idx), "face_plate_visible: requires place_on_faces context");
@@ -445,29 +430,39 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
             eps = eps
         );
     } else {
-        vis_cells = ps_face_visible_segments(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
         z0 = base_z_eff - max(clear_height, face_thk + pillow_thk + clear_height);
         z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
         cut_clearance = edge_inset / 2;
-        union() {
-            for (cell = vis_cells) {
-                intersection() {
-                    face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
-                        edge_inset = edge_inset,
-                        pillow_min_rad = pillow_min_rad,
-                        pillow_inset = pillow_inset,
-                        pillow_ramp = pillow_ramp,
-                        pillow_thk = pillow_thk,
-                        top_thk = top_thk,
-                        base_z = base_z,
-                        clear_height = clear_height,
-                        eps = eps
-                    );
-                    _visible_cell_mask(cell, cut_clearance, z0, z1);
-                }
-            }
-        }
+        cut_profile_spec = [
+            base_z_eff,
+            base_z_eff + face_thk - top_thk,
+            base_z_eff + face_thk,
+            base_z_eff + face_thk + pillow_thk,
+            pillow_ramp
+        ];
+        ps_clip_to_visible_face_segments_ctx(
+            z0,
+            z1,
+            cut_clearance = cut_clearance,
+            along_pad = is_undef(seg_along_pad) ? edge_inset : seg_along_pad,
+            mode = "nonzero",
+            eps = eps,
+            filter_parent = true,
+            apply_cut_bands = seg_apply_cut_bands,
+            cut_profile_spec = seg_apply_cut_bands ? cut_profile_spec : undef
+        )
+            face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
+                edge_inset = edge_inset,
+                pillow_min_rad = pillow_min_rad,
+                pillow_inset = pillow_inset,
+                pillow_ramp = pillow_ramp,
+                pillow_thk = pillow_thk,
+                top_thk = top_thk,
+                base_z = base_z,
+                clear_height = clear_height,
+                eps = eps
+            );
     }
 }
 
