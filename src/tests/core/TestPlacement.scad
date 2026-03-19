@@ -107,7 +107,7 @@ module test_place_on_face_segments__star_face_split() {
     p = poly_antiprism(5, 2);
     place_on_faces(p) {
         if ($ps_face_idx == 0) {
-            place_on_face_segments() {
+            place_on_face_segments(mode="evenodd") {
                 assert(!is_undef($ps_seg_idx), "segment idx should be defined");
                 assert(!is_undef($ps_seg_count), "segment count should be defined");
                 assert($ps_seg_count > 1, "star face should split into multiple segments");
@@ -116,6 +116,17 @@ module test_place_on_face_segments__star_face_split() {
                 assert(len($ps_seg_pts3d_local) == $ps_seg_vertex_count, "segment pts3d count");
                 assert(len($ps_seg_parent_face_edge_idx) == $ps_seg_vertex_count, "segment parent-edge mapping");
                 assert($ps_face_has_segments == ($ps_seg_count > 1), "segment split flag consistency");
+            }
+        }
+    }
+}
+
+module test_place_on_face_segments__default_nonzero_keeps_filled_star() {
+    p = poly_antiprism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 0) {
+            place_on_face_segments() {
+                assert_int_eq($ps_seg_count, 1, "default nonzero face segments should keep filled star as one region");
             }
         }
     }
@@ -182,7 +193,7 @@ module test_seg_face_tris3__concave_area_preserved() {
 module test_seg_face_tris3__star_area_matches_segments() {
     // Pentagram-style self-intersecting face loop.
     pts3 = [[0,9,0], [-5,-5,0], [8,3,0], [-8,3,0], [5,-5,0]];
-    tris = _ps_seg_face_tris3([0,1,2,3,4], pts3, 1e-9);
+    tris = _ps_seg_face_tris3([0,1,2,3,4], pts3, 1e-9, "evenodd");
     segs = ps_face_segments(pts3, "evenodd", 1e-9);
     area_tris = _list_sum([
         for (t = tris)
@@ -357,6 +368,7 @@ module run_TestPlacement() {
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_face_segments__star_face_split();
+    test_place_on_face_segments__default_nonzero_keeps_filled_star();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
     test_seg_cycle_probe_point__concave_inside();
     test_seg_face_tris3__concave_area_preserved();

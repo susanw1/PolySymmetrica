@@ -333,15 +333,15 @@ function _ps_seg_cycle_probe_point(poly, eps=1e-9) =
 // Segment a face loop in face-local coordinates.
 //
 // mode controls how self-intersecting loops are filled:
+// - "nonzero": inside if winding number is non-zero (solid/star-face default)
 // - "evenodd": inside if ray-crossing parity is odd (star centers can be holes)
-// - "nonzero": inside if winding number is non-zero (star centers stay filled)
 // - "all": keep every extracted cycle (debug/inspection)
 //
 // Input:  face_pts3d_local = [[x,y,z], ...] in loop order.
 // Return:
 //   [[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds, seg_cut_entry_ids], ...]
 // where seg_cut_entry_ids is parallel to seg_edge_kinds and is undef for parent edges.
-function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
+function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
     let(n = len(face_pts3d_local))
     (n < 3) ? [] :
     let(
@@ -402,8 +402,8 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
 
 // Nested face-segment iterator. Call inside place_on_faces(...).
 // Uses the same mode semantics as ps_face_segments(...):
-// "evenodd" | "nonzero" | "all".
-module place_on_face_segments(mode="evenodd", eps=1e-8) {
+// "nonzero" | "evenodd" | "all".
+module place_on_face_segments(mode="nonzero", eps=1e-8) {
     face_pts3d_local = is_undef($ps_face_pts3d_local)
         ? [for (p = $ps_face_pts2d) [p[0], p[1], 0]]
         : $ps_face_pts3d_local;
@@ -431,8 +431,8 @@ module place_on_face_segments(mode="evenodd", eps=1e-8) {
 //   ps_polygon($ps_face_pts2d, mode="nonzero");
 //
 // mode:
-// - "evenodd": parity fill (can leave star centers hollow)
 // - "nonzero": winding fill (fills star centers)
+// - "evenodd": parity fill (can leave star centers hollow)
 // - "all": render all extracted cycles (debug)
 module ps_polygon(points, mode="nonzero", eps=1e-8) {
     assert(!is_undef(points), "ps_polygon: points must be defined");
@@ -553,9 +553,9 @@ function _ps_seg_triangulate_simple_poly_idx(pts2d, eps=1e-9) =
 
 // Triangulate a face in face-local coordinates.
 // Unlike a simple fan, this path handles concave/self-intersecting loops by:
-// 1) splitting into simple segments via ps_face_segments(..., "evenodd"),
+// 1) splitting into simple segments via ps_face_segments(..., "nonzero"),
 // 2) ear-clipping each simple segment.
-function _ps_seg_face_tris3(face_idx_loop, poly_verts_local, eps=1e-8, mode="evenodd") =
+function _ps_seg_face_tris3(face_idx_loop, poly_verts_local, eps=1e-8, mode="nonzero") =
     let(
         face_pts3d = [for (vi = face_idx_loop) poly_verts_local[vi]],
         segs = ps_face_segments(face_pts3d, mode, eps)
@@ -862,7 +862,7 @@ function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_ver
 // - face_idx: current face index
 // - poly_faces_idx: full poly faces as index loops
 // - poly_verts_local: full poly vertices in current face-local coordinates
-// - mode: face fill rule to use when triangulating cutter faces ("evenodd" | "nonzero")
+// - mode: face fill rule to use when triangulating cutter faces ("nonzero" | "evenodd")
 function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     [for (e = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent)) e[0]];
 

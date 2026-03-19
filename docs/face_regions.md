@@ -32,7 +32,7 @@ Builds the local face-region volume between `z0` and `z1`.
 
 - Real face edges are split by the usual dihedral/2 rule.
 - Positive `z` is outward from the face plane.
-- `mode` is passed through to `ps_face_segments(...)`, so star/self-intersecting faces can use `"evenodd"` or `"nonzero"` semantics consistently.
+- `mode` is passed through to `ps_face_segments(...)`, so star/self-intersecting faces can use `"nonzero"` (default solid fill) or `"evenodd"` semantics consistently.
 
 ### `ps_face_region_volume_ctx(z0, z1, mode="nonzero", eps=1e-8)`
 
