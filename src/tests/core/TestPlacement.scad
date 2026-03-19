@@ -360,6 +360,26 @@ module test_ps_face_geom_cut_segments__respects_fill_mode() {
     assert(len_nonzero > len_evenodd + 1e-6, str("nonzero star cutter should span a longer merged cut evenodd=", len_evenodd, " nonzero=", len_nonzero));
 }
 
+module test_seg_merge_face_cut_group__preserves_disjoint_spans() {
+    group = [
+        [[[0, 0], [2, 0]], 7, 110],
+        [[[4, 0], [6, 0]], 7, 120]
+    ];
+    merged = _ps_seg_merge_face_cut_group(group, 1e-8);
+    assert_int_eq(len(merged), 2, str("disjoint same-face cut spans must remain separate merged=", merged));
+}
+
+module test_seg_merge_face_cut_group__merges_touching_spans() {
+    group = [
+        [[[0, 0], [2, 0]], 7, 110],
+        [[[2, 0], [5, 0]], 7, 120]
+    ];
+    merged = _ps_seg_merge_face_cut_group(group, 1e-8);
+    assert_int_eq(len(merged), 1, str("touching same-face cut spans should merge merged=", merged));
+    assert(_ps_seg2_eq(merged[0][0], [[0, 0], [5, 0]], 1e-8), str("merged touching span endpoints wrong merged=", merged));
+    assert(merged[0][2] == 120, str("merged touching span dihedral should keep max merged=", merged));
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -380,6 +400,8 @@ module run_TestPlacement() {
     test_ps_face_visible_segments__star_prism_cut_edges_reference_cut_entries();
     test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries();
     test_ps_face_geom_cut_segments__respects_fill_mode();
+    test_seg_merge_face_cut_group__preserves_disjoint_spans();
+    test_seg_merge_face_cut_group__merges_touching_spans();
 }
 
 run_TestPlacement();

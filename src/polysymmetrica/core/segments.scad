@@ -807,6 +807,40 @@ function _ps_seg_cut_entries_dedupe(entries, eps=1e-8, i=0, acc=[]) =
     )
     _ps_seg_cut_entries_dedupe(entries, eps, i + 1, acc2);
 
+function _ps_seg_min_interval_idx(intervals, idx=0, best=0) =
+    (idx >= len(intervals)) ? best :
+    _ps_seg_min_interval_idx(intervals, idx + 1, (intervals[idx][0] < intervals[best][0]) ? idx : best);
+
+function _ps_seg_remove_interval_at(intervals, idx) =
+    [for (i = [0:1:len(intervals)-1]) if (i != idx) intervals[i]];
+
+function _ps_seg_sort_intervals(intervals, acc=[]) =
+    (len(intervals) == 0) ? acc :
+    let(mi = _ps_seg_min_interval_idx(intervals))
+    _ps_seg_sort_intervals(_ps_seg_remove_interval_at(intervals, mi), concat(acc, [intervals[mi]]));
+
+function _ps_seg_line_point2(origin, dir, t) =
+    [origin[0] + dir[0] * t, origin[1] + dir[1] * t];
+
+function _ps_seg_merge_sorted_intervals(sorted_intervals, origin, dir, face_idx, eps=1e-8, i=1, cur=undef, acc=[]) =
+    let(
+        cur0 = is_undef(cur) ? sorted_intervals[0] : cur
+    )
+    (len(sorted_intervals) == 0) ? [] :
+    (i >= len(sorted_intervals))
+        ? concat(acc, [[[ _ps_seg_line_point2(origin, dir, cur0[0]), _ps_seg_line_point2(origin, dir, cur0[1]) ], face_idx, cur0[2]]])
+        : let(
+            nxt = sorted_intervals[i],
+            overlaps = nxt[0] <= cur0[1] + eps,
+            cur2 = overlaps
+                ? [cur0[0], max(cur0[1], nxt[1]), max(cur0[2], nxt[2])]
+                : nxt,
+            acc2 = overlaps
+                ? acc
+                : concat(acc, [[[ _ps_seg_line_point2(origin, dir, cur0[0]), _ps_seg_line_point2(origin, dir, cur0[1]) ], face_idx, cur0[2]]])
+        )
+        _ps_seg_merge_sorted_intervals(sorted_intervals, origin, dir, face_idx, eps, i + 1, cur2, acc2);
+
 function _ps_seg_merge_face_cut_group(group, eps=1e-8) =
     (len(group) <= 1) ? group :
     let(
@@ -817,10 +851,22 @@ function _ps_seg_merge_face_cut_group(group, eps=1e-8) =
                 for (p = pts)
                     abs(_ps_seg_orient2(pair[0], pair[1], p))
             ]) <= eps
-        )
+        ),
+        dir = line_ok ? v_norm(pair[1] - pair[0]) : undef,
+        origin = line_ok ? pair[0] : undef,
+        intervals = !line_ok ? [] : [
+            for (g = group)
+                let(
+                    seg = g[0],
+                    t0 = v_dot(seg[0] - origin, dir),
+                    t1 = v_dot(seg[1] - origin, dir)
+                )
+                [min(t0, t1), max(t0, t1), g[2]]
+        ],
+        sorted_intervals = _ps_seg_sort_intervals(intervals)
     )
     line_ok
-        ? [[[pair[0], pair[1]], group[0][1], max([for (g = group) g[2]])]]
+        ? _ps_seg_merge_sorted_intervals(sorted_intervals, origin, dir, group[0][1], eps)
         : group;
 
 function _ps_seg_merge_face_cut_entries(entries, eps=1e-8, i=0, done=[], acc=[]) =
