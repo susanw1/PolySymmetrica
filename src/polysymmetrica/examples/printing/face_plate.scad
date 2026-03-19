@@ -409,7 +409,8 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
     clear_height = FACE_PLATE_CLEAR_HEIGHT,
     eps = 1e-4,
     seg_apply_cut_bands = false,
-    seg_along_pad = undef
+    seg_along_pad = undef,
+    seg_cut_clearance = undef
 ) {
     assert(!is_undef($ps_face_idx), "face_plate_visible: requires place_on_faces context");
     assert(!is_undef($ps_poly_faces_idx), "face_plate_visible: requires place_on_faces context");
@@ -435,10 +436,9 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
         z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
         band_z0 = base_z_eff;
         band_z1 = base_z_eff + face_thk + pillow_thk;
-        // `edge_inset` is the intended total join clearance. The core cut-band
-        // helpers already split that across the two neighboring pieces, so pass
-        // the full value here rather than halving it again.
-        cut_clearance = edge_inset;
+        // Segmentation joins need their own clearance control. Default to the
+        // outer edge inset so existing callers keep the same behavior.
+        cut_clearance = is_undef(seg_cut_clearance) ? edge_inset : seg_cut_clearance;
         ps_clip_to_visible_face_segments_ctx(
             z0,
             z1,
