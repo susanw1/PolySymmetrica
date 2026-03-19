@@ -151,6 +151,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `core/face_regions.scad`: the dead linear/stratified cut-profile experiments were removed. The active cut-band path is now just the normal-derived profile (`ps_face_cut_profile2d_from_cutter_normal(...)`) plus `band_overcut`; avoid reintroducing alternate profile APIs unless they have a real consumer.
 - `core/segments.scad`: `nonzero` is now the intended default for `ps_face_segments(...)` / `place_on_face_segments(...)`; keep `evenodd` as an explicit/debug option rather than the normal user path.
 - Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
+- Docs split: `docs/segments.md` explains split-cell / cut-line analysis and iteration; `docs/face_regions.md` explains the 3D clipping/volume layer that consumes that data. Keep examples and docs pointing users at the right layer instead of re-explaining segmentation inside `face_plate`-style consumers.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
 - For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
 

@@ -1,6 +1,14 @@
 // ---------------------------------------------------------------------------
 // PolySymmetrica - Face segmentation helpers
 // Extracts simple face segments from possibly self-intersecting face loops.
+//
+// Scope of this file:
+// - analyze a face loop into simple cells
+// - derive geometry cut entries/segments
+// - determine visible cells from face-local +Z
+//
+// It intentionally stops at data/iteration. 3D keep/cut volumes that consume
+// this analysis live in core/face_regions.scad.
 
 use <funcs.scad>
 
@@ -828,6 +836,12 @@ function _ps_seg_merge_face_cut_entries(entries, eps=1e-8, i=0, done=[], acc=[])
     )
     _ps_seg_merge_face_cut_entries(entries, eps, i + 1, done2, acc2);
 
+// Returns cut provenance entries in the form:
+//   [seg2d, cutter_face_idx, cut_dihed]
+// where:
+// - seg2d: [[x0,y0], [x1,y1]] in the current face-local 2D frame
+// - cutter_face_idx: index into poly_faces_idx
+// - cut_dihed: cut dihedral associated with that cutter face
 function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     (is_undef(face_pts2d) || is_undef(poly_faces_idx) || is_undef(poly_verts_local)) ? [] :
     let(
