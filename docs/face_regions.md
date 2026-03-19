@@ -94,12 +94,6 @@ When `apply_cut_bands=true`, the visible-cell keep volume no longer applies its
 own cut-edge clearance. The cut-band subtraction owns cut-edge relief
 completely in that mode.
 
-### `ps_face_cut_band_volume(seg2d, inward_n, cut_dihed, z0, z1, cut_clearance=0, along_pad=0, eps=1e-8)`
-
-Builds a bounded cut-band volume along one segmentation edge.
-
-This is the simple generic cut-band form. It is local to the cut edge and is preferable to clipping with a whole cutter plane.
-
 ### `ps_face_cut_band_volume_profiled(seg2d, inward_n, profile2d, along_pad=0, eps=1e-8)`
 
 Builds a bounded cut-band volume from an explicit cross-section profile.
@@ -108,22 +102,9 @@ Builds a bounded cut-band volume from an explicit cross-section profile.
 - `u` is inward/outward offset from the segmentation edge in the face plane
 - `z` is face-local height
 
-This is the intended route for consumers that need cut-edge behavior more
-specific than the simple generic wedge.
+This is the route used by the current cut-band path.
 
-### `ps_face_cut_profile2d_stratified(spec, cut_dihed, cut_clearance=0)`
-
-Helper for building a per-edge cut profile from:
-
-- explicit vertical extents / breakpoints (`spec`)
-- the actual cut-edge dihedral
-- optional cut clearance
-
-This is still experimental. The important design point is that the profile is
-expressed against explicit face-local `z` levels, not against any global
-polyhedral centre.
-
-### `ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8)`
+### `ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, band_overcut=1e-3)`
 
 Context wrapper that emits cut-band volumes for the current visible cell.
 
@@ -134,11 +115,7 @@ Requires:
 
 ## Notes
 
-- The current printing baseline uses `ps_face_visible_cell_volume(...)`, not the cut-band path, because the parent-edge behavior is stable there.
-- Proper segmentation-edge join relief remains future work; the optional
-  cut-band path exists here in core specifically so that work does not need to
-  happen inside example files.
-- The current unresolved design question is the cut-band **profile shape**,
-  not the abstraction or plumbing. In particular, consumers should not assume
-  the relief collapses to the cut line at the roof region unless that is
-  genuinely desired.
+- The current printing path uses the cut-band path in core.
+- Treat `cut_clearance` as the segmentation join-gap control.
+- Treat `along_pad` as along-edge overreach only, not gap width.
+- Treat `band_overcut` as a robustness epsilon for exact-coincidence cleanup, not as a primary design parameter.

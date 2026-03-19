@@ -133,37 +133,6 @@ module ps_clip_to_face_region_ctx(z0, z1, mode="nonzero", eps=1e-8) {
 
 function ps_face_cut_join_dihed(cut_dihed) = 360 - cut_dihed;
 
-function ps_face_cut_inset_at_z(cut_dihed, z, cut_clearance=0) =
-    let(
-        join_dihed = ps_face_cut_join_dihed(cut_dihed),
-        slope = tan((join_dihed - 180) / 2)
-    )
-    cut_clearance / 2 + abs(z) * max(0, slope);
-
-function ps_face_cut_inset_at_z_linear(cut_dihed, z, cut_clearance=0) =
-    let(
-        join_dihed = ps_face_cut_join_dihed(cut_dihed),
-        slope = tan((join_dihed - 180) / 2)
-    )
-    cut_clearance / 2 + z * slope;
-
-function ps_face_cut_profile2d_linear(z0, z1, cut_dihed, cut_clearance=0) =
-    let(
-        z_min = min(z0, z1),
-        z_max = max(z0, z1),
-        spans_zero = (z_min < 0) && (z_max > 0)
-    )
-    spans_zero
-        ? [
-            [ps_face_cut_inset_at_z_linear(cut_dihed, z_min, cut_clearance), z_min],
-            [ps_face_cut_inset_at_z_linear(cut_dihed, 0, cut_clearance), 0],
-            [ps_face_cut_inset_at_z_linear(cut_dihed, z_max, cut_clearance), z_max]
-        ]
-        : [
-            [ps_face_cut_inset_at_z_linear(cut_dihed, z_min, cut_clearance), z_min],
-            [ps_face_cut_inset_at_z_linear(cut_dihed, z_max, cut_clearance), z_max]
-        ];
-
 function ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance=0, eps=1e-9) =
     let(
         z_min = min(z0, z1),
@@ -186,32 +155,6 @@ function ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, c
             [cut_clearance / 2 + slope_mag * abs(z_min), z_min],
             [cut_clearance / 2 + slope_mag * abs(z_max), z_max]
         ];
-
-function ps_face_cut_profile2d_stratified(spec, cut_dihed, cut_clearance=0) =
-    let(
-        z_base = spec[0],
-        z_body_top = spec[1],
-        z_roof_top = spec[2],
-        z_pillow_top = spec[3],
-        u_pillow_top = spec[4],
-        join_dihed = ps_face_cut_join_dihed(cut_dihed),
-        slope = tan((join_dihed - 180) / 2),
-        u_base = cut_clearance / 2 + (z_body_top - z_base) * max(0, slope)
-    )
-    [
-        [-u_base, z_base],
-        [0, z_body_top],
-        [0, z_roof_top],
-        [u_pillow_top, z_pillow_top]
-    ];
-
-function _ps_fr_cut_profile_from_spec(spec, cut_dihed, cut_clearance=0) =
-    is_undef(spec) ? undef :
-    (is_string(spec[0]) && spec[0] == "linear")
-        ? ps_face_cut_profile2d_linear(spec[1], spec[2], cut_dihed, cut_clearance)
-        : (is_string(spec[0]) && spec[0] == "stratified")
-            ? ps_face_cut_profile2d_stratified(spec[1], cut_dihed, cut_clearance)
-            : ps_face_cut_profile2d_stratified(spec, cut_dihed, cut_clearance);
 
 function ps_face_visible_cell_mask_loop(cell, cut_clearance=0) =
     let(
@@ -245,7 +188,7 @@ module ps_face_visible_cell_volume_ctx(z0, z1, cut_clearance=0, eps=1e-8) {
 // cut-band subtraction is available for future segmented join relief work,
 // but is disabled by default while the stable baseline remains plain cell
 // clipping.
-module ps_clip_to_visible_face_cell_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, apply_cut_bands=false, cut_profile2d=undef, cut_profile_spec=undef, band_z0=undef, band_z1=undef, band_overcut=1e-3) {
+module ps_clip_to_visible_face_cell_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, apply_cut_bands=false, band_z0=undef, band_z1=undef, band_overcut=1e-3) {
     cell_cut_clearance = apply_cut_bands ? 0 : cut_clearance;
     cut_z0 = is_undef(band_z0) ? z0 : band_z0;
     cut_z1 = is_undef(band_z1) ? z1 : band_z1;
@@ -257,42 +200,21 @@ module ps_clip_to_visible_face_cell_ctx(z0, z1, cut_clearance=0, along_pad=0, mo
             ps_face_visible_cell_volume_ctx(z0, z1, cell_cut_clearance, eps);
         }
         if (apply_cut_bands)
-            ps_face_visible_segment_cut_bands_ctx(cut_z0_eff, cut_z1_eff, cut_clearance, along_pad, mode, eps, cut_profile2d, cut_profile_spec, band_overcut);
+            ps_face_visible_segment_cut_bands_ctx(cut_z0_eff, cut_z1_eff, cut_clearance, along_pad, mode, eps, band_overcut);
     }
 }
 
 // Apply visible-cell clipping to arbitrary child geometry for all visible cells
 // of the current face. This is the generic segmented-face consumer used by
 // examples such as face_plate_visible(...).
-module ps_clip_to_visible_face_segments_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, filter_parent=true, apply_cut_bands=false, cut_profile2d=undef, cut_profile_spec=undef, band_z0=undef, band_z1=undef, band_overcut=1e-3) {
+module ps_clip_to_visible_face_segments_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, filter_parent=true, apply_cut_bands=false, band_z0=undef, band_z1=undef, band_overcut=1e-3) {
     union() {
         place_on_face_visible_segments(mode, eps, filter_parent) {
-            ps_clip_to_visible_face_cell_ctx(z0, z1, cut_clearance, along_pad, mode, eps, apply_cut_bands, cut_profile2d, cut_profile_spec, band_z0, band_z1, band_overcut)
+            ps_clip_to_visible_face_cell_ctx(z0, z1, cut_clearance, along_pad, mode, eps, apply_cut_bands, band_z0, band_z1, band_overcut)
                 children();
         }
     }
 }
-
-function _ps_fr_cut_band_loop(seg2d, inward_n, cut_dihed, z, cut_clearance=0, along_pad=0, overcut=0) =
-    let(
-        u = ps_face_cut_inset_at_z(cut_dihed, z, cut_clearance)
-    )
-    _ps_fr_cut_band_loop_u_overcut(seg2d, inward_n, u, along_pad, overcut);
-
-function _ps_fr_cut_band_loop_u(seg2d, inward_n, u, along_pad=0) =
-    let(
-        a = seg2d[0],
-        b = seg2d[1],
-        e = v_norm(b - a),
-        t = e * along_pad,
-        du = inward_n * u
-    )
-    [
-        a - t,
-        b + t,
-        b + t + du,
-        a - t + du
-    ];
 
 function _ps_fr_cut_band_loop_u_overcut(seg2d, inward_n, u, along_pad=0, overcut=0) =
     let(
@@ -338,23 +260,6 @@ module _ps_fr_stack_quad_loops(loop_levels, eps=1e-8) {
     polyhedron(points = points, faces = faces, convexity = 2);
 }
 
-module ps_face_cut_band_volume(seg2d, inward_n, cut_dihed, z0, z1, cut_clearance=0, along_pad=0, eps=1e-8, overcut=0) {
-    z_min = min(z0, z1);
-    z_max = max(z0, z1);
-    spans_zero = (z_min < 0) && (z_max > 0);
-    loops = spans_zero
-        ? [
-            [_ps_fr_cut_band_loop(seg2d, inward_n, cut_dihed, z_min, cut_clearance, along_pad, overcut), z_min],
-            [_ps_fr_cut_band_loop(seg2d, inward_n, cut_dihed, 0, cut_clearance, along_pad, overcut), 0],
-            [_ps_fr_cut_band_loop(seg2d, inward_n, cut_dihed, z_max, cut_clearance, along_pad, overcut), z_max]
-        ]
-        : [
-            [_ps_fr_cut_band_loop(seg2d, inward_n, cut_dihed, z_min, cut_clearance, along_pad, overcut), z_min],
-            [_ps_fr_cut_band_loop(seg2d, inward_n, cut_dihed, z_max, cut_clearance, along_pad, overcut), z_max]
-        ];
-    _ps_fr_stack_quad_loops(loops, eps);
-}
-
 module ps_face_cut_band_volume_profiled(seg2d, inward_n, profile2d, along_pad=0, eps=1e-8, overcut=0) {
     assert(len(profile2d) >= 2, "ps_face_cut_band_volume_profiled: need at least 2 profile points");
     loops = [
@@ -364,7 +269,7 @@ module ps_face_cut_band_volume_profiled(seg2d, inward_n, profile2d, along_pad=0,
     _ps_fr_stack_quad_loops(loops, eps);
 }
 
-module ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, cut_profile2d=undef, cut_profile_spec=undef, band_overcut=1e-3) {
+module ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, band_overcut=1e-3) {
     assert(!is_undef($ps_face_pts2d), "ps_face_visible_segment_cut_bands_ctx: requires place_on_faces context ($ps_face_pts2d)");
     assert(!is_undef($ps_face_idx), "ps_face_visible_segment_cut_bands_ctx: requires place_on_faces context ($ps_face_idx)");
     assert(!is_undef($ps_poly_faces_idx), "ps_face_visible_segment_cut_bands_ctx: requires place_on_faces context ($ps_poly_faces_idx)");
@@ -387,12 +292,7 @@ module ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=
             inward_n = (v_dot(perp0, probe - mid) < 0) ? -perp0 : perp0;
             cutter_f = $ps_poly_faces_idx[entries[cid][1]];
             cutter_n3 = ps_face_frame_normal($ps_poly_verts_local, cutter_f);
-            if (!is_undef(cut_profile2d))
-                ps_face_cut_band_volume_profiled([a, b], inward_n, cut_profile2d, along_pad, eps, band_overcut);
-            else if (!is_undef(cut_profile_spec))
-                ps_face_cut_band_volume_profiled([a, b], inward_n, _ps_fr_cut_profile_from_spec(cut_profile_spec, entries[cid][2], cut_clearance), along_pad, eps, band_overcut);
-            else
-                ps_face_cut_band_volume_profiled([a, b], inward_n, ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance, eps), along_pad, eps, band_overcut);
+            ps_face_cut_band_volume_profiled([a, b], inward_n, ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance, eps), along_pad, eps, band_overcut);
         }
     }
 }

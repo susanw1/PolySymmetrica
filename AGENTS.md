@@ -148,6 +148,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 ## Session Notes (Printing Face Segmentation)
 - `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
 - `examples/printing/face_plate.scad`: keep segmentation join clearance separate from ordinary outer-edge inset. `face_plate_visible(..., seg_cut_clearance=...)` controls the cut-edge gap; it defaults to `edge_inset` only for backward-compatible behavior.
+- `core/face_regions.scad`: the dead linear/stratified cut-profile experiments were removed. The active cut-band path is now just the normal-derived profile (`ps_face_cut_profile2d_from_cutter_normal(...)`) plus `band_overcut`; avoid reintroducing alternate profile APIs unless they have a real consumer.
 - Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
 - For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.

@@ -21,39 +21,6 @@ module test_ps_face_cut_join_dihed__is_complement() {
     assert_near(ps_face_cut_join_dihed(120), 240, 1e-9, "join dihedral complement");
 }
 
-module test_ps_face_cut_inset_at_z__face_plane_has_half_clearance() {
-    assert_near(
-        ps_face_cut_inset_at_z(102.857142857, 0, 0.2),
-        0.1,
-        1e-9,
-        "cut inset at face plane should start at half clearance"
-    );
-}
-
-module test_ps_face_cut_inset_at_z__grows_with_distance_from_plane() {
-    u0 = ps_face_cut_inset_at_z(102.857142857, 0, 0.2);
-    u1 = ps_face_cut_inset_at_z(102.857142857, 0.5, 0.2);
-    u2 = ps_face_cut_inset_at_z(102.857142857, 1.0, 0.2);
-
-    assert_ge(u1, u0, "cut inset should not shrink away from face plane");
-    assert_ge(u2, u1, "cut inset should keep growing with z distance");
-}
-
-module test_ps_face_cut_inset_at_z_linear__changes_sign_across_plane() {
-    u_neg = ps_face_cut_inset_at_z_linear(102.857142857, -1.0, 0.2);
-    u_zero = ps_face_cut_inset_at_z_linear(102.857142857, 0, 0.2);
-    u_pos = ps_face_cut_inset_at_z_linear(102.857142857, 1.0, 0.2);
-
-    assert(u_neg < u_zero, "linear inset should open outward below the face plane");
-    assert(u_pos > u_zero, "linear inset should move inward above the face plane");
-}
-
-module test_ps_face_cut_profile2d_linear__includes_zero_when_spanning_plane() {
-    prof = ps_face_cut_profile2d_linear(-1, 2, 102.857142857, 0.2);
-    assert(len(prof) == 3, "linear cut profile spanning z=0 should include face plane sample");
-    assert_near(prof[1][1], 0, 1e-9, "middle sample should lie on the face plane");
-}
-
 module test_ps_face_cut_profile2d_from_cutter_normal__includes_zero_when_spanning_plane() {
     prof = ps_face_cut_profile2d_from_cutter_normal(
         -1,
@@ -113,10 +80,6 @@ module test_ps_clip_to_visible_face_segments_ctx__cut_bands_smoke() {
 
 module run_TestFaceRegions() {
     test_ps_face_cut_join_dihed__is_complement();
-    test_ps_face_cut_inset_at_z__face_plane_has_half_clearance();
-    test_ps_face_cut_inset_at_z__grows_with_distance_from_plane();
-    test_ps_face_cut_inset_at_z_linear__changes_sign_across_plane();
-    test_ps_face_cut_profile2d_linear__includes_zero_when_spanning_plane();
     test_ps_face_cut_profile2d_from_cutter_normal__includes_zero_when_spanning_plane();
     test_ps_face_visible_cell_mask_loop__cut_edges_pull_inward();
     test_ps_face_region_inset_at_z__zero_at_face_plane();
