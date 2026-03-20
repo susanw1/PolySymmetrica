@@ -952,8 +952,10 @@ function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_ver
                         !hidden
                 ],
                 all_visible = (len(vis_mask) > 0) && (min([for (v = vis_mask) v ? 1 : 0]) == 1),
+                vis_count = sum([for (v = vis_mask) v ? 1 : 0]),
                 hidden_idxs = [for (ci = [0:1:len(cells)-1]) if (!vis_mask[ci]) ci],
                 hidden_interior_only =
+                    (vis_count == 1) &&
                     (len(hidden_idxs) > 0) &&
                     (min([
                         for (ci = hidden_idxs)

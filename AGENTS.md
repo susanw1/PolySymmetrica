@@ -154,6 +154,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Same-face cut fragments must merge by connected collinear intervals only. Do not collapse all fragments from one cutter face to the farthest pair, or disjoint spans get bridged across empty gaps.
 - Docs split: `docs/segments.md` explains split-cell / cut-line analysis and iteration; `docs/face_regions.md` explains the 3D clipping/volume layer that consumes that data. Keep examples and docs pointing users at the right layer instead of re-explaining segmentation inside `face_plate`-style consumers.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
+- The `hidden_interior_only` collapse in `ps_face_visible_segments(...)` should only suppress segmentation when there is exactly one visible survivor. If multiple visible boundary pieces remain (for example angled star-antiprism cuts into a triangle), keep them as separate cells.
 - For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
 
 ## Session Notes (Construction Toolkit)
