@@ -400,6 +400,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
 // path so regular/star faces keep their known-good bevel behaviour.
 module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_space,
     edge_inset = FACE_PLATE_EDGE_INSET,
+    seg_cut_clearance = undef,
     pillow_min_rad = FACE_PLATE_PILLOW_MIN_RAD,
     pillow_inset = FACE_PLATE_PILLOW_INSET,
     pillow_ramp = FACE_PLATE_PILLOW_RAMP,
@@ -408,8 +409,7 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
     base_z = undef,
     clear_height = FACE_PLATE_CLEAR_HEIGHT,
     eps = 1e-4,
-    seg_apply_cut_bands = false,
-    seg_along_pad = undef
+    seg_apply_cut_bands = false
 ) {
     assert(!is_undef($ps_face_idx), "face_plate_visible: requires place_on_faces context");
     assert(!is_undef($ps_poly_faces_idx), "face_plate_visible: requires place_on_faces context");
@@ -435,15 +435,11 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
         z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
         band_z0 = base_z_eff;
         band_z1 = base_z_eff + face_thk + pillow_thk;
-        // `edge_inset` is the intended total join clearance. The core cut-band
-        // helpers already split that across the two neighboring pieces, so pass
-        // the full value here rather than halving it again.
-        cut_clearance = edge_inset;
+        cut_clearance = is_undef(seg_cut_clearance) ? edge_inset : seg_cut_clearance;
         ps_clip_to_visible_face_segments_ctx(
             z0,
             z1,
             cut_clearance = cut_clearance,
-            along_pad = is_undef(seg_along_pad) ? edge_inset : seg_along_pad,
             mode = "nonzero",
             eps = eps,
             filter_parent = true,

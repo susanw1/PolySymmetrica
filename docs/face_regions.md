@@ -289,7 +289,5 @@ This is the generic version of what `face_plate_visible(...)` now does.
 - The current printing path is built on the core wrappers in this file. Example
   code should stay a thin consumer of these region builders.
 - Treat `cut_clearance` as the segmentation join-gap control.
-- Treat `band_overcut` as a robustness epsilon for exact-coincidence cleanup,
-  not as a primary design parameter.
-- `along_pad` is legacy baggage from the earlier edge-band subtraction model.
-  It should not be treated as a core design parameter going forward.
+- The old edge-band `along_pad` tuning belongs to the retired subtraction-band
+  approach and is no longer part of the active segmented-region path.

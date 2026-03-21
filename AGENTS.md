@@ -121,41 +121,36 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `ps_clip_to_face_region(_ctx)`
   - `ps_clip_to_visible_face_cell_ctx(...)`
   - `ps_clip_to_visible_face_segments_ctx(...)`
-- The stable baseline for segmented printing remains: full child geometry clipped by visible-cell volumes. Optional cut-band subtraction is exposed in core but should stay opt-in until the join geometry is proven robust.
-- `examples/printing/face_plate.scad` now exposes that same choice via `face_plate_visible(..., seg_apply_cut_bands=...)`, but default behavior must remain the stable baseline.
-- Important ownership rule: when `apply_cut_bands=true`, cut-edge clearance should come from the cut-band subtraction, not from also shrinking the visible-cell mask. Avoid double-applying cut-edge retreat.
-- Consumer rule: the core cut-band helpers expect the full intended join clearance. Do not halve `edge_inset` before passing it in; the core geometry already distributes that clearance across the two neighboring pieces.
-- The default generic cut-band path in `core/face_regions.scad` should be driven by the actual cutter-face normal and the true face/cutter bisector, not by the older symmetric `abs(z)` slope approximation. That gives the cut-edge sign/orientation from geometry instead of a scalar guess.
-- Watch for sign-crossing in profiled cut bands: if the profile changes side across z-levels, `_ps_fr_stack_quad_loops()` will build a twisted/hashed shell. The generic normal-derived cut profile should stay on the kept side of the cut edge and widen away from the face plane, not cross through the edge.
-- In practice this showed up on `poly_prism(n=7, p=2)`: the lower profile sample went negative while the middle/upper stayed positive. Probing the actual `ps_face_visible_segments(...)` cells and derived band loops in `.tmp/` is the fastest way to confirm whether a bad preview trace at `_ps_fr_stack_quad_loops()` is a geometry/profile issue rather than a winding bug.
-- `_ps_fr_stack_quad_loops()` should triangulate its side walls, not emit quads, because varying-width cut-band levels do not guarantee planar side faces. On `7/2` this combined with side-crossing profiles to produce the hashed artifact/trace at `face_regions.scad:317`.
-- Keep the consumer simple: `examples/printing/face_plate.scad` should prefer the generic dihedral/extent-based cut-band volume from `core/face_regions.scad`. A face-plate-specific cut profile override proved to be overfitting and made the `7/3` star-prism joins worse.
-- If cut-band joins still need tuning, change the generic cut-band geometry in `core/face_regions.scad`; do not reintroduce example-specific profile logic into `face_plate.scad`.
+- `core/face_regions.scad` now owns the real segmented-face geometry story. `segments.scad` finds visible cells and cut provenance; `face_regions.scad` turns that into admissible 3D regions.
+- The supported contract is: derive keep regions from the underlying polyhedron alone, then clip arbitrary child geometry to them. Do not try to infer a perfect result recursively from already-decorated neighboring faces.
+- `examples/printing/face_plate.scad` should stay a thin consumer of those core regions. Avoid reintroducing segmentation or join solving into the example layer.
+- For segmented visible cells, the important model is direct region construction from **all** side constraints together, not "keep prism minus a union of independent cut bands". This matters when multiple cut edges meet at one corner, for example where a true edge punches through another face.
+- Parent edges use the ordinary face dihedral/2 rule. Cut edges use cutter-derived join geometry from the matched cut entries and cutter face normals.
+- `face_plate_visible(..., seg_apply_cut_bands=true)` now selects the direct visible-cell region path. `seg_along_pad` and the old subtraction-band tuning were removed as dead baggage.
+- Consumer rule: pass the full intended segmentation join clearance into the core region path. Do not halve `edge_inset` before passing it in.
 
 ## Session Notes (Printing Segmentation Metadata)
-- `face_plate_visible(...)` is currently on the stable baseline: clip the full `face_plate(...)` solid by visible-cell masks. This preserves original face-edge bevels; cut-edge relief is still a separate unresolved layer.
+- `face_plate_visible(...)` uses `ps_clip_to_visible_face_segments_ctx(...)` as its segmented path and should remain a thin consumer of the core region model.
 - `ps_face_visible_segments(...)` now returns `cell_cut_entry_ids` as a fifth parallel vector alongside `cell_edge_kinds`. Values are `undef` for parent edges and stable indices into `ps_face_geom_cut_entries(...)` for cut edges.
 - `place_on_face_visible_segments(...)` exposes the same data as `$ps_vis_seg_cut_entry_ids`; `place_on_face_segments(...)` exposes `$ps_seg_cut_entry_ids`.
 - The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
-- Failed keep-volume experiments should be deleted rather than left around dead. The current baseline is intentionally just full-face clipping by `_visible_cell_mask(...)`; plan B for future cut-edge relief is direct mesh clipping/splitting of the already-built face plate, not deeper `intersection()`/keep-volume CSG.
-- A clipped-loop attempt inside `face_plate_visible(...)` was also backed out. Even if it compiles, segmented-face join geometry should not be re-derived in the example layer. The next implementation should move into a core segmented-face clipping primitive and let `face_plate` remain a thin consumer.
+- Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
 
 ## Session Notes (Printing Segmentation)
-- The more robust printing model is to clip the already-built full `face_plate(...)` solid by per-cell masks from `ps_face_visible_segments(...)`, not to rebuild each visible cell as an independent face. That preserves original parent-edge bevel geometry on star-prism side faces.
-- Cut-edge beveling for segmented printable pieces remains unresolved: the attempted wedge-subtraction path did not yet produce the intended outward-opening V on sharp star-prism cuts, so the stable baseline is currently full-face clipping plus vertical cut clearance only.
+- The generic segmented path now builds visible-cell regions directly from all edge side lines together. This is the right abstraction for punch-through cases and future stellation-style intersections.
 
 ## Session Notes (Printing Face Segmentation)
 - `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
 - `examples/printing/face_plate.scad`: keep segmentation join clearance separate from ordinary outer-edge inset. `face_plate_visible(..., seg_cut_clearance=...)` controls the cut-edge gap; it defaults to `edge_inset` only for backward-compatible behavior.
-- `core/face_regions.scad`: the dead linear/stratified cut-profile experiments were removed. The active cut-band path is now just the normal-derived profile (`ps_face_cut_profile2d_from_cutter_normal(...)`) plus `band_overcut`; avoid reintroducing alternate profile APIs unless they have a real consumer.
+- `core/face_regions.scad`: avoid reintroducing alternate cut-band/subtraction APIs unless they have a real consumer. The main segmented path should stay the direct visible-cell region build.
 - `core/segments.scad`: `nonzero` is now the intended default for `ps_face_segments(...)` / `place_on_face_segments(...)`; keep `evenodd` as an explicit/debug option rather than the normal user path.
 - Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
 - Same-face cut fragments must merge by connected collinear intervals only. Do not collapse all fragments from one cutter face to the farthest pair, or disjoint spans get bridged across empty gaps.
 - Docs split: `docs/segments.md` explains split-cell / cut-line analysis and iteration; `docs/face_regions.md` explains the 3D clipping/volume layer that consumes that data. Keep examples and docs pointing users at the right layer instead of re-explaining segmentation inside `face_plate`-style consumers.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
-- The `hidden_interior_only` collapse in `ps_face_visible_segments(...)` should only suppress segmentation when there is exactly one visible survivor. If multiple visible boundary pieces remain (for example angled star-antiprism cuts into a triangle), keep them as separate cells.
-- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
+- `ps_face_visible_segments(...)` should only collapse back to the unsplit parent polygon when **all** split cells are visible. If a cut leaves multiple visible survivors, keep them all as separate cells.
+- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata from the region model. Avoid solving segmented joins in the example layer.
 
 ## Session Notes (Construction Toolkit)
 - Johnson-style construction should build on explicit topology tools first: delete faces, recover boundary loops, then cap them. Keep “repair” semantics visible instead of burying them in magical element-deletion helpers.

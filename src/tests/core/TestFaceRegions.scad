@@ -21,7 +21,7 @@ module test_ps_face_cut_join_dihed__is_complement() {
     assert_near(ps_face_cut_join_dihed(120), 240, 1e-9, "join dihedral complement");
 }
 
-module test_ps_face_cut_profile2d_from_cutter_normal__includes_zero_when_spanning_plane() {
+module test_ps_face_cut_profile2d_from_cutter_normal__is_planar_across_span() {
     prof = ps_face_cut_profile2d_from_cutter_normal(
         -1,
         2,
@@ -29,11 +29,11 @@ module test_ps_face_cut_profile2d_from_cutter_normal__includes_zero_when_spannin
         [-0.8, 0, 0.6],
         0.2
     );
-    assert(len(prof) == 3, "normal-derived cut profile spanning z=0 should include face plane sample");
-    assert_near(prof[1][0], 0.1, 1e-9, "middle inset should be half the requested clearance");
-    assert_near(prof[1][1], 0, 1e-9, "middle sample should lie on the face plane");
-    assert(prof[0][0] > prof[1][0], "profile should widen away from the face plane below");
-    assert(prof[2][0] > prof[1][0], "profile should widen away from the face plane above");
+    assert(len(prof) == 2, "normal-derived cut profile should define one straight cut plane across the active z span");
+    assert_near(prof[0][0], 0.1, 1e-9, "profile should stay on the kept side over the full z span");
+    assert_near(prof[0][1], -1, 1e-9, "lower sample z");
+    assert_near(prof[1][0], 6.1, 1e-9, "profile should preserve signed slope after shifting onto the kept side");
+    assert_near(prof[1][1], 2, 1e-9, "upper sample z");
 }
 
 module test_ps_face_visible_cell_mask_loop__cut_edges_pull_inward() {
@@ -73,14 +73,14 @@ module test_ps_clip_to_visible_face_segments_ctx__smoke() {
 module test_ps_clip_to_visible_face_segments_ctx__cut_bands_smoke() {
     place_on_faces(poly_prism(5, 2)) {
         if ($ps_vertex_count == 4)
-            ps_clip_to_visible_face_segments_ctx(-1, 1, cut_clearance = 0.1, along_pad = 0.2, mode = "nonzero", apply_cut_bands = true)
+            ps_clip_to_visible_face_segments_ctx(-1, 1, cut_clearance = 0.1, mode = "nonzero", apply_cut_bands = true)
                 cube([6, 6, 6], center = true);
     }
 }
 
 module run_TestFaceRegions() {
     test_ps_face_cut_join_dihed__is_complement();
-    test_ps_face_cut_profile2d_from_cutter_normal__includes_zero_when_spanning_plane();
+    test_ps_face_cut_profile2d_from_cutter_normal__is_planar_across_span();
     test_ps_face_visible_cell_mask_loop__cut_edges_pull_inward();
     test_ps_face_region_inset_at_z__zero_at_face_plane();
     test_ps_clip_to_face_region_ctx__smoke();
