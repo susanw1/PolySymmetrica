@@ -16,7 +16,7 @@ If you are deciding where to start:
 
 - the admissible region around a real poly face
 - visible-cell keep volumes for segmented faces
-- bounded cut-band volumes derived from segmentation edges
+- segmentation-edge join regions derived from intersecting faces
 
 These helpers are deliberately local. They depend on:
 
@@ -25,6 +25,63 @@ These helpers are deliberately local. They depend on:
 - cut-edge metadata from `segments.scad`
 
 They do **not** depend on any global polyhedral centre convention.
+
+## Philosophy
+
+The important design decision is that face-region logic must be driven by the
+**underlying polyhedral geometry**, not by the detailed form of whatever child
+geometry the user places on the face.
+
+That gives a stable contract:
+
+1. `segments.scad` determines the visible face cells and the cut provenance.
+2. `face_regions.scad` turns that into admissible 3D regions.
+3. User/example geometry is clipped to those regions.
+
+This avoids a circular problem.
+
+It is **not** generally possible to say:
+
+- "take arbitrary decorated geometry on every face, look at all final mutual
+  intersections, and automatically infer the perfect result in one pass"
+
+because each final clipped face would depend recursively on the others.
+
+It **is** possible to say:
+
+- "derive the legal keep region from the polyhedron alone, then clip arbitrary
+  child geometry to that region"
+
+That is the supported model here.
+
+### What Is Supported
+
+- ordinary face regions bounded by true face-edge dihedral/2 planes
+- segmented visible cells derived from intersecting faces
+- segmentation joins derived from the underlying cutter faces
+- arbitrary child geometry clipped to those admissible regions
+
+### What Is Not Generically Solvable
+
+- arbitrary child geometry that intentionally protrudes outside the admissible
+  region and then expects the system to recursively reconcile those extra
+  intersections
+
+For example, if a user places a tall looping shape that leaves one face,
+crosses a neighboring face, and comes back elsewhere, that becomes a bespoke
+constructive-modeling problem rather than a generic face-placement problem.
+
+So the guarantee here is:
+
+- the admissible region is correct and stable
+
+not:
+
+- every arbitrary clipped child shape will look aesthetically simple after
+  clipping
+
+That distinction matters for examples such as `face_plate(...)`, which layer
+their own body/roof/pillow structure on top of the generic region model.
 
 ## Purpose
 
@@ -40,6 +97,33 @@ That split is deliberate:
 
 - `segments.scad` answers "what are the cells and cuts?"
 - `face_regions.scad` answers "what volume is legal to keep?"
+
+## Current Plan
+
+The current direction is deliberately narrow and geometric:
+
+1. Keep `segments.scad` focused on **analysis only**:
+   - split loops
+   - derive cut entries
+   - determine visible cells
+   - propagate cut provenance
+
+2. Keep `face_regions.scad` focused on **region construction only**:
+   - ordinary face regions from parent-edge dihedral/2 planes
+   - segmented visible-cell regions from all cell side lines together
+
+3. For segmented cells, prefer a **direct region build** over "keep prism minus
+   a union of independent cut bands".
+   This matters when multiple cut edges meet in one place, for example when a
+   true poly edge punches through another face.
+
+4. Keep examples such as `face_plate.scad` thin:
+   - build example geometry
+   - clip it to the core face/visible-cell regions
+   - do not solve generic segmentation inside the example layer
+
+This is the route intended to support more difficult future cases such as
+stellations.
 
 ## Main Helpers
 
@@ -88,7 +172,8 @@ Builds a simple keep volume for one visible face cell returned by `ps_face_visib
 - Parent edges stay on the cell boundary.
 - Cut edges are pulled inward by `cut_clearance`.
 
-This is the current stable baseline used by `face_plate_visible(...)`.
+This is the simple segmented baseline used when you only want vertical
+cut-clearance handling.
 
 The `cut_clearance` here is the nominal segmentation gap. It is independent of
 ordinary outer face-edge beveling.
@@ -103,13 +188,29 @@ Requires:
 - `$ps_vis_seg_edge_kinds`
 - optionally `$ps_vis_seg_cut_entry_ids`
 
+### `ps_face_visible_cell_region_volume(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8)`
+
+Builds a segmented visible-cell region directly from **all** of the cell's side
+constraints together.
+
+- Parent edges use the true face dihedral/2 rule.
+- Cut edges use cutter-derived join geometry.
+- The loop at each `z` is formed by intersecting adjacent side lines in order.
+
+This direct region construction is the important model for complex local cases
+where multiple cut edges meet in one place.
+
+### `ps_face_visible_cell_region_volume_ctx(...)`
+
+Context wrapper for the direct visible-cell region builder.
+
 ### `ps_clip_to_visible_face_cell_ctx(...)`
 
 Child-consuming wrapper for one visible segmented face cell.
 
-- Baseline behavior: clip to the visible cell volume only.
-- Optional `apply_cut_bands=true` enables subtraction of bounded cut-band
-  volumes derived from segmentation edges.
+- Baseline behavior: clip to the simple visible-cell volume only.
+- With `apply_cut_bands=true`, use the direct segmented visible-cell region
+  instead.
 
 Typical use:
 
@@ -134,36 +235,11 @@ of the current face.
 This is the generic segmented-face consumer now used by
 `examples/printing/face_plate.scad`.
 
-Consumers can keep the stable baseline by leaving `apply_cut_bands=false`, or
-opt into experimental segmentation-edge join relief by passing
-`apply_cut_bands=true`.
+Consumers can keep the simple baseline by leaving `apply_cut_bands=false`, or
+use the direct segmented visible-cell region by passing `apply_cut_bands=true`.
 
-When `apply_cut_bands=true`, the visible-cell keep volume no longer applies its
-own cut-edge clearance. The cut-band subtraction owns cut-edge relief
-completely in that mode.
-
-### `ps_face_cut_band_volume_profiled(seg2d, inward_n, profile2d, along_pad=0, eps=1e-8)`
-
-Builds a bounded cut-band volume from an explicit cross-section profile.
-
-- `profile2d` is a list of `[u, z]` points
-- `u` is inward/outward offset from the segmentation edge in the face plane
-- `z` is face-local height
-
-This is the route used by the current cut-band path.
-
-### `ps_face_visible_segment_cut_bands_ctx(z0, z1, cut_clearance=0, along_pad=0, mode="nonzero", eps=1e-8, band_overcut=1e-3)`
-
-Context wrapper that emits cut-band volumes for the current visible cell.
-
-Requires:
-
-- `place_on_faces(...)` context
-- `place_on_face_visible_segments(...)` context
-
-This is the advanced cut-join tool. In normal usage, most consumers should
-start with `ps_clip_to_visible_face_segments_ctx(...)` and only care about
-these lower-level band helpers when they need to tune segmentation joins.
+Despite the name, the preferred main path is now the direct visible-cell region
+construction, not a literal "subtract a union of independent cut bands" model.
 
 ## Recommended Usage Patterns
 
@@ -210,9 +286,10 @@ This is the generic version of what `face_plate_visible(...)` now does.
 
 ## Notes
 
-- The current printing path is built on the core wrappers in this file. The
-  cut-band path is available here and can be enabled selectively by consumers
-  such as `face_plate_visible(...)`; it is not forced for every caller.
+- The current printing path is built on the core wrappers in this file. Example
+  code should stay a thin consumer of these region builders.
 - Treat `cut_clearance` as the segmentation join-gap control.
-- Treat `along_pad` as along-edge overreach only, not gap width.
-- Treat `band_overcut` as a robustness epsilon for exact-coincidence cleanup, not as a primary design parameter.
+- Treat `band_overcut` as a robustness epsilon for exact-coincidence cleanup,
+  not as a primary design parameter.
+- `along_pad` is legacy baggage from the earlier edge-band subtraction model.
+  It should not be treated as a core design parameter going forward.
