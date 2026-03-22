@@ -431,10 +431,10 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
         );
     } else {
         base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
-        z0 = base_z_eff - max(clear_height, face_thk + pillow_thk + clear_height);
-        z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
         band_z0 = base_z_eff;
         band_z1 = base_z_eff + face_thk + pillow_thk;
+        z0 = base_z_eff - max(clear_height, face_thk + pillow_thk + clear_height);
+        z1 = base_z_eff + face_thk + pillow_thk + clear_height + max(clear_height, face_thk);
         cut_clearance = is_undef(seg_cut_clearance) ? edge_inset : seg_cut_clearance;
         ps_clip_to_visible_face_segments_ctx(
             z0,

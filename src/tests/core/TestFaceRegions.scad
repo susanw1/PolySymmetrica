@@ -28,11 +28,13 @@ module test_ps_face_cut_profile2d_from_cutter_normal__is_planar_across_span() {
         [1, 0],
         [-0.8, 0, 0.6],
         0.2
+        ,
+        126.86989764584402
     );
     assert(len(prof) == 2, "normal-derived cut profile should define one straight cut plane across the active z span");
     assert_near(prof[0][0], 0.1, 1e-9, "profile should stay on the kept side over the full z span");
     assert_near(prof[0][1], -1, 1e-9, "lower sample z");
-    assert_near(prof[1][0], 6.1, 1e-9, "profile should preserve signed slope after shifting onto the kept side");
+    assert_near(prof[1][0], 1.6, 1e-9, "profile should use cut dihedral for slope magnitude while staying on the kept side");
     assert_near(prof[1][1], 2, 1e-9, "upper sample z");
 }
 

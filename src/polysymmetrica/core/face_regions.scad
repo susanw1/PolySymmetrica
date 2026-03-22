@@ -133,7 +133,7 @@ module ps_clip_to_face_region_ctx(z0, z1, mode="nonzero", eps=1e-8) {
 
 function ps_face_cut_join_dihed(cut_dihed) = 360 - cut_dihed;
 
-function ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance=0, eps=1e-9) =
+function ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, cut_clearance=0, cut_dihed=undef, eps=1e-9) =
     let(
         z_min = min(z0, z1),
         z_max = max(z0, z1),
@@ -143,7 +143,9 @@ function ps_face_cut_profile2d_from_cutter_normal(z0, z1, inward_n, cutter_n3, c
         b_use = (v_dot([b[0], b[1]], inward_n) < 0) ? -b : b,
         b_u = v_dot([b_use[0], b_use[1]], inward_n),
         b_z = b_use[2],
-        slope_signed = (abs(b_u) <= eps) ? 0 : (-b_z / b_u),
+        slope_geom = (abs(b_u) <= eps) ? 0 : (-b_z / b_u),
+        slope_mag = is_undef(cut_dihed) ? abs(slope_geom) : tan((180 - cut_dihed) / 2),
+        slope_signed = ((slope_geom < 0) ? -1 : 1) * slope_mag,
         u0_raw = cut_clearance / 2 + slope_signed * z_min,
         u1_raw = cut_clearance / 2 + slope_signed * z_max,
         shift = max(0, cut_clearance / 2 - min(u0_raw, u1_raw))
@@ -214,18 +216,18 @@ function _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_fa
     )
     (kind == "parent")
         ? ps_face_region_inset_at_z(_ps_fr_safe_at(face_diheds, _ps_fr_safe_at(edge_ids, edge_idx, 0), 180), z)
-        : let(
-            cid = _ps_fr_safe_at(cut_ids, edge_idx, undef),
-            probe = _ps_fr_cell_probe(cell[0], eps),
-            inward_n = _ps_fr_cell_edge_inward_n(cell[0], edge_idx, probe, eps),
-            valid_cid = !is_undef(cid) && cid >= 0 && cid < len(cut_entries)
-        )
+            : let(
+                cid = _ps_fr_safe_at(cut_ids, edge_idx, undef),
+                probe = _ps_fr_cell_probe(cell[0], eps),
+                inward_n = _ps_fr_cell_edge_inward_n(cell[0], edge_idx, probe, eps),
+                valid_cid = !is_undef(cid) && cid >= 0 && cid < len(cut_entries)
+            )
         !valid_cid
             ? cut_clearance
             : let(
                 cutter_f = poly_faces_idx[cut_entries[cid][1]],
                 cutter_n3 = ps_face_frame_normal(poly_verts_local, cutter_f),
-                profile = ps_face_cut_profile2d_from_cutter_normal(band_z0, band_z1, inward_n, cutter_n3, cut_clearance, eps)
+                profile = ps_face_cut_profile2d_from_cutter_normal(band_z0, band_z1, inward_n, cutter_n3, cut_clearance, cut_entries[cid][2], eps)
             )
             _ps_fr_profile_u_at_z(profile, z, eps);
 
