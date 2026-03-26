@@ -307,7 +307,7 @@ module debug_live_face_slab(show_faces = undef, show_cells = undef) {
 module model(show_faces = undef, clear_airspace = true) {
     let (inter_radius = IR)
     union() {
-        *union() {
+        union() {
             // Constructs the edge-based frame
             color("gray")
             place_on_edges(p, IR) {
@@ -326,7 +326,7 @@ module model(show_faces = undef, clear_airspace = true) {
         }
         // Constructs faces, removes them from frame to create face-fitting sockets.
         place_on_faces(p, IR) {
-            color($ps_face_idx < 2? "red" : ["yellow", "green", "blue", "white", "orange"][$ps_face_idx % 5], 0.7)
+            color($ps_face_idx < 2? "red" : ["yellow", "green", "blue", "white", "orange"][$ps_face_idx % 5], 1)
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
                 face_plate_visible($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
@@ -338,7 +338,7 @@ module model(show_faces = undef, clear_airspace = true) {
 }
 
 if (DEBUG_SHOW_MODEL) {
-    model(undef, false);
+    model(undef, true);
 }
 
 if (DEBUG_SEG_LABELS) {

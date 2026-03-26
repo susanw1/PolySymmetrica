@@ -570,8 +570,7 @@ function _ps_seg_is_parent_edge(seg2d, face_pts2d, eps=1e-8) =
             (colinear && overlaps) ? 1 : 0
     ]) == 1;
 
-function _ps_seg_orient2(a, b, c) =
-    _ps_seg_cross2([b[0] - a[0], b[1] - a[1]], [c[0] - a[0], c[1] - a[1]]);
+function _ps_seg_orient2(a, b, c) = _ps_orient2(a, b, c);
 
 function _ps_seg_point_in_tri2(p, a, b, c, eps=1e-9) =
     let(

@@ -72,6 +72,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 
 ## Session Notes (Recent Cleanup Insights)
 - Prefer shared scalar helpers in `funcs.scad` when used across core files (for example `ps_clamp(...)`), rather than duplicating private variants per file.
+- Promote only genuinely generic geometry primitives into `funcs.scad` (for example 2D orientation, convexity, or line intersection); keep face-region-specific half-plane clipping and offset machinery local until it has a second real consumer.
 - Remove thin pass-through wrappers when they add no semantic value; call the canonical helper directly.
 - For inert cleanup passes, include comment-only/doc-only normalization together with dead-local/dead-helper removal, then always run:
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`

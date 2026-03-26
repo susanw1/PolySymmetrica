@@ -358,6 +358,34 @@ function ps_calc_edge(n_vertex, rad) = 2 * rad * sin(180 / n_vertex);
 /** Calculate polygon radius, given N and edge length */
 function ps_calc_radius(n_vertex, edge_len) = edge_len / (2 * sin(180 / n_vertex));
 
+function _ps_orient2(a, b, c) =
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+// Intersection of two 2D lines given as dot(n, p) = d.
+function _ps_line_intersect_2d(n1, d1, n2, d2, eps=1e-9) =
+    let(det = n1[0] * n2[1] - n1[1] * n2[0])
+    (abs(det) < eps)
+        ? [0, 0]
+        : [
+            (d1 * n2[1] - n1[1] * d2) / det,
+            (n1[0] * d2 - d1 * n2[0]) / det
+        ];
+
+function _ps_poly_turns2(poly) =
+    let(n = len(poly))
+    [
+        for (i = [0:1:n-1])
+            _ps_orient2(poly[(i - 1 + n) % n], poly[i], poly[(i + 1) % n])
+    ];
+
+function _ps_poly_is_convex2(poly, eps=1e-9) =
+    let(
+        turns = [for (t = _ps_poly_turns2(poly)) if (abs(t) > eps) t]
+    )
+    (len(turns) <= 1) ||
+    (min(turns) >= -eps) ||
+    (max(turns) <= eps);
+
 
 ///////////////////////////////////////
 // ---- Geometry helpers ----

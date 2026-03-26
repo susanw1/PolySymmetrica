@@ -2,18 +2,6 @@ use <funcs.scad>
 use <render.scad>
 use <segments.scad>
 
-function _ps_fr_safe_at(v, i, dflt) =
-    (is_undef(i) || i < 0 || i >= len(v)) ? dflt : v[i];
-
-function _ps_fr_line_intersect_2d(n1, d1, n2, d2) =
-    let(det = n1[0] * n2[1] - n1[1] * n2[0])
-    (abs(det) < 1e-9)
-        ? [0, 0]
-        : [
-            (d1 * n2[1] - n1[1] * d2) / det,
-            (n1[0] * d2 - d1 * n2[0]) / det
-        ];
-
 function _ps_fr_loop_from_adjacent_lines(lines) =
     let(m = len(lines))
     [
@@ -22,7 +10,7 @@ function _ps_fr_loop_from_adjacent_lines(lines) =
                 l0 = lines[(k - 1 + m) % m],
                 l1 = lines[k]
             )
-            _ps_fr_line_intersect_2d(l0[0], l0[1], l1[0], l1[1])
+            _ps_line_intersect_2d(l0[0], l0[1], l1[0], l1[1])
     ];
 
 function _ps_fr_line_keep(line, p, eps=1e-9) =
@@ -88,106 +76,6 @@ function _ps_fr_lines_seed_square(lines, probe, eps=1e-9) =
 function _ps_fr_loop_from_halfplanes(lines, probe, eps=1e-9) =
     _ps_fr_clip_poly_lines(_ps_fr_lines_seed_square(lines, probe, eps), lines, eps);
 
-function _ps_fr_min_pair_idx(pairs, idx=0, best=0) =
-    (idx >= len(pairs)) ? best :
-    _ps_fr_min_pair_idx(pairs, idx + 1, (pairs[idx][0] < pairs[best][0]) ? idx : best);
-
-function _ps_fr_remove_at(list, idx) =
-    [for (i = [0:1:len(list)-1]) if (i != idx) list[i]];
-
-function _ps_fr_sort_pairs(pairs, acc=[]) =
-    (len(pairs) == 0) ? acc :
-    let(mi = _ps_fr_min_pair_idx(pairs))
-    _ps_fr_sort_pairs(_ps_fr_remove_at(pairs, mi), concat(acc, [pairs[mi]]));
-
-function _ps_fr_plane_keep(plane, p, eps=1e-8) =
-    v_dot(plane[0], p) >= plane[1] - eps;
-
-function _ps_fr_plane_intersect3(pa, pb, pc, eps=1e-9) =
-    let(
-        n1 = pa[0], d1 = pa[1],
-        n2 = pb[0], d2 = pb[1],
-        n3 = pc[0], d3 = pc[1],
-        c23 = v_cross(n2, n3),
-        det = v_dot(n1, c23)
-    )
-    (abs(det) <= eps)
-        ? undef
-        : (
-            v_add(
-                v_add(v_scale(c23, d1), v_scale(v_cross(n3, n1), d2)),
-                v_scale(v_cross(n1, n2), d3)
-            ) / det
-        );
-
-function _ps_fr_point_keep_all(planes, p, eps=1e-8) =
-    len([for (pl = planes) if (_ps_fr_plane_keep(pl, p, eps)) 1]) == len(planes);
-
-function _ps_fr_unique_pts3(pts, eps=1e-7) =
-    [
-        for (i = [0:1:len(pts)-1])
-            if (!is_undef(pts[i]) &&
-                len([for (j = [0:1:i-1]) if (!is_undef(pts[j]) && ps_point_eq(pts[i], pts[j], eps)) 1]) == 0)
-                pts[i]
-    ];
-
-function _ps_fr_plane_face_basis_ex(n) =
-    let(helper = (abs(n[2]) < 0.9) ? [0, 0, 1] : [0, 1, 0])
-    v_norm(v_cross(helper, n));
-
-function _ps_fr_sort_face_indices(points, idxs, n) =
-    let(
-        c = v_scale(v_sum([for (i = idxs) points[i]]), 1 / len(idxs)),
-        ex = _ps_fr_plane_face_basis_ex(n),
-        ey = v_norm(v_cross(n, ex)),
-        pairs = [
-            for (i = idxs)
-                let(
-                    v = points[i] - c,
-                    ang = atan2(v_dot(v, ey), v_dot(v, ex))
-                )
-                [ang, i]
-        ]
-    )
-    [for (p = _ps_fr_sort_pairs(pairs)) p[1]];
-
-function _ps_fr_halfspace_vertices(planes, eps=1e-8) =
-    _ps_fr_unique_pts3(
-        [
-            for (i = [0:1:len(planes)-1])
-                for (j = [i+1:1:len(planes)-1])
-                    for (k = [j+1:1:len(planes)-1])
-                        let(p = _ps_fr_plane_intersect3(planes[i], planes[j], planes[k], eps))
-                        if (!is_undef(p) && _ps_fr_point_keep_all(planes, p, 10 * eps)) p
-        ],
-        20 * eps
-    );
-
-module _ps_fr_convex_volume_from_halfspaces(planes, eps=1e-8) {
-    pts = _ps_fr_halfspace_vertices(planes, eps);
-    if (len(pts) >= 4) {
-        face_loops = [
-            for (pi = [0:1:len(planes)-1])
-                let(
-                    plane = planes[pi],
-                    idxs = [
-                        for (vi = [0:1:len(pts)-1])
-                            if (abs(v_dot(plane[0], pts[vi]) - plane[1]) <= 20 * eps) vi
-                    ],
-                    sorted = (len(idxs) >= 3) ? _ps_fr_sort_face_indices(pts, idxs, plane[0]) : []
-                )
-                if (len(sorted) >= 3) sorted
-        ];
-        faces = [
-            for (loop = face_loops)
-                for (i = [1:1:len(loop)-2])
-                    [loop[0], loop[i], loop[i + 1]]
-        ];
-        if (len(faces) >= 4)
-            polyhedron(points = pts, faces = faces, convexity = 4);
-    }
-}
-
 function _ps_fr_offset_pts2d_inset_edges(pts, insets) =
     let(
         n = len(pts),
@@ -216,7 +104,7 @@ function _ps_fr_offset_pts2d_inset_edges(pts, insets) =
                 l0 = lines[(k-1+n)%n],
                 l1 = lines[k]
             )
-            _ps_fr_line_intersect_2d(l0[0], l0[1], l1[0], l1[1])
+            _ps_line_intersect_2d(l0[0], l0[1], l1[0], l1[1])
     ];
 
 function ps_face_region_inset_at_z(dihed, z) =
@@ -231,8 +119,8 @@ function _ps_fr_loop_from_seg_at_z(seg, face_diheds, z) =
         m = len(s_pts),
         insets = [
             for (k = [0:1:m-1])
-                (_ps_fr_safe_at(s_kinds, k, "cut") == "parent")
-                    ? ps_face_region_inset_at_z(_ps_fr_safe_at(face_diheds, _ps_fr_safe_at(s_edge_ids, k, 0), 180), z)
+                (_ps_seg_safe_at(s_kinds, k, "cut") == "parent")
+                    ? ps_face_region_inset_at_z(_ps_seg_safe_at(face_diheds, _ps_seg_safe_at(s_edge_ids, k, 0), 180), z)
                     : 0
         ]
     )
@@ -336,7 +224,7 @@ function ps_face_visible_cell_mask_loop(cell, cut_clearance=0) =
         m = len(s_pts),
         insets = [
             for (k = [0:1:m-1])
-                (_ps_fr_safe_at(s_kinds, k, "cut") == "parent") ? 0 : cut_clearance
+                (_ps_seg_safe_at(s_kinds, k, "cut") == "parent") ? 0 : cut_clearance
                 
         ]
     )
@@ -394,7 +282,7 @@ function ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly
         cut_hi = is_undef(band_z1) ? z_max : band_z1,
         pts = cell[0],
         m = len(pts),
-        probe = _ps_fr_cell_probe(pts, eps),
+        probe = _ps_seg_cycle_probe_point(pts, eps),
         z_mid = (z_min + z_max) / 2
     )
     concat(
@@ -428,7 +316,7 @@ function ps_face_visible_cell_loop_at_z_from_region_planes(cell, face_diheds, cu
     let(
         z_min = min(z0, z1),
         z_max = max(z0, z1),
-        probe = _ps_fr_cell_probe(cell[0], eps),
+        probe = _ps_seg_cycle_probe_point(cell[0], eps),
         planes = ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0, band_z1, cut_clearance, eps),
         lines = [
             for (pi = [2:1:len(planes)-1])
@@ -440,24 +328,6 @@ function ps_face_visible_cell_loop_at_z_from_region_planes(cell, face_diheds, cu
         ? []
         : _ps_fr_loop_from_halfplanes(lines, probe, eps);
 
-function _ps_fr_cell_probe(cell_pts2d, eps=1e-9) =
-    _ps_seg_cycle_probe_point(cell_pts2d, eps);
-
-function _ps_fr_poly_turns(poly) =
-    let(n = len(poly))
-    [
-        for (i = [0:1:n-1])
-            _ps_seg_orient2(poly[(i - 1 + n) % n], poly[i], poly[(i + 1) % n])
-    ];
-
-function _ps_fr_poly_is_convex(poly, eps=1e-9) =
-    let(
-        turns = [for (t = _ps_fr_poly_turns(poly)) if (abs(t) > eps) t]
-    )
-    (len(turns) <= 1) ||
-    (min(turns) >= -eps) ||
-    (max(turns) <= eps);
-
 function _ps_fr_atom_edge_meta(cell, ia, ib, eps=1e-9) =
     let(
         pts = cell[0],
@@ -468,12 +338,12 @@ function _ps_fr_atom_edge_meta(cell, ia, ib, eps=1e-9) =
         fwd = [
             for (k = [0:1:n-1])
                 if (k == ia && ((ia + 1) % n) == ib)
-                    [_ps_fr_safe_at(edge_ids, k, undef), _ps_fr_safe_at(kinds, k, "inner"), _ps_fr_safe_at(cut_ids, k, undef)]
+                    [_ps_seg_safe_at(edge_ids, k, undef), _ps_seg_safe_at(kinds, k, "inner"), _ps_seg_safe_at(cut_ids, k, undef)]
         ],
         rev = [
             for (k = [0:1:n-1])
                 if (k == ib && ((ib + 1) % n) == ia)
-                    [_ps_fr_safe_at(edge_ids, k, undef), _ps_fr_safe_at(kinds, k, "inner"), _ps_fr_safe_at(cut_ids, k, undef)]
+                    [_ps_seg_safe_at(edge_ids, k, undef), _ps_seg_safe_at(kinds, k, "inner"), _ps_seg_safe_at(cut_ids, k, undef)]
         ]
     )
     (len(fwd) > 0) ? fwd[0] :
@@ -485,7 +355,7 @@ function _ps_fr_visible_cell_atoms(cell, eps=1e-9) =
         pts = cell[0],
         tris = _ps_seg_triangulate_simple_poly_idx(pts, eps)
     )
-    _ps_fr_poly_is_convex(pts, eps)
+    _ps_poly_is_convex2(pts, eps)
         ? [cell]
         : [
             for (tri = tris)
@@ -522,15 +392,15 @@ function _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_fa
         kinds = cell[3],
         edge_ids = cell[2],
         cut_ids = cell[4],
-        kind = _ps_fr_safe_at(kinds, edge_idx, "cut")
+        kind = _ps_seg_safe_at(kinds, edge_idx, "cut")
     )
     (kind == "inner")
         ? 0
         : (kind == "parent")
-        ? ps_face_region_inset_at_z(_ps_fr_safe_at(face_diheds, _ps_fr_safe_at(edge_ids, edge_idx, 0), 180), z)
+        ? ps_face_region_inset_at_z(_ps_seg_safe_at(face_diheds, _ps_seg_safe_at(edge_ids, edge_idx, 0), 180), z)
             : let(
-                cid = _ps_fr_safe_at(cut_ids, edge_idx, undef),
-                probe = _ps_fr_cell_probe(cell[0], eps),
+                cid = _ps_seg_safe_at(cut_ids, edge_idx, undef),
+                probe = _ps_seg_cycle_probe_point(cell[0], eps),
                 inward_n = _ps_fr_cell_edge_inward_n(cell[0], edge_idx, probe, eps),
                 valid_cid = !is_undef(cid) && cid >= 0 && cid < len(cut_entries)
             )
@@ -543,42 +413,35 @@ function _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_fa
             )
             _ps_fr_profile_u_at_z(profile, z, eps);
 
-function _ps_fr_visible_cell_loop_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance=0, eps=1e-9) =
+function _ps_fr_visible_cell_lines_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance=0, eps=1e-9) =
     let(
         pts = cell[0],
         m = len(pts),
-        probe = _ps_fr_cell_probe(pts, eps),
-        lines = [
-            for (k = [0:1:m-1])
-                let(
-                    p0 = pts[k],
-                    inward_n = _ps_fr_cell_edge_inward_n(pts, k, probe, eps),
-                    u = _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, k, z, band_z0, band_z1, cut_clearance, eps),
-                    d = v_dot(inward_n, p0) + u,
-                    keep_ge = v_dot(inward_n, probe) >= d
-                )
-                [inward_n, d, keep_ge]
-        ],
+        probe = _ps_seg_cycle_probe_point(pts, eps)
+    )
+    [
+        for (k = [0:1:m-1])
+            let(
+                p0 = pts[k],
+                inward_n = _ps_fr_cell_edge_inward_n(pts, k, probe, eps),
+                u = _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, k, z, band_z0, band_z1, cut_clearance, eps),
+                d = v_dot(inward_n, p0) + u,
+                keep_ge = v_dot(inward_n, probe) >= d
+            )
+            [inward_n, d, keep_ge]
+    ];
+
+function _ps_fr_visible_cell_loop_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance=0, eps=1e-9) =
+    let(
+        lines = _ps_fr_visible_cell_lines_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance, eps),
         seed = _ps_fr_loop_from_adjacent_lines(lines)
     )
     seed;
 
 function ps_face_visible_cell_loop_at_z_clipped(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance=0, eps=1e-9) =
     let(
-        pts = cell[0],
-        m = len(pts),
-        probe = _ps_fr_cell_probe(pts, eps),
-        lines = [
-            for (k = [0:1:m-1])
-                let(
-                    p0 = pts[k],
-                    inward_n = _ps_fr_cell_edge_inward_n(pts, k, probe, eps),
-                    u = _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, k, z, band_z0, band_z1, cut_clearance, eps),
-                    d = v_dot(inward_n, p0) + u,
-                    keep_ge = v_dot(inward_n, probe) >= d
-                )
-                [inward_n, d, keep_ge]
-        ]
+        probe = _ps_seg_cycle_probe_point(cell[0], eps),
+        lines = _ps_fr_visible_cell_lines_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance, eps)
     )
     _ps_fr_loop_from_halfplanes(lines, probe, eps);
 
