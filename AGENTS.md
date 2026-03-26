@@ -19,6 +19,8 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Run all negative tests (expects each file in `src/tests/negative/` to fail):
   `src/tests/run_negative_all.sh`
 - Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
+- `openscad-nightly` is installed via snap on this machine, so it is sandboxed more tightly than the apt `openscad`. When feeding `openscad-nightly` a scratch `.scad`, prefer a repo-local `.tmp/` path over `/tmp`, otherwise snap confinement may block reading the input file.
+- This environment has `python3` available but not `python`. For quick probe-file generation or text rewriting, use `python3`.
 - Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
 - Process safety: never kill `openscad-nightly` broadly (`pkill openscad*` etc.). The user keeps an interactive `openscad-nightly` session running.
   Only target exact non-interactive command lines started for this task.
@@ -70,6 +72,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 
 ## Session Notes (Recent Cleanup Insights)
 - Prefer shared scalar helpers in `funcs.scad` when used across core files (for example `ps_clamp(...)`), rather than duplicating private variants per file.
+- Promote only genuinely generic geometry primitives into `funcs.scad` (for example 2D orientation, convexity, or line intersection); keep face-region-specific half-plane clipping and offset machinery local until it has a second real consumer.
 - Remove thin pass-through wrappers when they add no semantic value; call the canonical helper directly.
 - For inert cleanup passes, include comment-only/doc-only normalization together with dead-local/dead-helper removal, then always run:
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
@@ -110,11 +113,60 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
   - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
+## Session Notes (Face Region Volumes)
+- `src/polysymmetrica/core/face_regions.scad` is the new home for local face-region and segmentation volume helpers.
+- These helpers are intentionally face-local: they depend on face geometry, cut geometry, and dihedral/2 rules, not on any global polyhedral centre convention.
+- Keep `examples/printing/face_plate.scad` thin. If segmented-face or printable join geometry needs more machinery, move that machinery into `core/face_regions.scad`, not back into the example.
+- Helper tests now live in `src/tests/core/TestFaceRegions.scad`, not under `src/tests/examples/`.
+- Generic child-clipping wrappers now live there too:
+  - `ps_clip_to_face_region(_ctx)`
+  - `ps_clip_to_visible_face_cell_ctx(...)`
+  - `ps_clip_to_visible_face_segments_ctx(...)`
+- `core/face_regions.scad` now owns the real segmented-face geometry story. `segments.scad` finds visible cells and cut provenance; `face_regions.scad` turns that into admissible 3D regions.
+- The supported contract is: derive keep regions from the underlying polyhedron alone, then clip arbitrary child geometry to them. Do not try to infer a perfect result recursively from already-decorated neighboring faces.
+- `examples/printing/face_plate.scad` should stay a thin consumer of those core regions. Avoid reintroducing segmentation or join solving into the example layer.
+- For segmented visible cells, the important model is direct region construction from **all** side constraints together, not "keep prism minus a union of independent cut bands". This matters when multiple cut edges meet at one corner, for example where a true edge punches through another face.
+- Parent edges use the ordinary face dihedral/2 rule. Cut edges use cutter-derived join geometry from the matched cut entries and cutter face normals.
+- `face_plate_visible(..., seg_apply_cut_bands=true)` now selects the direct visible-cell region path. `seg_along_pad` and the old subtraction-band tuning were removed as dead baggage.
+- Consumer rule: pass the full intended segmentation join clearance into the core region path. Do not halve `edge_inset` before passing it in.
+- The exact 2D clipped loop helper (`ps_face_visible_cell_loop_at_z_clipped(...)`) is now trusted as cross-section truth for bad punch-through cases such as `poly_antiprism(7,3, angle=15)` `f2/c0`.
+- Important lesson: a visible cell may still be nonconvex. In that case the clipped half-plane loop is the convex kernel of the cell, not the whole visible region. Do not replace a nonconvex live cell loop with the clipped loop directly.
+- The current live fix is: decompose nonconvex visible cells into convex atoms in `face_regions.scad`, build one atom region per convex atom, then union them.
+- Do not switch live geometry over just because the clipped top loop looks right. The acceptance rule for future exact-region work is stricter: an exact convex-atom region model must reproduce the accepted local cross-sections across the actual occupied `z` span before the live region builder is replaced.
+- The raw exact 3D CSG probe/debug path was removed as a dead end. Keep the useful diagnostics only:
+  - face/cell/cut labels
+  - orange-vs-cyan loop comparison
+  - plane-derived 2D cross-section checks
+- For the canonical troublesome `poly_antiprism(7,3, angle=15)` join, the matched cut pair `f2/c0/e1/c1/f5` and `f5/c1/e1/c0/f2` already agree numerically:
+  - `cut_dihed ~= 94.2341`
+  - `join_dihed ~= 265.7659`
+  - identical profile over the face slab span `[[0.55, -0.4], [2.03592, 1.2]]`
+  So if that join still looks wrong, the bug is in whole-cell region construction, not in the per-edge dihedral math.
+
+## Session Notes (Printing Segmentation Metadata)
+- `face_plate_visible(...)` uses `ps_clip_to_visible_face_segments_ctx(...)` as its segmented path and should remain a thin consumer of the core region model.
+- `ps_face_visible_segments(...)` now returns `cell_cut_entry_ids` as a fifth parallel vector alongside `cell_edge_kinds`. Values are `undef` for parent edges and stable indices into `ps_face_geom_cut_entries(...)` for cut edges.
+- `place_on_face_visible_segments(...)` exposes the same data as `$ps_vis_seg_cut_entry_ids`; `place_on_face_segments(...)` exposes `$ps_seg_cut_entry_ids`.
+- `cut_entry_id` is face-local; use it to index back into `ps_face_geom_cut_entries(...)`.
+- `cut_pair_id` is the world-stable join id for the same geometric cut seen from two faces. It is derived from the two face ids plus a quantized world-space line signature (anchor point + direction), and is exposed as `$ps_vis_seg_cut_pair_ids` when `place_on_faces(...)` world-frame context is available.
+- The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
+- Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
+- Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
+
+## Session Notes (Printing Segmentation)
+- The generic segmented path now builds visible-cell regions directly from all edge side lines together. This is the right abstraction for punch-through cases and future stellation-style intersections.
+
 ## Session Notes (Printing Face Segmentation)
 - `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
+- `examples/printing/face_plate.scad`: keep segmentation join clearance separate from ordinary outer-edge inset. `face_plate_visible(..., seg_cut_clearance=...)` controls the cut-edge gap; it defaults to `edge_inset` only for backward-compatible behavior.
+- `core/face_regions.scad`: avoid reintroducing alternate cut-band/subtraction APIs unless they have a real consumer. The main segmented path should stay the direct visible-cell region build.
+- `core/segments.scad`: `nonzero` is now the intended default for `ps_face_segments(...)` / `place_on_face_segments(...)`; keep `evenodd` as an explicit/debug option rather than the normal user path.
 - Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
+- Same-face cut fragments must merge by connected collinear intervals only. Do not collapse all fragments from one cutter face to the farthest pair, or disjoint spans get bridged across empty gaps.
+- Docs split: `docs/segments.md` explains split-cell / cut-line analysis and iteration; `docs/face_regions.md` explains the 3D clipping/volume layer that consumes that data. Keep examples and docs pointing users at the right layer instead of re-explaining segmentation inside `face_plate`-style consumers.
 - `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
-- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
+- `ps_face_visible_segments(...)` should only collapse back to the unsplit parent polygon when **all** split cells are visible. If a cut leaves multiple visible survivors, keep them all as separate cells.
+- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata from the region model. Avoid solving segmented joins in the example layer.
 
 ## Session Notes (Construction Toolkit)
 - Johnson-style construction should build on explicit topology tools first: delete faces, recover boundary loops, then cap them. Keep “repair” semantics visible instead of burying them in magical element-deletion helpers.
@@ -138,6 +190,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `place_on_face_visible_segments(...)`
   - `face_visible_mask(...)`
 - This path works by splitting a face by geometry-derived cut segments, then discarding cells occluded by other local triangles. It is preferable to `hull() face_cut_stencil(...)` for printing because it avoids magic-number cutters and over-subtraction.
+- If cut lines split a face but every child cell remains visible, keep the original unsplit face cell.
+- Star-prism side faces should resolve to the two visible side panels after spike occlusion; do not collapse that case to a single octagon or center strip.
 - When splitting a simple face by cut segments, do not require child cell winding to match the outer boundary. The traversal can yield mixed orientation for valid cells.
 - Endpoint-on-boundary intersections matter for cut segmentation. A strict interior/interior-only segment intersection test will miss essential split nodes.
 
