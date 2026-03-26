@@ -98,32 +98,44 @@ That split is deliberate:
 - `segments.scad` answers "what are the cells and cuts?"
 - `face_regions.scad` answers "what volume is legal to keep?"
 
-## Current Plan
+## What Ended Up Working
 
-The current direction is deliberately narrow and geometric:
+The important practical lesson from the recent segmentation work is:
 
-1. Keep `segments.scad` focused on **analysis only**:
-   - split loops
-   - derive cut entries
-   - determine visible cells
-   - propagate cut provenance
+- visible cells from `segments.scad` can still be **nonconvex**
+- the exact half-plane-clipped loop at one `z` is then only the **convex
+  kernel** of that cell, not the full visible region
 
-2. Keep `face_regions.scad` focused on **region construction only**:
-   - ordinary face regions from parent-edge dihedral/2 planes
-   - segmented visible-cell regions from all cell side lines together
+That means a direct "replace the live loop with the clipped loop" fix is wrong
+for nonconvex cells. It shrinks the cell to its kernel and destroys real
+visible area.
 
-3. For segmented cells, prefer a **direct region build** over "keep prism minus
-   a union of independent cut bands".
-   This matters when multiple cut edges meet in one place, for example when a
-   true poly edge punches through another face.
+The working remedy lives in `face_regions.scad`:
 
-4. Keep examples such as `face_plate.scad` thin:
-   - build example geometry
-   - clip it to the core face/visible-cell regions
-   - do not solve generic segmentation inside the example layer
+1. keep `segments.scad` as the analysis layer
+2. detect nonconvex visible cells in `face_regions.scad`
+3. decompose those cells into convex atoms
+4. build one admissible region per convex atom
+5. union the atom regions back together
 
-This is the route intended to support more difficult future cases such as
-stellations.
+This keeps the example layer thin, preserves nonconvex visible pieces, and
+still lets the region builder operate on convex pieces locally.
+
+It also explains why the bad `poly_antiprism(7,3, angle=15)` `f2/c0` case was
+hard:
+
+- the problematic blue visible cell was nonconvex
+- the orange live loop was too large because adjacent-line intersection was too
+  loose
+- the cyan clipped loop looked "right" locally because it was the convex kernel
+  near the bad corner
+- but using that cyan loop directly for the whole cell broke the rest of the
+  piece
+
+So the current live strategy is:
+
+- build segmented visible-cell regions from the full visible cell shape
+- but decompose nonconvex cells into convex atoms before lofting
 
 ## Main Helpers
 
@@ -187,22 +199,51 @@ Requires:
 - `$ps_vis_seg_pts2d`
 - `$ps_vis_seg_edge_kinds`
 - optionally `$ps_vis_seg_cut_entry_ids`
+- optionally `$ps_vis_seg_cut_pair_ids`
 
 ### `ps_face_visible_cell_region_volume(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8)`
 
-Builds a segmented visible-cell region directly from **all** of the cell's side
-constraints together.
+Builds the segmented visible-cell region used by the live clipping path.
 
 - Parent edges use the true face dihedral/2 rule.
 - Cut edges use cutter-derived join geometry.
-- The loop at each `z` is formed by intersecting adjacent side lines in order.
+- Convex cells are lofted directly.
+- Nonconvex cells are first decomposed into convex atoms, and those atom
+  regions are then unioned.
 
-This direct region construction is the important model for complex local cases
-where multiple cut edges meet in one place.
+That convex-atom decomposition is the key to handling punch-through cases and
+future stellation-style intersections without collapsing the visible region to a
+convex kernel.
 
 ### `ps_face_visible_cell_region_volume_ctx(...)`
 
 Context wrapper for the direct visible-cell region builder.
+
+### `ps_face_visible_cell_region_planes(...)`
+
+Returns the exact side-plane set for one visible cell:
+
+- bottom slab plane
+- top slab plane
+- one kept plane per parent edge
+- one kept plane per cut edge
+
+This is primarily a debug/probe helper for cross-section reasoning and future
+exact-region work.
+
+### `ps_face_visible_cell_loop_at_z_from_region_planes(...)`
+
+Derives a 2D loop at a chosen `z` directly from the region planes.
+
+This is the useful 2D acceptance helper:
+
+- `ps_face_visible_cell_loop_at_z_clipped(...)` gives trusted 2D half-plane
+  truth for the convex kernel at a chosen `z`
+- `ps_face_visible_cell_loop_at_z_from_region_planes(...)` checks whether a
+  plane-set model reproduces that same cross-section
+
+The abandoned exact 3D CSG probe was removed once it proved too misleading to
+guide fixes.
 
 ### `ps_clip_to_visible_face_cell_ctx(...)`
 
@@ -211,6 +252,8 @@ Child-consuming wrapper for one visible segmented face cell.
 - Baseline behavior: clip to the simple visible-cell volume only.
 - With `apply_cut_bands=true`, use the direct segmented visible-cell region
   instead.
+
+This direct region path is the current preferred segmented path.
 
 Typical use:
 

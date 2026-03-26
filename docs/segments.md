@@ -121,6 +121,25 @@ Where:
 
 This is the provenance consumed by `face_regions.scad`.
 
+### `ps_face_geom_cut_pair_ids(cut_entries, face_idx, face_center_world, face_ex_world, face_ey_world, pair_eps=1e-6)`
+
+Builds a world-stable join id for each cut entry.
+
+This is primarily for:
+
+- cross-face debugging
+- verifying that two neighboring faces are talking about the same geometric join
+- future exact-region work that needs stable join pairing
+
+Each id is derived from:
+
+- the two face ids involved in the cut
+- the world-space intersection line, represented by a quantized anchor point and direction
+
+So corresponding cut edges on two different faces get the same `cut_pair_id`
+even though their local edge indices, local cut-entry ids, and local cropped
+segment spans can differ.
+
 ### `ps_face_geom_cut_segments(...)`
 
 Convenience wrapper returning only the `seg2d` part of
@@ -155,6 +174,15 @@ Returns the same cell structure as `ps_face_segments(...)`:
 
 This is the main handoff from analysis to clipping.
 
+Important:
+
+- a visible cell returned here may still be **nonconvex**
+- `face_regions.scad` is responsible for decomposing such cells into convex
+  atoms when it needs convex local region construction
+
+So `ps_face_visible_segments(...)` should keep returning the true visible cell
+topology, not a speculative convexified approximation.
+
 ### `place_on_face_visible_segments(...)`
 
 Iterator wrapper over visible cells.
@@ -169,6 +197,7 @@ Provides:
 - `$ps_vis_seg_edge_ids`
 - `$ps_vis_seg_edge_kinds`
 - `$ps_vis_seg_cut_entry_ids`
+- `$ps_vis_seg_cut_pair_ids`
 
 ### `face_cut_stencil(face_thk, kerf=0.2, extend=0.5, z_pad=0.2, mode="nonzero", eps=1e-8, filter_parent=true)`
 
@@ -229,6 +258,26 @@ Use `face_regions.scad` when:
 - you already have arbitrary geometry
 - you want to clip that geometry to a face region or visible segmented cells
 - you want cut-band subtraction handled as a volume operation
+
+One practical boundary:
+
+- `segments.scad` should not try to pre-convexify or otherwise distort visible
+  cells just to make downstream region construction easier
+- if a consumer needs convex pieces, that decomposition belongs in
+  `face_regions.scad` or the consumer, not here
+
+## Join Metadata
+
+There are now two useful levels of cut metadata:
+
+- `cut_entry_id`
+  Local to one face. Good for indexing back into
+  `ps_face_geom_cut_entries(...)`.
+
+- `cut_pair_id`
+  Stable across the two faces that share the same geometric join.
+  Use this when you need to compare or debug the same segmentation edge from
+  both sides.
 
 See also:
 

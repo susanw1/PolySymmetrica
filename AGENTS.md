@@ -128,11 +128,26 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Parent edges use the ordinary face dihedral/2 rule. Cut edges use cutter-derived join geometry from the matched cut entries and cutter face normals.
 - `face_plate_visible(..., seg_apply_cut_bands=true)` now selects the direct visible-cell region path. `seg_along_pad` and the old subtraction-band tuning were removed as dead baggage.
 - Consumer rule: pass the full intended segmentation join clearance into the core region path. Do not halve `edge_inset` before passing it in.
+- The exact 2D clipped loop helper (`ps_face_visible_cell_loop_at_z_clipped(...)`) is now trusted as cross-section truth for bad punch-through cases such as `poly_antiprism(7,3, angle=15)` `f2/c0`.
+- Important lesson: a visible cell may still be nonconvex. In that case the clipped half-plane loop is the convex kernel of the cell, not the whole visible region. Do not replace a nonconvex live cell loop with the clipped loop directly.
+- The current live fix is: decompose nonconvex visible cells into convex atoms in `face_regions.scad`, build one atom region per convex atom, then union them.
+- Do not switch live geometry over just because the clipped top loop looks right. The acceptance rule for future exact-region work is stricter: an exact convex-atom region model must reproduce the accepted local cross-sections across the actual occupied `z` span before the live region builder is replaced.
+- The raw exact 3D CSG probe/debug path was removed as a dead end. Keep the useful diagnostics only:
+  - face/cell/cut labels
+  - orange-vs-cyan loop comparison
+  - plane-derived 2D cross-section checks
+- For the canonical troublesome `poly_antiprism(7,3, angle=15)` join, the matched cut pair `f2/c0/e1/c1/f5` and `f5/c1/e1/c0/f2` already agree numerically:
+  - `cut_dihed ~= 94.2341`
+  - `join_dihed ~= 265.7659`
+  - identical profile over the face slab span `[[0.55, -0.4], [2.03592, 1.2]]`
+  So if that join still looks wrong, the bug is in whole-cell region construction, not in the per-edge dihedral math.
 
 ## Session Notes (Printing Segmentation Metadata)
 - `face_plate_visible(...)` uses `ps_clip_to_visible_face_segments_ctx(...)` as its segmented path and should remain a thin consumer of the core region model.
 - `ps_face_visible_segments(...)` now returns `cell_cut_entry_ids` as a fifth parallel vector alongside `cell_edge_kinds`. Values are `undef` for parent edges and stable indices into `ps_face_geom_cut_entries(...)` for cut edges.
 - `place_on_face_visible_segments(...)` exposes the same data as `$ps_vis_seg_cut_entry_ids`; `place_on_face_segments(...)` exposes `$ps_seg_cut_entry_ids`.
+- `cut_entry_id` is face-local; use it to index back into `ps_face_geom_cut_entries(...)`.
+- `cut_pair_id` is the world-stable join id for the same geometric cut seen from two faces. It is derived from the two face ids plus a quantized world-space line signature (anchor point + direction), and is exposed as `$ps_vis_seg_cut_pair_ids` when `place_on_faces(...)` world-frame context is available.
 - The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.

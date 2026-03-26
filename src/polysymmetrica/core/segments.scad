@@ -461,6 +461,75 @@ function _ps_seg2_eq(s0, s1, eps=1e-8) =
     (_ps_seg_close2(s0[0], s1[0], eps) && _ps_seg_close2(s0[1], s1[1], eps)) ||
     (_ps_seg_close2(s0[0], s1[1], eps) && _ps_seg_close2(s0[1], s1[0], eps));
 
+function _ps_seg_safe_at(v, i, dflt) =
+    (is_undef(i) || i < 0 || i >= len(v)) ? dflt : v[i];
+
+function _ps_seg_local2_to_world(p2d, face_center_world, face_ex_world, face_ey_world) =
+    face_center_world + face_ex_world * p2d[0] + face_ey_world * p2d[1];
+
+function _ps_seg_quant3(p, pair_eps=1e-6) =
+    [for (x = p) round(x / pair_eps)];
+
+function _ps_seg_vec3_lex_lt(a, b) =
+    (a[0] < b[0]) ||
+    ((a[0] == b[0]) && (
+        (a[1] < b[1]) ||
+        ((a[1] == b[1]) && (a[2] < b[2]))
+    ));
+
+function _ps_seg_vec3_canonical_sign(v, eps=1e-9) =
+    (abs(v[0]) > eps) ? ((v[0] < 0) ? -1 : 1) :
+    (abs(v[1]) > eps) ? ((v[1] < 0) ? -1 : 1) :
+    (abs(v[2]) > eps) ? ((v[2] < 0) ? -1 : 1) :
+    1;
+
+function _ps_seg_line_signature_from_seg2d(seg2d, face_center_world, face_ex_world, face_ey_world, pair_eps=1e-6) =
+    let(
+        p0 = _ps_seg_local2_to_world(seg2d[0], face_center_world, face_ex_world, face_ey_world),
+        p1 = _ps_seg_local2_to_world(seg2d[1], face_center_world, face_ex_world, face_ey_world),
+        dir0 = v_norm(p1 - p0),
+        dir = dir0 * _ps_seg_vec3_canonical_sign(dir0, 100 * pair_eps),
+        anchor = p0 - dir * v_dot(dir, p0),
+        q_anchor = _ps_seg_quant3(anchor, pair_eps),
+        q_dir = _ps_seg_quant3(dir, pair_eps)
+    )
+    [q_anchor, q_dir];
+
+function ps_cut_entry_segment2d(entry) = entry[0];
+function ps_cut_entry_cutter_face_idx(entry) = entry[1];
+function ps_cut_entry_dihed(entry) = entry[2];
+function ps_cut_entry_pair_id(entry) = (len(entry) > 3) ? entry[3] : undef;
+
+function ps_cut_entry_pair_id_from_seg2d(seg2d, face_idx, cutter_face_idx, face_center_world, face_ex_world, face_ey_world, pair_eps=1e-6) =
+    let(
+        fs = min(face_idx, cutter_face_idx),
+        fl = max(face_idx, cutter_face_idx),
+        sig = _ps_seg_line_signature_from_seg2d(seg2d, face_center_world, face_ex_world, face_ey_world, pair_eps),
+        a = sig[0],
+        d = sig[1]
+    )
+    str(
+        "j", fs, "_", fl,
+        "_", a[0], "_", a[1], "_", a[2],
+        "_", d[0], "_", d[1], "_", d[2]
+    );
+
+function ps_face_geom_cut_pair_ids(cut_entries, face_idx, face_center_world=undef, face_ex_world=undef, face_ey_world=undef, pair_eps=1e-6) =
+    (is_undef(face_center_world) || is_undef(face_ex_world) || is_undef(face_ey_world))
+        ? [for (_e = cut_entries) undef]
+        : [
+            for (e = cut_entries)
+                ps_cut_entry_pair_id_from_seg2d(
+                    ps_cut_entry_segment2d(e),
+                    face_idx,
+                    ps_cut_entry_cutter_face_idx(e),
+                    face_center_world,
+                    face_ex_world,
+                    face_ey_world,
+                    pair_eps
+                )
+        ];
+
 function _ps_seg_dedupe_segments(segs, eps=1e-8, i=0, acc=[]) =
     (i >= len(segs)) ? acc :
     let(
@@ -883,11 +952,12 @@ function _ps_seg_merge_face_cut_entries(entries, eps=1e-8, i=0, done=[], acc=[])
     _ps_seg_merge_face_cut_entries(entries, eps, i + 1, done2, acc2);
 
 // Returns cut provenance entries in the form:
-//   [seg2d, cutter_face_idx, cut_dihed]
+//   [seg2d, cutter_face_idx, cut_dihed, cut_pair_id?]
 // where:
 // - seg2d: [[x0,y0], [x1,y1]] in the current face-local 2D frame
 // - cutter_face_idx: index into poly_faces_idx
 // - cut_dihed: cut dihedral associated with that cutter face
+// - cut_pair_id: optional world-stable join id (appended when face world frame is supplied)
 function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     (is_undef(face_pts2d) || is_undef(poly_faces_idx) || is_undef(poly_verts_local)) ? [] :
     let(
@@ -971,12 +1041,21 @@ module place_on_face_geom_cut_segments(mode="nonzero", eps=1e-8, filter_parent=t
     assert(!is_undef($ps_face_idx), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_face_idx)");
     assert(!is_undef($ps_poly_faces_idx), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_poly_faces_idx)");
     assert(!is_undef($ps_poly_verts_local), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_poly_verts_local)");
-    segs = ps_face_geom_cut_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
+    entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
+    pair_ids = ps_face_geom_cut_pair_ids(
+        entries,
+        $ps_face_idx,
+        is_undef($ps_face_center_world) ? undef : $ps_face_center_world,
+        is_undef($ps_face_ex_world) ? undef : $ps_face_ex_world,
+        is_undef($ps_face_ey_world) ? undef : $ps_face_ey_world
+    );
+    segs = [for (e = entries) ps_cut_entry_segment2d(e)];
     for (si = [0:1:len(segs)-1]) {
         $ps_face_cut_idx = si;
         $ps_face_cut_count = len(segs);
         $ps_face_cut_segment2d_local = segs[si];
         $ps_face_cut_segments2d_local = segs;
+        $ps_face_cut_pair_id = pair_ids[si];
         children();
     }
 }
@@ -988,9 +1067,21 @@ module place_on_face_visible_segments(mode="nonzero", eps=1e-8, filter_parent=tr
     assert(!is_undef($ps_poly_faces_idx), "place_on_face_visible_segments: requires place_on_faces context ($ps_poly_faces_idx)");
     assert(!is_undef($ps_poly_verts_local), "place_on_face_visible_segments: requires place_on_faces context ($ps_poly_verts_local)");
 
+    cut_entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
+    cut_pair_ids = ps_face_geom_cut_pair_ids(
+        cut_entries,
+        $ps_face_idx,
+        is_undef($ps_face_center_world) ? undef : $ps_face_center_world,
+        is_undef($ps_face_ex_world) ? undef : $ps_face_ex_world,
+        is_undef($ps_face_ey_world) ? undef : $ps_face_ey_world
+    );
     segs = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
     for (si = [0:1:len(segs)-1]) {
         s = segs[si];
+        seg_cut_pair_ids = [
+            for (cid = s[4])
+                is_undef(cid) ? undef : _ps_seg_safe_at(cut_pair_ids, cid, undef)
+        ];
         $ps_vis_seg_idx = si;
         $ps_vis_seg_count = len(segs);
         $ps_vis_seg_vertex_count = len(s[0]);
@@ -999,6 +1090,7 @@ module place_on_face_visible_segments(mode="nonzero", eps=1e-8, filter_parent=tr
         $ps_vis_seg_edge_ids = s[2];
         $ps_vis_seg_edge_kinds = s[3];
         $ps_vis_seg_cut_entry_ids = s[4];
+        $ps_vis_seg_cut_pair_ids = seg_cut_pair_ids;
         children();
     }
 }

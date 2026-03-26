@@ -94,6 +94,10 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
         $ps_vertex_count      = len(face_pts2d);    // vertex count for this face (length of the $ps_face_pts2d list)
         $ps_face_midradius    = face_midradius;     // (mean) distance of the face polygon centre from polyhedral centre
         $ps_face_radius       = face_radius;        // (mean) distance from face centre to vertices
+        $ps_face_center_world = center;             // face centre in world coords
+        $ps_face_ex_world     = ex;                 // local +X axis in world coords
+        $ps_face_ey_world     = ey;                 // local +Y axis in world coords
+        $ps_face_ez_world     = ez;                 // local +Z axis in world coords
         $ps_poly_center_local = poly_center_local;  // polyhedral centre in local coords (for regular faces, [0, 0, -$face_midradius])
         $ps_face_pts2d        = face_pts2d;         // [[x,y]...] for polygon()
         $ps_face_pts3d_local  = face_pts3d_local;   // [[x,y,z]...] in face-local coords, mean-centered in z

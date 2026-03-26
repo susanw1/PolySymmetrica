@@ -13,6 +13,32 @@ module assert_vec3_near(v, w, eps=1e-9, msg="") {
     assert(norm(v - w) <= eps, str(msg, " expected=", w, " got=", v));
 }
 
+function _test_face_cut_ctx(poly, fi) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        face = faces[fi],
+        center = poly_face_center(poly, fi, 1),
+        ex = poly_face_ex(poly, fi, 1),
+        ey = poly_face_ey(poly, fi, 1),
+        ez = poly_face_ez(poly, fi, 1),
+        face_verts_local = [
+            for (vid = face)
+                let(p = verts[vid] - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        poly_verts_local_raw = [
+            for (vi = [0:1:len(verts)-1])
+                let(p = verts[vi] - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        zvals = [for (p = face_verts_local) p[2]],
+        zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals),
+        face_pts2d = [for (p = face_verts_local) [p[0], p[1]]],
+        poly_verts_local = [for (p = poly_verts_local_raw) [p[0], p[1], p[2] - zmean]]
+    )
+    [face_pts2d, poly_verts_local, center, ex, ey];
+
 module test_place_on_faces__family_ids_and_counts_from_classify() {
     p = rhombicuboctahedron();
     faces = poly_faces(p);
@@ -338,6 +364,47 @@ module test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_ent
     }
 }
 
+module test_ps_face_visible_segments__cut_pair_ids_defined_in_ctx() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2 || $ps_face_idx == 5) {
+            place_on_face_visible_segments() {
+                for (k = [0:1:len($ps_vis_seg_edge_kinds)-1]) {
+                    if ($ps_vis_seg_edge_kinds[k] == "cut") {
+                        assert(
+                            !is_undef($ps_vis_seg_cut_pair_ids[k]),
+                            str("cut pair id should be defined face=", $ps_face_idx, " cell=", $ps_vis_seg_idx, " edge=", k)
+                        );
+                    } else {
+                        assert(is_undef($ps_vis_seg_cut_pair_ids[k]), "parent edge should not carry cut pair id");
+                    }
+                }
+            }
+        }
+    }
+}
+
+module test_ps_face_geom_cut_pair_ids__matching_faces_share_join_id() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    faces = poly_faces(p);
+
+    ctx2 = _test_face_cut_ctx(p, 2);
+    entries2 = ps_face_geom_cut_entries(ctx2[0], 2, faces, ctx2[1], 1e-8, "nonzero", true);
+    pairs2 = ps_face_geom_cut_pair_ids(entries2, 2, ctx2[2], ctx2[3], ctx2[4]);
+
+    ctx5 = _test_face_cut_ctx(p, 5);
+    entries5 = ps_face_geom_cut_entries(ctx5[0], 5, faces, ctx5[1], 1e-8, "nonzero", true);
+    pairs5 = ps_face_geom_cut_pair_ids(entries5, 5, ctx5[2], ctx5[3], ctx5[4]);
+
+    common = [
+        for (pid = pairs2)
+            if (!is_undef(pid) && len([for (q = pairs5) if (q == pid) 1]) > 0)
+                pid
+    ];
+
+    assert(len(common) > 0, "matching cut entries across faces should share at least one join id");
+}
+
 module test_ps_face_geom_cut_segments__respects_fill_mode() {
     // Target square in z=0 plane plus a star-shaped cutter face tilted through the plane.
     target = [[-6,-6], [6,-6], [6,6], [-6,6]];
@@ -399,6 +466,8 @@ module run_TestPlacement() {
     test_ps_face_visible_segments__cells_preserve_parent_winding();
     test_ps_face_visible_segments__star_prism_cut_edges_reference_cut_entries();
     test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries();
+    test_ps_face_visible_segments__cut_pair_ids_defined_in_ctx();
+    test_ps_face_geom_cut_pair_ids__matching_faces_share_join_id();
     test_ps_face_geom_cut_segments__respects_fill_mode();
     test_seg_merge_face_cut_group__preserves_disjoint_spans();
     test_seg_merge_face_cut_group__merges_touching_spans();
