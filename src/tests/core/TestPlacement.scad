@@ -375,8 +375,13 @@ module test_ps_face_visible_segments__cut_pair_ids_defined_in_ctx() {
                             !is_undef($ps_vis_seg_cut_pair_ids[k]),
                             str("cut pair id should be defined face=", $ps_face_idx, " cell=", $ps_vis_seg_idx, " edge=", k)
                         );
+                        assert(
+                            !is_undef($ps_vis_seg_cut_run_ids[k]),
+                            str("cut run id should be defined face=", $ps_face_idx, " cell=", $ps_vis_seg_idx, " edge=", k)
+                        );
                     } else {
                         assert(is_undef($ps_vis_seg_cut_pair_ids[k]), "parent edge should not carry cut pair id");
+                        assert(is_undef($ps_vis_seg_cut_run_ids[k]), "parent edge should not carry cut run id");
                     }
                 }
             }
@@ -403,6 +408,36 @@ module test_ps_face_geom_cut_pair_ids__matching_faces_share_join_id() {
     ];
 
     assert(len(common) > 0, "matching cut entries across faces should share at least one join id");
+}
+
+module test_ps_face_visible_cell_cut_run_ids__wraparound_same_cutter_merges() {
+    kinds = ["cut", "cut", "cut"];
+    cids = [4, 7, 4];
+    runs = ps_face_visible_cell_cut_run_ids(kinds, cids);
+    assert_int_eq(runs[0], runs[2], "wrap-around split cut span should keep same run across cycle seam");
+    assert(runs[1] != runs[0], "middle distinct cutter contribution should keep distinct run id");
+}
+
+module test_ps_face_visible_segments__split_cut_spans_get_distinct_run_ids() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    faces = poly_faces(p);
+    ctx2 = _test_face_cut_ctx(p, 2);
+    entries2 = ps_face_geom_cut_entries(ctx2[0], 2, faces, ctx2[1], 1e-8, "nonzero", true);
+    vis2 = ps_face_visible_segments(ctx2[0], 2, faces, ctx2[1], 1e-8, "nonzero", true);
+    cell = vis2[0];
+    f11_edges = [
+        for (k = [0:1:len(cell[3])-1])
+            if (
+                cell[3][k] == "cut" &&
+                ps_cut_entry_cutter_face_idx(entries2[cell[4][k]]) == 11
+            )
+                k
+    ];
+
+    assert_int_eq(len(f11_edges), 2, str("f2/c0 should see two split f11 cut spans edges=", f11_edges));
+    assert(!is_undef(cell[5][f11_edges[0]]), "first split cut span should have run id");
+    assert(!is_undef(cell[5][f11_edges[1]]), "second split cut span should have run id");
+    assert(cell[5][f11_edges[0]] != cell[5][f11_edges[1]], str("split cut spans from same cutter must keep distinct run ids runs=", cell[5]));
 }
 
 module test_ps_face_geom_cut_segments__respects_fill_mode() {
@@ -468,6 +503,8 @@ module run_TestPlacement() {
     test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries();
     test_ps_face_visible_segments__cut_pair_ids_defined_in_ctx();
     test_ps_face_geom_cut_pair_ids__matching_faces_share_join_id();
+    test_ps_face_visible_cell_cut_run_ids__wraparound_same_cutter_merges();
+    test_ps_face_visible_segments__split_cut_spans_get_distinct_run_ids();
     test_ps_face_geom_cut_segments__respects_fill_mode();
     test_seg_merge_face_cut_group__preserves_disjoint_spans();
     test_seg_merge_face_cut_group__merges_touching_spans();

@@ -143,6 +143,7 @@ module debug_seg_labels(show_faces = undef) {
                     for (ei = [0:1:len($ps_vis_seg_pts2d)-1]) {
                         if ($ps_vis_seg_edge_kinds[ei] == "cut") {
                             cid = $ps_vis_seg_cut_entry_ids[ei];
+                            rid = is_undef($ps_vis_seg_cut_run_ids) ? undef : $ps_vis_seg_cut_run_ids[ei];
                             cutter_face = cut_entries[cid][1];
 
                             color("purple")
@@ -159,7 +160,7 @@ module debug_seg_labels(show_faces = undef) {
                             ])
                                 linear_extrude(DEBUG_LABEL_T)
                                     text(
-                                        str("e", ei, "/c", cid, "/f", cutter_face),
+                                        str("e", ei, "/c", cid, "/r", rid, "/f", cutter_face),
                                         size = DEBUG_EDGE_LABEL_SIZE,
                                         halign = "center",
                                         valign = "center"
@@ -338,7 +339,7 @@ module model(show_faces = undef, clear_airspace = true) {
 }
 
 if (DEBUG_SHOW_MODEL) {
-    model(undef, true);
+    model([2,11], false);
 }
 
 if (DEBUG_SEG_LABELS) {

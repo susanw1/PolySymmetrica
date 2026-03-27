@@ -530,6 +530,54 @@ function ps_face_geom_cut_pair_ids(cut_entries, face_idx, face_center_world=unde
                 )
         ];
 
+function _ps_seg_rotate_order(n, start=0) =
+    [for (k = [0:1:n-1]) (start + k) % n];
+
+function _ps_seg_first_noncut_idx(kinds) =
+    let(idxs = [for (i = [0:1:len(kinds)-1]) if (kinds[i] != "cut") i])
+    (len(idxs) == 0) ? undef : idxs[0];
+
+function _ps_seg_cut_run_ids_ordered(order, kinds, cut_entry_ids, i=0, prev_is_cut=false, prev_cid=undef, cur_run=undef, next_run=0, acc=[]) =
+    (i >= len(order)) ? acc :
+    let(
+        idx = order[i],
+        is_cut = _ps_seg_safe_at(kinds, idx, undef) == "cut",
+        cid = _ps_seg_safe_at(cut_entry_ids, idx, undef),
+        starts_new = is_cut && (!prev_is_cut || cid != prev_cid),
+        rid = !is_cut ? undef : (starts_new ? next_run : cur_run),
+        cur_run2 = is_cut ? rid : cur_run,
+        next_run2 = (is_cut && starts_new) ? (next_run + 1) : next_run
+    )
+    _ps_seg_cut_run_ids_ordered(order, kinds, cut_entry_ids, i + 1, is_cut, cid, cur_run2, next_run2, concat(acc, [rid]));
+
+function _ps_seg_lookup_run_id(order, vals, idx, j=0) =
+    (j >= len(order)) ? undef :
+    (order[j] == idx) ? vals[j] : _ps_seg_lookup_run_id(order, vals, idx, j + 1);
+
+// Local to one visible-cell boundary. Groups one continuous cutter contribution
+// into a single run id, while preserving split cut spans from the same cutter as
+// distinct ids when they are separated by other edges.
+function ps_face_visible_cell_cut_run_ids(cell_edge_kinds, cell_cut_entry_ids) =
+    let(
+        n = len(cell_edge_kinds),
+        first_noncut = _ps_seg_first_noncut_idx(cell_edge_kinds),
+        start = is_undef(first_noncut) ? 0 : ((first_noncut + 1) % n),
+        order = _ps_seg_rotate_order(n, start),
+        ordered0 = _ps_seg_cut_run_ids_ordered(order, cell_edge_kinds, cell_cut_entry_ids),
+        first_idx = (n == 0) ? undef : order[0],
+        last_idx = (n == 0) ? undef : order[n - 1],
+        merge_wrap = !is_undef(first_idx) &&
+            (_ps_seg_safe_at(cell_edge_kinds, first_idx, undef) == "cut") &&
+            (_ps_seg_safe_at(cell_edge_kinds, last_idx, undef) == "cut") &&
+            (_ps_seg_safe_at(cell_cut_entry_ids, first_idx, undef) == _ps_seg_safe_at(cell_cut_entry_ids, last_idx, undef)) &&
+            (ordered0[0] != ordered0[n - 1]),
+        ordered = !merge_wrap ? ordered0 : [
+            for (rid = ordered0)
+                (rid == ordered0[n - 1]) ? ordered0[0] : rid
+        ]
+    )
+    [for (i = [0:1:n-1]) _ps_seg_lookup_run_id(order, ordered, i)];
+
 function _ps_seg_dedupe_segments(segs, eps=1e-8, i=0, acc=[]) =
     (i >= len(segs)) ? acc :
     let(
@@ -999,8 +1047,11 @@ function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_ve
 // cells that are actually visible from the face-local +Z side.
 //
 // Returns:
-//   [[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds, cell_cut_entry_ids], ...]
-// where cell_cut_entry_ids is parallel to cell_edge_kinds and is undef for parent edges.
+//   [[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds, cell_cut_entry_ids, cell_cut_run_ids], ...]
+// where:
+// - cell_cut_entry_ids is parallel to cell_edge_kinds and is undef for parent edges
+// - cell_cut_run_ids is local to this visible cell boundary and distinguishes
+//   split cut spans from the same cutter when they re-enter the same cell
 function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     let(
         base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
@@ -1026,10 +1077,21 @@ function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_ver
             each (
                 (
                     all_visible
-                    ? [_ps_seg_orient_cell(base, target_sign, eps)]
+                    ? [
+                        let(
+                            cell = _ps_seg_orient_cell(base, target_sign, eps),
+                            cut_run_ids = ps_face_visible_cell_cut_run_ids(cell[3], cell[4])
+                        )
+                        concat(cell, [cut_run_ids])
+                    ]
                     : [
                         for (ci = [0:1:len(cells)-1])
-                            if (vis_mask[ci]) _ps_seg_orient_cell(cells[ci], target_sign, eps)
+                            if (vis_mask[ci])
+                                let(
+                                    cell = _ps_seg_orient_cell(cells[ci], target_sign, eps),
+                                    cut_run_ids = ps_face_visible_cell_cut_run_ids(cell[3], cell[4])
+                                )
+                                concat(cell, [cut_run_ids])
                     ])
             )
     ];
@@ -1090,6 +1152,7 @@ module place_on_face_visible_segments(mode="nonzero", eps=1e-8, filter_parent=tr
         $ps_vis_seg_edge_kinds = s[3];
         $ps_vis_seg_cut_entry_ids = s[4];
         $ps_vis_seg_cut_pair_ids = seg_cut_pair_ids;
+        $ps_vis_seg_cut_run_ids = s[5];
         children();
     }
 }
