@@ -57,6 +57,26 @@ The harder future exact-region work is still about replacing the sampled/lofted
 convex-atom builder with a more exact one, not about collapsing nonconvex cells
 to their kernels.
 
+There is now a second, narrower refinement problem too:
+
+- even when the side planes are correct, the **endpoints of a cut span** can
+  still misbehave near the top surface / top cap
+- this happens when a cutter face contributes multiple disjoint spans to the
+  same visible cell, or when a cut span terminates into another cut / true-edge
+  constraint
+- the result is that the lower cut faces look correct and parallel, but the top
+  cap runs across and touches or overlaps the neighbouring piece at the span
+  endpoints
+
+So the region problem is now split into two levels:
+
+- **whole-cell region correctness**
+  - solved enough for the current `f2/c0` / `f5/c1` join by convex-atom
+    decomposition
+- **cut-span endpoint / cut-vertex relief**
+  - still unresolved for more complex cases like the `f2` / `f11` repeated-cut
+    spans
+
 The sampled path is hard because it still approximates the convex-atom truth by:
 
 - computing 2D loops at a few `z` levels
@@ -105,6 +125,57 @@ For each edge of one visible cell:
   - plus `seg_cut_clearance`
 
 This should be a real 3D plane equation, not a sampled `u(z)` profile.
+
+3a. Add a distinct cut-span endpoint / cut-vertex model.
+
+This is now a separate requirement from the edge planes themselves.
+
+For a visible cell, classify each vertex as:
+
+- parent-parent
+- parent-cut
+- cut-cut
+- repeated-cutter re-entry / punch-through neighbourhood
+
+Then apply local endpoint relief rules:
+
+- parent-parent:
+  - no extra treatment
+- parent-cut:
+  - one-sided retreat aligned to the cut span endpoint
+- cut-cut:
+  - vertex bisector / chamfer rule derived from the two incident cut
+    constraints
+- repeated-cutter re-entry / punch-through:
+  - treat the two cut-span endpoints independently; do not assume the whole
+    same-face contribution is one continuous join
+
+The important point is that edge planes and endpoint relief are different
+layers:
+
+- the edge planes define the correct side faces of the admissible region
+- the endpoint relief stops the top cap from running across and touching the
+  neighbour at the ends of those spans
+
+Implementation guardrails:
+
+- do **not** derive endpoint relief independently per convex atom
+- derive it on the original visible cell first, then propagate it into the
+  convex atoms used by the live region builder
+
+Why:
+
+- one original visible-cell vertex can appear in multiple atoms after
+  triangulation
+- if each atom invents its own local endpoint chamfer, the same real endpoint
+  can be cut twice or inconsistently
+
+Also:
+
+- the first endpoint-relief implementation must preserve the sampled loop arity
+  used by the current live convex-atom loft builder
+- otherwise we will just reintroduce the earlier "exact loop is right, loft is
+  broken" failure mode under a different name
 
 4. Keep the current convex-atom sampled builder as the stable live path.
 
@@ -179,6 +250,48 @@ The useful debug artifacts were:
 The abandoned exact 3D CSG probe was removed rather than kept around as
 misleading machinery.
 
+7. There is a real distinction between edge-angle correctness and endpoint
+   correctness.
+
+The `f2` / `f11` case established that:
+
+- the cut side faces can be parallel and correctly spaced at the lower `z`
+  portion of the span
+- the local cut dihedral can be right
+- but the top surface can still overrun at the ends of that span
+
+So once the side planes are trusted, the next bug class is not "wrong dihedral"
+but "missing cut-span endpoint relief".
+
+8. Repeated spans from the same cutter face are a real case.
+
+The `f2/c0` chain
+
+- `e2/c4/f11`
+- `e3/c3/f7`
+- `e4/c5/f13`
+- `e5/c4/f11`
+
+shows that one cutter face can re-enter the same visible cell in multiple
+disjoint spans, with other cuts intervening.
+
+That means:
+
+- same cutter face does not imply one simple continuous join on the live piece
+- `cut_entry_id` / `cut_pair_id` are not sufficient by themselves to identify a
+  specific cut-span endpoint inside one visible cell
+- endpoint handling must therefore be keyed per **cut run / span**, not just per
+  cutter face or pair id globally
+
+So the next metadata addition is likely to be:
+
+- `cut_run_id` (or equivalent), local to one visible cell boundary, grouping
+  one continuous cut span between its two endpoints
+
+This should be derived after visible-cell construction, not from the raw global
+cut-entry list.
+- endpoint handling must work per span, not per cutter face globally
+
 ## Revised Staging Rule
 
 Do not replace the live convex-atom region builder until an exact convex-atom
@@ -216,16 +329,35 @@ The earlier failed attempts jumped too early from 1 to 3.
 - keep loop-comparison overlays
 - use pair-id / cell-id overlays when discussing a problematic join
 - do not reintroduce the abandoned exact-volume blob debug
+- add endpoint-focused debug views only if they show the local top-cap geometry
+  clearly; avoid broad translucent CSG overlays
+- when debugging endpoint relief, label cut spans/runs explicitly, not just
+  cutter-face ids, because the same cutter can re-enter the same cell multiple
+  times
 
 4. Tests
 
 - sample-point tests on exact region membership
 - pair consistency tests across matched seg edges
+- endpoint-specific tests for repeated same-cutter spans and cut-cut vertices
 - canonical visual/probe cases:
   - `poly_prism(5,2)`
   - `poly_prism(7,2)`
   - `poly_prism(7,3)`
   - `poly_antiprism(7,3, angle=15)`
+
+Additional canonical endpoint-relief cases:
+
+- `poly_antiprism(7,3, angle=15)`:
+  - `f2/c0` with the repeated `f11` spans
+  - verify that the lower cut faces remain parallel and spaced
+  - verify that the top cap does not overrun at either end of the `f11` spans
+  - verify that the two `f11` spans are treated as distinct runs with distinct
+    endpoints, not merged because they share a cutter face
+- any future edge-mounted example where a true edge punches through a face:
+  - use it to validate that endpoint relief composes with `place_on_edges(...)`
+  - endpoint relief must not consume the true-edge neighbourhood so aggressively
+    that edge-mounted geometry loses a predictable interface
 
 ## Recommendation
 
@@ -236,6 +368,13 @@ The next real work unit should be:
 - keep `segments.scad` stable
 - keep the current live geometry path stable
 - keep the convex-atom decomposition
+- add cut-run / span metadata on visible-cell boundaries
+- derive endpoint relief on the original visible cell, then map it into convex
+  atoms
+- add cut-span endpoint / cut-vertex relief as a new layer in
+  `face_regions.scad`, without revisiting the already-correct side-plane math
+- preserve per-atom loop arity in the first implementation so the current loft
+  builder remains valid
 - only pursue future exact-region work per convex atom
 - accept any future replacement only when its horizontal slices match the
   accepted local cross-sections across the actual occupied `z` span
