@@ -200,6 +200,7 @@ Requires:
 - `$ps_vis_seg_edge_kinds`
 - optionally `$ps_vis_seg_cut_entry_ids`
 - optionally `$ps_vis_seg_cut_pair_ids`
+- optionally `$ps_vis_seg_cut_run_ids`
 
 ### `ps_face_visible_cell_region_volume(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8)`
 

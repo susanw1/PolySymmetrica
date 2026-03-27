@@ -167,7 +167,7 @@ Returns the same cell structure as `ps_face_segments(...)`:
 
 ```scad
 [
-    [cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds, cell_cut_entry_ids],
+    [cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds, cell_cut_entry_ids, cell_cut_run_ids],
     ...
 ]
 ```
@@ -182,6 +182,15 @@ Important:
 
 So `ps_face_visible_segments(...)` should keep returning the true visible cell
 topology, not a speculative convexified approximation.
+
+`cell_cut_run_ids` is parallel to `cell_edge_kinds` and `cell_cut_entry_ids`:
+
+- `undef` for parent edges
+- a local run id for cut edges
+
+This is how split cut spans are distinguished. If the same cutter contributes
+multiple disjoint spans to the same visible cell, those spans keep distinct
+`cut_run_id`s even when they share the same `cut_entry_id`.
 
 ### `place_on_face_visible_segments(...)`
 
@@ -198,6 +207,7 @@ Provides:
 - `$ps_vis_seg_edge_kinds`
 - `$ps_vis_seg_cut_entry_ids`
 - `$ps_vis_seg_cut_pair_ids`
+- `$ps_vis_seg_cut_run_ids`
 
 ### `face_cut_stencil(face_thk, kerf=0.2, extend=0.5, z_pad=0.2, mode="nonzero", eps=1e-8, filter_parent=true)`
 

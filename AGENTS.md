@@ -149,6 +149,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `place_on_face_visible_segments(...)` exposes the same data as `$ps_vis_seg_cut_entry_ids`; `place_on_face_segments(...)` exposes `$ps_seg_cut_entry_ids`.
 - `cut_entry_id` is face-local; use it to index back into `ps_face_geom_cut_entries(...)`.
 - `cut_pair_id` is the world-stable join id for the same geometric cut seen from two faces. It is derived from the two face ids plus a quantized world-space line signature (anchor point + direction), and is exposed as `$ps_vis_seg_cut_pair_ids` when `place_on_faces(...)` world-frame context is available.
+- `cut_run_id` is local to one visible-cell boundary and groups one continuous cutter contribution. Use it to distinguish split cut spans when the same cutter re-enters the same visible cell in multiple disjoint runs.
 - The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.

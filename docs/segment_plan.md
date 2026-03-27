@@ -114,6 +114,18 @@ Why:
 - lets us test "these two neighboring pieces should use the same join plane"
 - makes debugging much less ambiguous
 
+2a. Keep split cut spans distinct on each visible cell boundary.
+
+- `cut_entry_id` and `cut_pair_id` are not enough for repeated same-cutter spans
+- add `cut_run_id` local to one visible cell boundary
+- use it to distinguish split cut spans when the same cutter re-enters the
+  same visible cell in multiple disjoint runs
+
+Why:
+
+- endpoint relief needs to know which local span endpoint it is acting on
+- repeated spans from the same cutter must not be conflated
+
 3. Represent every cell boundary edge as an exact 3D plane.
 
 For each edge of one visible cell:
