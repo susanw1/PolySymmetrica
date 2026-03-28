@@ -16,6 +16,10 @@ module assert_ge(a, b, msg="") {
     assert(a >= b, str(msg, " expected ", a, " >= ", b));
 }
 
+module assert_int_eq(a, b, msg="") {
+    assert(a == b, str(msg, " expected=", b, " got=", a));
+}
+
 function area2(poly) =
     let(n = len(poly))
     (n < 3) ? 0 :
@@ -110,6 +114,78 @@ module test_ps_face_visible_cell_region_planes__include_slab_and_edges() {
     }
 }
 
+module test_ps_face_visible_cell_region_planes__can_append_run_end_planes() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            cut_entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            cell = vis[0];
+            base_planes = ps_face_visible_cell_region_planes(cell, $ps_face_dihedrals, cut_entries, $ps_poly_faces_idx, $ps_poly_verts_local, -0.4, 1.6, -0.4, 1.6, 1.1, 1e-8);
+            run_end_entries = ps_face_visible_cell_cut_run_end_entries(cell);
+            planes_with_runs = ps_face_visible_cell_region_planes(cell, $ps_face_dihedrals, cut_entries, $ps_poly_faces_idx, $ps_poly_verts_local, -0.4, 1.6, -0.4, 1.6, 1.1, 1e-8, true);
+
+            assert_int_eq(len(planes_with_runs), len(base_planes) + len(run_end_entries), "run-end planes should append to the base region-plane set");
+        }
+    }
+}
+
+module test_ps_face_visible_cell_cut_run_end_entries__single_span_orientation() {
+    cell = [
+        [[0, 0], [2, 0], [2, 1], [0, 1]],
+        undef,
+        [0, 1, 2, 3],
+        ["parent", "cut", "parent", "parent"],
+        [undef, 7, undef, undef],
+        [undef, 0, undef, undef]
+    ];
+    ends = ps_face_visible_cell_cut_run_end_entries(cell);
+    assert(len(ends) == 2, "single cut span should have start and end planes");
+
+    start = ends[0];
+    finish = ends[1];
+
+    assert_near(start[0][0][0], 0, 1e-9, "start normal x");
+    assert_near(start[0][0][1], 1, 1e-9, "start normal y");
+    assert_near(start[0][1], 0, 1e-9, "start plane should pass through run start");
+    assert(start[0][2], "start plane keep side should be >= along edge direction");
+    assert(start[1] == 1 && start[2] == true && start[3] == 0, "start entry metadata");
+
+    assert_near(finish[0][0][0], 0, 1e-9, "end normal x");
+    assert_near(finish[0][0][1], 1, 1e-9, "end normal y");
+    assert_near(finish[0][1], 1, 1e-9, "end plane should pass through run end");
+    assert(!finish[0][2], "end plane keep side should be <= along edge direction");
+    assert(finish[1] == 1 && finish[2] == false && finish[3] == 0, "end entry metadata");
+}
+
+module test_ps_face_visible_cell_cut_run_end_entries__split_spans_stay_distinct() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            cell = vis[0];
+            ends = ps_face_visible_cell_cut_run_end_entries(cell);
+            run_ids = cell[5];
+            cut_runs = [
+                for (rid = run_ids)
+                    if (!is_undef(rid))
+                        rid
+            ];
+            distinct_runs = [
+                for (ri = [0:1:len(cut_runs)-1])
+                    if (len([for (rj = [0:1:ri-1]) if (cut_runs[rj] == cut_runs[ri]) 1]) == 0)
+                        cut_runs[ri]
+            ];
+
+            assert_int_eq(len(ends), 2 * len(distinct_runs), "each split cut span should contribute two run-end planes");
+            for (rid = distinct_runs) {
+                rid_ends = [for (e = ends) if (e[3] == rid) e];
+                assert_int_eq(len(rid_ends), 2, str("run should keep distinct start/end planes rid=", rid));
+            }
+        }
+    }
+}
+
 module test_ps_face_visible_cell_loop_at_z_from_region_planes__matches_clipped_loop() {
     p = poly_antiprism(n=7, p=3, angle=15);
     zs = [-0.4, 0.4, 1.6];
@@ -126,6 +202,36 @@ module test_ps_face_visible_cell_loop_at_z_from_region_planes__matches_clipped_l
                 assert(len(loop_planes) == len(loop_clip), str("plane-sliced loop arity should match clipped loop at z=", z));
                 assert(_poly_same_pts(loop_planes, loop_clip, 1e-5), str("plane-sliced loop should match clipped loop at z=", z));
             }
+        }
+    }
+}
+
+module test_ps_fr_atom_can_use_clipped_loops__rejects_inner_edge_atoms() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    levels = [-0.4, 1.6, 1.8];
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            cut_entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            atoms = _ps_fr_visible_cell_atoms(vis[0], 1e-8);
+
+            eligible = [
+                for (atom = atoms)
+                    let(
+                        clip_loops = [
+                            for (z = levels)
+                                [ps_face_visible_cell_loop_at_z_clipped(atom, $ps_face_dihedrals, cut_entries, $ps_poly_faces_idx, $ps_poly_verts_local, z, -0.4, 1.6, 1.1, 1e-8), z]
+                        ],
+                        clip_sizes = [for (lz = clip_loops) len(lz[0])],
+                        clip_stable = min(clip_sizes) >= 3 &&
+                            len([for (n = clip_sizes) if (n != clip_sizes[0]) 1]) == 0
+                    )
+                    if (_ps_fr_atom_has_inner_edges(atom) && clip_stable)
+                        _ps_fr_atom_can_use_clipped_loops(atom, clip_loops, 1e-8)
+            ];
+
+            assert(len(eligible) > 0, "fixture should include inner-edge atoms with superficially stable clipped-loop arity");
+            assert_int_eq(len([for (ok = eligible) if (ok) 1]), 0, "inner-edge atoms must not take clipped-loop lofting");
         }
     }
 }
@@ -219,7 +325,11 @@ module run_TestFaceRegions() {
     test_ps_fr_loop_from_halfplanes__clips_square();
     test_ps_face_visible_cell_loop_at_z_clipped__shrinks_bad_antiprism_cell();
     test_ps_face_visible_cell_region_planes__include_slab_and_edges();
+    test_ps_face_visible_cell_region_planes__can_append_run_end_planes();
+    test_ps_face_visible_cell_cut_run_end_entries__single_span_orientation();
+    test_ps_face_visible_cell_cut_run_end_entries__split_spans_stay_distinct();
     test_ps_face_visible_cell_loop_at_z_from_region_planes__matches_clipped_loop();
+    test_ps_fr_atom_can_use_clipped_loops__rejects_inner_edge_atoms();
     test_ps_face_cut_profile2d_from_cutter_normal__matches_f2_f5_join();
     test_ps_face_region_inset_at_z__zero_at_face_plane();
     test_ps_clip_to_face_region_ctx__smoke();

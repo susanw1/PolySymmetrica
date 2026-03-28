@@ -13,7 +13,23 @@ function _ps_fr_loop_from_adjacent_lines(lines) =
             _ps_line_intersect_2d(l0[0], l0[1], l1[0], l1[1])
     ];
 
+function _ps_fr_probe_point(poly, eps=1e-9) =
+    let(
+        probe = _ps_seg_cycle_probe_point(poly, eps),
+        n = len(poly),
+        centroid = (n == 0) ? [0, 0] : v_scale([
+            sum([for (p = poly) p[0]]),
+            sum([for (p = poly) p[1]])
+        ], 1 / n)
+    )
+    is_undef(probe) ? centroid : probe;
+
+function _ps_fr_norm2(v, eps=1e-9) =
+    let(L = norm(v))
+    (L <= eps) ? [0, 0] : v / L;
+
 function _ps_fr_line_keep(line, p, eps=1e-9) =
+    (is_undef(p) || is_undef(line) || len(line) < 3 || is_undef(line[0]) || len(line[0]) != 2 || is_undef(line[1]) || is_undef(line[2])) ? false :
     let(
         n = line[0],
         d = line[1],
@@ -23,6 +39,7 @@ function _ps_fr_line_keep(line, p, eps=1e-9) =
     keep_ge ? (val >= -eps) : (val <= eps);
 
 function _ps_fr_line_seg_intersection(line, a, b, eps=1e-9) =
+    (is_undef(a) || is_undef(b) || is_undef(line) || len(line) < 3 || is_undef(line[0]) || len(line[0]) != 2 || is_undef(line[1])) ? undef :
     let(
         n = line[0],
         d = line[1],
@@ -31,26 +48,27 @@ function _ps_fr_line_seg_intersection(line, a, b, eps=1e-9) =
         denom = da - db,
         t = (abs(denom) <= eps) ? 0 : da / denom
     )
-    a + (b - a) * t;
+    (abs(denom) <= eps) ? undef : a + (b - a) * t;
 
 function _ps_fr_clip_poly_line(poly, line, eps=1e-9) =
     let(
-        m = len(poly)
+        clean = [for (p = poly) if (!is_undef(p) && len(p) == 2) p],
+        m = len(clean)
     )
     (m == 0) ? [] :
     [
         for (i = [0:1:m-1])
             let(
-                a = poly[i],
-                b = poly[(i + 1) % m],
+                a = clean[i],
+                b = clean[(i + 1) % m],
                 a_keep = _ps_fr_line_keep(line, a, eps),
                 b_keep = _ps_fr_line_keep(line, b, eps),
                 x = _ps_fr_line_seg_intersection(line, a, b, eps)
             )
             each (
                 a_keep && b_keep ? [b] :
-                a_keep && !b_keep ? [x] :
-                !a_keep && b_keep ? [x, b] :
+                a_keep && !b_keep ? (is_undef(x) ? [] : [x]) :
+                !a_keep && b_keep ? (is_undef(x) ? [b] : [x, b]) :
                 []
             )
     ];
@@ -88,8 +106,8 @@ function _ps_fr_offset_pts2d_inset_edges(pts, insets) =
                 let(
                     p0 = pts[k],
                     p1 = pts[(k+1)%n],
-                    e = v_norm(p1 - p0),
-                    perp0 = v_norm([-e[1], e[0]]),
+                    e = _ps_fr_norm2(p1 - p0),
+                    perp0 = _ps_fr_norm2([-e[1], e[0]]),
                     mid = (p0 + p1) / 2,
                     to_center = centroid - mid,
                     perp = (v_dot(perp0, to_center) < 0) ? -perp0 : perp0,
@@ -274,7 +292,17 @@ function _ps_fr_edge_plane_from_profile(pts, edge_idx, probe2d, profile2d, z_mid
     )
     keep_ok ? [n0, d0] : [-n0, -d0];
 
-function ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8) =
+function _ps_fr_run_end_plane(entry) =
+    let(
+        line = entry[0],
+        n2 = line[0],
+        d = line[1],
+        keep_ge = line[2],
+        n3 = [n2[0], n2[1], 0]
+    )
+    keep_ge ? [n3, d] : [-n3, -d];
+
+function ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8, include_run_ends=false) =
     let(
         z_min = min(z0, z1),
         z_max = max(z0, z1),
@@ -282,8 +310,9 @@ function ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly
         cut_hi = is_undef(band_z1) ? z_max : band_z1,
         pts = cell[0],
         m = len(pts),
-        probe = _ps_seg_cycle_probe_point(pts, eps),
-        z_mid = (z_min + z_max) / 2
+        probe = _ps_fr_probe_point(pts, eps),
+        z_mid = (z_min + z_max) / 2,
+        run_end_entries = include_run_ends ? ps_face_visible_cell_cut_run_end_entries(cell, eps) : []
     )
     concat(
         [
@@ -299,7 +328,8 @@ function ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly
                     ]
                 )
                 _ps_fr_edge_plane_from_profile(pts, k, probe, profile, z_mid, eps)
-        ]
+        ],
+        [for (entry = run_end_entries) _ps_fr_run_end_plane(entry)]
     );
 
 function _ps_fr_plane_slice_line(plane, probe2d, z, eps=1e-9) =
@@ -312,12 +342,12 @@ function _ps_fr_plane_slice_line(plane, probe2d, z, eps=1e-9) =
         ? undef
         : [n2, d2, v_dot(n2, probe2d) >= d2];
 
-function ps_face_visible_cell_loop_at_z_from_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8) =
+function ps_face_visible_cell_loop_at_z_from_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8, include_run_ends=false) =
     let(
         z_min = min(z0, z1),
         z_max = max(z0, z1),
-        probe = _ps_seg_cycle_probe_point(cell[0], eps),
-        planes = ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0, band_z1, cut_clearance, eps),
+        probe = _ps_fr_probe_point(cell[0], eps),
+        planes = ps_face_visible_cell_region_planes(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0, band_z1, cut_clearance, eps, include_run_ends),
         lines = [
             for (pi = [2:1:len(planes)-1])
                 let(line = _ps_fr_plane_slice_line(planes[pi], probe, z, eps))
@@ -334,21 +364,22 @@ function _ps_fr_atom_edge_meta(cell, ia, ib, eps=1e-9) =
         edge_ids = cell[2],
         kinds = cell[3],
         cut_ids = cell[4],
+        cut_run_ids = (len(cell) > 5) ? cell[5] : [],
         n = len(pts),
         fwd = [
             for (k = [0:1:n-1])
                 if (k == ia && ((ia + 1) % n) == ib)
-                    [_ps_seg_safe_at(edge_ids, k, undef), _ps_seg_safe_at(kinds, k, "inner"), _ps_seg_safe_at(cut_ids, k, undef)]
+                    [_ps_seg_safe_at(edge_ids, k, undef), _ps_seg_safe_at(kinds, k, "inner"), _ps_seg_safe_at(cut_ids, k, undef), _ps_seg_safe_at(cut_run_ids, k, undef)]
         ],
         rev = [
             for (k = [0:1:n-1])
                 if (k == ib && ((ib + 1) % n) == ia)
-                    [_ps_seg_safe_at(edge_ids, k, undef), _ps_seg_safe_at(kinds, k, "inner"), _ps_seg_safe_at(cut_ids, k, undef)]
+                    [_ps_seg_safe_at(edge_ids, k, undef), _ps_seg_safe_at(kinds, k, "inner"), _ps_seg_safe_at(cut_ids, k, undef), _ps_seg_safe_at(cut_run_ids, k, undef)]
         ]
     )
     (len(fwd) > 0) ? fwd[0] :
     (len(rev) > 0) ? rev[0] :
-    [undef, "inner", undef];
+    [undef, "inner", undef, undef];
 
 function _ps_fr_visible_cell_atoms(cell, eps=1e-9) =
     let(
@@ -372,17 +403,80 @@ function _ps_fr_visible_cell_atoms(cell, eps=1e-9) =
                     undef,
                     [m01[0], m12[0], m20[0]],
                     [m01[1], m12[1], m20[1]],
-                    [m01[2], m12[2], m20[2]]
+                    [m01[2], m12[2], m20[2]],
+                    [m01[3], m12[3], m20[3]]
                 ]
         ];
+
+function _ps_fr_atom_has_inner_edges(cell) =
+    len([for (kind = cell[3]) if (kind == "inner") 1]) > 0;
+
+function _ps_fr_atom_can_use_clipped_loops(cell, clip_loops, eps=1e-9) =
+    let(
+        clip_sizes = [for (lz = clip_loops) len(lz[0])]
+    )
+    !_ps_fr_atom_has_inner_edges(cell) &&
+    min(clip_sizes) >= 3 &&
+    len([for (n = clip_sizes) if (n != clip_sizes[0]) 1]) == 0;
+
+function _ps_fr_cut_run_starts_at_edge(cell, edge_idx) =
+    let(
+        kinds = cell[3],
+        run_ids = (len(cell) > 5) ? cell[5] : [],
+        n = len(kinds),
+        prev_e = (edge_idx - 1 + n) % n,
+        run = _ps_seg_safe_at(run_ids, edge_idx, undef)
+    )
+    (_ps_seg_safe_at(kinds, edge_idx, undef) == "cut") &&
+    (_ps_seg_safe_at(run_ids, prev_e, undef) != run);
+
+function _ps_fr_cut_run_ends_at_edge(cell, edge_idx) =
+    let(
+        kinds = cell[3],
+        run_ids = (len(cell) > 5) ? cell[5] : [],
+        n = len(kinds),
+        next_e = (edge_idx + 1) % n,
+        run = _ps_seg_safe_at(run_ids, edge_idx, undef)
+    )
+    (_ps_seg_safe_at(kinds, edge_idx, undef) == "cut") &&
+    (_ps_seg_safe_at(run_ids, next_e, undef) != run);
+
+// Full-depth boundary planes for finite cut spans. These are local 2D line
+// constraints; in 3D they lift to planes constant across z0..z1.
+function ps_face_visible_cell_cut_run_end_entries(cell, eps=1e-9) =
+    let(
+        pts = cell[0],
+        run_ids = (len(cell) > 5) ? cell[5] : [],
+        n = len(pts)
+    )
+    [
+        for (ei = [0:1:n-1])
+            let(
+                a = pts[ei],
+                b = pts[(ei + 1) % n],
+                dir = _ps_fr_norm2(b - a),
+                run_id = _ps_seg_safe_at(run_ids, ei, undef)
+            )
+            each concat(
+                _ps_fr_cut_run_starts_at_edge(cell, ei)
+                    ? [[[dir, v_dot(dir, a), true], ei, true, run_id]]
+                    : [],
+                _ps_fr_cut_run_ends_at_edge(cell, ei)
+                    ? [[[dir, v_dot(dir, b), false], ei, false, run_id]]
+                    : []
+            )
+    ];
+
+function ps_face_visible_cell_cut_run_end_lines(cell, eps=1e-9) =
+    [for (e = ps_face_visible_cell_cut_run_end_entries(cell, eps)) e[0]];
 
 function _ps_fr_cell_edge_inward_n(cell_pts2d, edge_idx, probe, eps=1e-9) =
     let(
         m = len(cell_pts2d),
         a = cell_pts2d[edge_idx],
         b = cell_pts2d[(edge_idx + 1) % m],
-        e = v_norm(b - a),
-        perp0 = v_norm([-e[1], e[0]]),
+        e = _ps_fr_norm2(b - a),
+        perp0 = _ps_fr_norm2([-e[1], e[0]]),
         mid = (a + b) / 2
     )
     (v_dot(perp0, probe - mid) < 0) ? -perp0 : perp0;
@@ -400,7 +494,7 @@ function _ps_fr_visible_cell_edge_u_at_z(cell, face_diheds, cut_entries, poly_fa
         ? ps_face_region_inset_at_z(_ps_seg_safe_at(face_diheds, _ps_seg_safe_at(edge_ids, edge_idx, 0), 180), z)
             : let(
                 cid = _ps_seg_safe_at(cut_ids, edge_idx, undef),
-                probe = _ps_seg_cycle_probe_point(cell[0], eps),
+                probe = _ps_fr_probe_point(cell[0], eps),
                 inward_n = _ps_fr_cell_edge_inward_n(cell[0], edge_idx, probe, eps),
                 valid_cid = !is_undef(cid) && cid >= 0 && cid < len(cut_entries)
             )
@@ -417,7 +511,7 @@ function _ps_fr_visible_cell_lines_at_z(cell, face_diheds, cut_entries, poly_fac
     let(
         pts = cell[0],
         m = len(pts),
-        probe = _ps_seg_cycle_probe_point(pts, eps)
+        probe = _ps_fr_probe_point(pts, eps)
     )
     [
         for (k = [0:1:m-1])
@@ -440,7 +534,7 @@ function _ps_fr_visible_cell_loop_at_z(cell, face_diheds, cut_entries, poly_face
 
 function ps_face_visible_cell_loop_at_z_clipped(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance=0, eps=1e-9) =
     let(
-        probe = _ps_seg_cycle_probe_point(cell[0], eps),
+        probe = _ps_fr_probe_point(cell[0], eps),
         lines = _ps_fr_visible_cell_lines_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, band_z0, band_z1, cut_clearance, eps)
     )
     _ps_fr_loop_from_halfplanes(lines, probe, eps);
@@ -467,8 +561,14 @@ module _ps_fr_visible_convex_atom_region_volume(cell, face_diheds, cut_entries, 
         for (z = levels)
             [_ps_fr_visible_cell_loop_at_z(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, cut_lo, cut_hi, cut_clearance, eps), z]
     ];
-    if (min([for (lz = loops) len(lz[0])]) >= 3)
-        _ps_fr_stack_same_arity_loops(loops, eps);
+    clip_loops = [
+        for (z = levels)
+            [ps_face_visible_cell_loop_at_z_clipped(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z, cut_lo, cut_hi, cut_clearance, eps), z]
+    ];
+    use_clipped = _ps_fr_atom_can_use_clipped_loops(cell, clip_loops, eps);
+    active_loops = use_clipped ? clip_loops : loops;
+    if (min([for (lz = active_loops) len(lz[0])]) >= 3)
+        _ps_fr_stack_same_arity_loops(active_loops, eps);
 }
 
 module ps_face_visible_cell_region_volume(cell, face_diheds, cut_entries, poly_faces_idx, poly_verts_local, z0, z1, band_z0=undef, band_z1=undef, cut_clearance=0, eps=1e-8) {
@@ -487,7 +587,14 @@ module ps_face_visible_cell_region_volume_ctx(z0, z1, band_z0=undef, band_z1=und
     assert(!is_undef($ps_face_dihedrals), "ps_face_visible_cell_region_volume_ctx: requires place_on_faces context ($ps_face_dihedrals)");
     assert(!is_undef($ps_vis_seg_pts2d), "ps_face_visible_cell_region_volume_ctx: requires place_on_face_visible_segments context ($ps_vis_seg_pts2d)");
     assert(!is_undef($ps_vis_seg_edge_kinds), "ps_face_visible_cell_region_volume_ctx: requires place_on_face_visible_segments context ($ps_vis_seg_edge_kinds)");
-    cell = [$ps_vis_seg_pts2d, undef, $ps_vis_seg_edge_ids, $ps_vis_seg_edge_kinds, is_undef($ps_vis_seg_cut_entry_ids) ? [] : $ps_vis_seg_cut_entry_ids];
+    cell = [
+        $ps_vis_seg_pts2d,
+        undef,
+        $ps_vis_seg_edge_ids,
+        $ps_vis_seg_edge_kinds,
+        is_undef($ps_vis_seg_cut_entry_ids) ? [] : $ps_vis_seg_cut_entry_ids,
+        is_undef($ps_vis_seg_cut_run_ids) ? [] : $ps_vis_seg_cut_run_ids
+    ];
     cut_entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
     ps_face_visible_cell_region_volume(cell, $ps_face_dihedrals, cut_entries, $ps_poly_faces_idx, $ps_poly_verts_local, z0, z1, band_z0, band_z1, cut_clearance, eps);
 }

@@ -60,13 +60,13 @@ to their kernels.
 There is now a second, narrower refinement problem too:
 
 - even when the side planes are correct, the **endpoints of a cut span** can
-  still misbehave near the top surface / top cap
+  still misbehave because the region currently lacks finite run-end bounds
 - this happens when a cutter face contributes multiple disjoint spans to the
   same visible cell, or when a cut span terminates into another cut / true-edge
   constraint
-- the result is that the lower cut faces look correct and parallel, but the top
-  cap runs across and touches or overlaps the neighbouring piece at the span
-  endpoints
+- the visible symptom can show up near one face boundary first, but there is no
+  special top/bottom rule in the core model: the missing geometry is a full-
+  depth run-end plane, not a cap-specific tweak
 
 So the region problem is now split into two levels:
 
@@ -166,14 +166,41 @@ The important point is that edge planes and endpoint relief are different
 layers:
 
 - the edge planes define the correct side faces of the admissible region
-- the endpoint relief stops the top cap from running across and touching the
-  neighbour at the ends of those spans
+- the run-end bounds stop a finite cut span from behaving like an infinite
+  cutter join
+
+Crucially:
+
+- `z0` and `z1` only bound the admissible region
+- they do **not** imply different geometric behavior at the "top" and
+  "bottom"
+- the principled target is therefore:
+  - full-depth side planes for parent and cut edges
+  - full-depth run-end planes for finite cut spans
+
+So any future endpoint handling should be expressed as extra bounding planes,
+not as top-only notches, tapers, or cap-specific heuristics.
+
+The same principle should eventually apply to the live cut-edge path:
+
+- active cut-edge side planes ought to be derived across the full active
+  `z0..z1` span
+- a privileged interior `band_z0` / `band_z1` is the wrong abstraction for
+  core geometry
+
+But this is still design intent, not a landed live-path guarantee: a direct
+swap to full-span construction caused broader region-builder regressions and
+was backed out.
 
 Implementation guardrails:
 
 - do **not** derive endpoint relief independently per convex atom
 - derive it on the original visible cell first, then propagate it into the
   convex atoms used by the live region builder
+- do **not** assume a triangulated convex atom is automatically a valid
+  half-plane-bounded region for clipped-loop lofting; atoms containing
+  triangulation `"inner"` edges are under-constrained and can blow up far
+  beyond the true atom footprint
 
 Why:
 

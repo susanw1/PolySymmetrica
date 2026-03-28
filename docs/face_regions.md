@@ -59,6 +59,8 @@ That is the supported model here.
 - ordinary face regions bounded by true face-edge dihedral/2 planes
 - segmented visible cells derived from intersecting faces
 - segmentation joins derived from the underlying cutter faces
+- split cut spans bounded by finite run endpoints, not treated as infinite
+  cutter joins
 - arbitrary child geometry clipped to those admissible regions
 
 ### What Is Not Generically Solvable
@@ -136,6 +138,23 @@ So the current live strategy is:
 
 - build segmented visible-cell regions from the full visible cell shape
 - but decompose nonconvex cells into convex atoms before lofting
+
+One important correction from the later debugging passes:
+
+- `z0` and `z1` are only bounds on the admissible region
+- they do **not** imply different geometric rules at the "top" and "bottom"
+
+In core region logic, a parent edge or cut edge should contribute one side
+plane across the full `z0..z1` span. If a cut span is finite, its start and end
+should likewise be bounded by full-depth run-end planes. Any tapering,
+styling, pillow/roof behaviour, or cap-specific shaping belongs in the
+consumer, not in `face_regions.scad`.
+
+That remains the target model. The current live path still carries `band_z0` /
+`band_z1` compatibility plumbing, and recent attempts to remove that asymmetry
+directly caused broader region-builder regressions. So treat "full-depth
+planes across `z0..z1`" as the design direction, not yet a completed live-path
+fact.
 
 ## Main Helpers
 
@@ -231,6 +250,26 @@ Returns the exact side-plane set for one visible cell:
 
 This is primarily a debug/probe helper for cross-section reasoning and future
 exact-region work.
+
+With `include_run_ends=true`, it can also append full-depth run-end planes for
+split cut spans. That remains an analysis/debug path for now; the live builder
+does not yet consume those extra planes.
+
+### `ps_face_visible_cell_cut_run_end_entries(...)`
+
+Returns the finite run-end boundaries implied by `cut_run_id` on one visible
+cell boundary.
+
+Each entry describes one full-depth endpoint plane for a split cut span:
+
+- local 2D line/plane data
+- source edge index on the visible cell
+- whether it is the run start or run end
+- the local `cut_run_id`
+
+This is currently an analysis/debug helper. It exists so future endpoint
+handling can be keyed to finite cut spans rather than treating one cutter face
+as an infinite join across the whole cell.
 
 ### `ps_face_visible_cell_loop_at_z_from_region_planes(...)`
 
