@@ -26,8 +26,11 @@ function _ps_resolve_classify(poly, classify=undef, classify_opts=undef) =
             _ps_cls_opt(classify_opts, 3, false)
         );
 
+function _ps_place_idx_enabled(indices, idx) =
+    is_undef(indices) || _ps_list_contains(indices, idx);
+
 // ---- Generic face-placement driver ----
-module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
+module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef, indices = undef) {
     exp_edge_len = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     scale = exp_edge_len;
 
@@ -43,7 +46,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
     edge_family_count = is_undef(family_counts) ? undef : family_counts[1];
     vert_family_count = is_undef(family_counts) ? undef : family_counts[2];
 
-    for (fi = [0 : 1 : len(faces)-1]) {
+    for (fi = [0 : 1 : len(faces)-1]) if (_ps_place_idx_enabled(indices, fi)) {
         f      = faces[fi];
         center = poly_face_center(poly, fi, scale);
         ex     = poly_face_ex(poly, fi, scale);
@@ -143,7 +146,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
 }
 
 // ---- Place children on all vertices of a polyhedron ----
-module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
+module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef, indices = undef) {
     target_edge_len = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     scale = target_edge_len;
 
@@ -156,7 +159,7 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = un
     face_family_count = is_undef(family_counts) ? undef : family_counts[0];
     edge_family_count = is_undef(family_counts) ? undef : family_counts[1];
 
-    for (vi = [0 : 1 : len(verts)-1]) {
+    for (vi = [0 : 1 : len(verts)-1]) if (_ps_place_idx_enabled(indices, vi)) {
 
         v0 = verts[vi] * scale;              // world-space vertex position
         ez = v_norm(v0);                     // outward: from centre to vertex
@@ -211,7 +214,7 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = un
 
 
 // ---- Place children on all edges of a polyhedron ----
-module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
+module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef, indices = undef) {
     scale = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     verts = poly_verts(poly);
     faces = poly_faces(poly);
@@ -222,7 +225,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef
     face_family_count = is_undef(family_counts) ? undef : family_counts[0];
     vert_family_count = is_undef(family_counts) ? undef : family_counts[2];
 
-    for (ei = [0 :  1 : len(edges)-1]) {
+    for (ei = [0 :  1 : len(edges)-1]) if (_ps_place_idx_enabled(indices, ei)) {
 
         e  = edges[ei];
         v0 = verts[e[0]] * scale;

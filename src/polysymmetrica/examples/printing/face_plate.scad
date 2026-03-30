@@ -141,6 +141,10 @@ function _gap_inset(dihed, gap) =
     let(s = sin(dihed / 2))
     (abs(s) < 1e-6) ? gap : (gap / (2 * s));
 
+function _face_plate_requires_segmented_loops(pts, edge_inset, eps=1e-8) =
+    edge_inset > 0 ||
+    len(_ps_seg_hits([for (p = pts) [p[0], p[1], 0]], eps)) > 0;
+
 
 function _bottom_pts2d_from_bevel(top_pts, diheds, ht) =
     let(
@@ -353,7 +357,7 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     insets = (is_undef(insets_override) || len(insets_override) != n)
         ? [for (k = [0:1:len(pts)-1]) _gap_inset(diheds[k], edge_inset)]
         : insets_override;
-    body_loops = (edge_inset > 0)
+    body_loops = _face_plate_requires_segmented_loops(pts, edge_inset, eps)
         ? _segmented_body_loops(pts, diheds, insets, eps)
         : [[pts, diheds]];
     roof_loops = [for (bd = body_loops) bd[0]];
@@ -468,5 +472,5 @@ difference() {
     translate([0,0,-5]) cube(20);
 
     *face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
-    #face_plate(0, [for (i=[0:4]) [10*cos(-144*i), 10*sin(-144*i)]], face_thk=1.2, diheds=[60,80,100,120,140], insets_override=undef, clear_space=false);
+    #face_plate(0, [for (i=[0:4]) [10*cos(-144*i), 10*sin(-144*i)]], face_thk=1.2, diheds=[60,80,100,120,140], insets_override=undef, clear_space=false, edge_inset = 0);
 }

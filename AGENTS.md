@@ -66,6 +66,8 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Shared mesh build helper: `_ps_poly_from_face_points(...)` dedups points, orients faces, and rescales to unit edge.
 - Placement modules now accept optional classification context:
   - `place_on_faces/edges/vertices(..., classify=cls, classify_opts=[detail,eps,radius,include_geom])`
+  - `place_on_faces/edges/vertices(..., indices=[...])` filters to an exact site list while reusing the same placement frames and `$ps_*` metadata.
+  - `core/proxy_interaction.scad` should build on those exact index lists rather than recreating feature transforms by hand.
   - New `$ps_*` family vars are exposed per element (`*_family_id`) plus global family counts.
   - To avoid family-id drift between placement and overrides/solvers, classify once and reuse the same `cls`.
 - Dependency hygiene: `faces_around_vertex` helpers now live in `core/funcs.scad` (shared primitive). Avoid pulling them from `duals.scad` to prevent `placement -> classify -> duals -> placement` style use-cycles.
@@ -157,6 +159,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Keep `_ps_fr_atom_is_enabled(...)` minimal and justified: all-inner atoms stay off, explicit debug skip lists are honored, but avoid heuristic atom-role suppressions in the live path unless they have a general geometric proof.
 - The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
 - A plausible future fabrication path is **proxy interaction**: keep the analytic layer for visibility/provenance, but let user-supplied raw face/edge/vertex proxy solids drive interference subtraction with ordinary CSG. If pursued, proxies must be raw proposals only, bounded by explicit local influence extents, and must not recurse on already-clipped neighbors.
+- For face-face interference in that proxy path, a useful early mode is `face_proxy_mode="sweep_to_bounds"`: project the neighboring face proxy to its local XY footprint and extrude it through `face_bounds` to form a bounded subtractor volume.
 - Signature sketches for that proxy path live in `src/polysymmetrica/core/proxy_interaction.scad`; keep that file at the API-contract level until there is a clear first implementation.
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.

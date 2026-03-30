@@ -177,9 +177,9 @@ This has multiple advantages:
 
 These operators attach arbitrary geometry to each face/edge/vertex of a polyhedron:
 
-* `place_on_faces(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
-* `place_on_edges(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
-* `place_on_vertices(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
+* `place_on_faces(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+* `place_on_edges(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+* `place_on_vertices(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
 
 Or calculate it based on edge length:
 
@@ -192,6 +192,19 @@ Classification controls:
 * `classify`: optional precomputed value from `poly_classify(...)`; preferred for consistency and speed.
 * `classify_opts`: optional `[detail, eps, radius, include_geom]`; used only when `classify` is not passed.
 * if both are omitted, placement remains geometry-only (no classification is performed and family vars are `undef`).
+* `indices`: optional exact index list for the placement site family (`face_idx`, `edge_idx`, or `vertex_idx`). `undef` means iterate all sites.
+
+This is also the intended low-level selector for the proxy-interaction path in
+`core/proxy_interaction.scad`: analytic code can identify the exact neighboring
+faces, edges, and vertices that can reach a target feature, then instantiate
+only those raw proxies in the correct placement frames.
+
+The face proxy path also supports a simple face-interferer realization mode:
+
+- `face_proxy_mode = "raw"`: use the neighboring face proxy geometry as-is,
+  bounded only by `face_bounds`
+- `face_proxy_mode = "sweep_to_bounds"`: project the neighboring face proxy to
+  its local XY footprint and extrude it through `face_bounds`
 
 
 Each operator:

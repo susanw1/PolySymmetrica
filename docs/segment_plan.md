@@ -363,12 +363,16 @@ ps_clip_face_by_feature_proxies(
     poly,
     face_idx,
     face_bounds = [z0, z1],
+    face_proxy_mode = "raw" | "sweep_to_bounds",
     edge_radius = ...,
     edge_length = ...,
     vertex_radius = ...,
     include_faces = true,
     include_edges = true,
     include_vertices = true,
+    face_indices = ...,
+    edge_indices = ...,
+    vertex_indices = ...,
     filter = ...
 ) {
     children();
@@ -388,6 +392,28 @@ The implementation would:
 - clip each interfering proxy to its influence bound
 - subtract the union of those clipped interfering proxies from the target face
   proxy
+
+For face-face interaction, a useful first realization mode is:
+
+- `face_proxy_mode = "sweep_to_bounds"`
+  - project the neighboring face proxy to its local XY footprint
+  - extrude that footprint through `face_bounds`
+  - use the resulting bounded occupancy solid as the subtractor
+
+Helpful supporting primitive:
+
+- `place_on_faces/edges/vertices(..., indices=[...])`
+  - lets the proxy path reuse the existing exact placement frames while
+    instantiating only the specific neighboring features that matter
+
+Exact site lists are first-class inputs to the proxy path:
+
+- `face_indices`
+- `edge_indices`
+- `vertex_indices`
+
+`undef` means “all candidate features of that family”, while a list means
+“instantiate exactly these known influencing sites”.
 
 ### Bounds Contract
 

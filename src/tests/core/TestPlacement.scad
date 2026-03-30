@@ -1,4 +1,5 @@
 use <../../polysymmetrica/core/placement.scad>
+use <../../polysymmetrica/core/proxy_interaction.scad>
 use <../../polysymmetrica/core/classify.scad>
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/prisms.scad>
@@ -97,6 +98,13 @@ module test_place_on_faces__auto_classify_matches_precomputed() {
     }
 }
 
+module test_place_on_faces__indices_filters_exact_face() {
+    p = hexahedron();
+    place_on_faces(p, indices = [2]) {
+        assert_int_eq($ps_face_idx, 2, "face index filter should visit only requested face");
+    }
+}
+
 module test_place_on_all__cube_single_family() {
     p = hexahedron();
     cls = poly_classify(p, 1, 1e-6, 1, false);
@@ -126,6 +134,20 @@ module test_place_on_edges__no_auto_classify_by_default() {
         assert(is_undef($ps_face_family_count), "default placement: face family count should be undef without classify");
         assert(is_undef($ps_edge_family_count), "default placement: edge family count should be undef without classify");
         assert(is_undef($ps_vertex_family_count), "default placement: vertex family count should be undef without classify");
+    }
+}
+
+module test_place_on_edges__indices_filters_exact_edge() {
+    p = hexahedron();
+    place_on_edges(p, indices = [3]) {
+        assert_int_eq($ps_edge_idx, 3, "edge index filter should visit only requested edge");
+    }
+}
+
+module test_place_on_vertices__indices_filters_exact_vertex() {
+    p = hexahedron();
+    place_on_vertices(p, indices = [5]) {
+        assert_int_eq($ps_vertex_idx, 5, "vertex index filter should visit only requested vertex");
     }
 }
 
@@ -482,13 +504,41 @@ module test_seg_merge_face_cut_group__merges_touching_spans() {
     assert(merged[0][2] == 120, str("merged touching span dihedral should keep max merged=", merged));
 }
 
+module test_ps_clip_face_by_feature_proxies__smoke_selected_indices() {
+    p = hexahedron();
+
+    ps_clip_face_by_feature_proxies(
+        p,
+        0,
+        edge_len = 1,
+        face_bounds = [-0.2, 0.2],
+        face_proxy_mode = "sweep_to_bounds",
+        edge_radius = 0.2,
+        edge_length = 1.2,
+        vertex_radius = 0.18,
+        face_indices = [1],
+        edge_indices = [0, 1, 2],
+        vertex_indices = [0, 1, 2]
+    ) {
+        translate([0, 0, -0.1])
+            cube([0.9, 0.9, 0.2], center = true);
+        cube([0.8, 0.25, 0.25], center = true);
+        sphere(r = 0.2);
+    }
+
+    assert(true, "proxy face smoke");
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
     test_place_on_vertices__family_ids_and_counts_from_classify();
     test_place_on_faces__auto_classify_matches_precomputed();
+    test_place_on_faces__indices_filters_exact_face();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
+    test_place_on_edges__indices_filters_exact_edge();
+    test_place_on_vertices__indices_filters_exact_vertex();
     test_place_on_face_segments__star_face_split();
     test_place_on_face_segments__default_nonzero_keeps_filled_star();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
@@ -508,6 +558,7 @@ module run_TestPlacement() {
     test_ps_face_geom_cut_segments__respects_fill_mode();
     test_seg_merge_face_cut_group__preserves_disjoint_spans();
     test_seg_merge_face_cut_group__merges_touching_spans();
+    test_ps_clip_face_by_feature_proxies__smoke_selected_indices();
 }
 
 run_TestPlacement();
