@@ -108,6 +108,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `place_on_faces(...)` now uses a frame normal intended for placement (`ps_face_frame_normal(...)`) rather than relying only on the first triangle normal.
 - `ps_face_frame_normal(...)` uses a Newell-style best-fit normal for non-planar faces, then aligns sign to `ps_face_normal(...)` so winding/orientation semantics remain consistent.
 - `ps_face_normal(...)` is still the topological/orientation normal and should remain unchanged for validation/duals logic.
+- `place_on_edges(...)` now uses the adjacent-face normal bisector as edge-local `+Z` when a usable face pair exists; this is the preferred dihedral-centered frame for edge structure/proxy work. Boundary/degenerate edges fall back to the older radial frame.
 - For non-planar faces, `$ps_poly_center_local` may legitimately have significant local X/Y components; this is expected and indicates the face center is not radially aligned to poly center.
 - `poly_face_ex(...)` must be projected onto the local face plane (perpendicular to face EZ) before normalization; otherwise local-dot projections drift and `$ps_poly_center_local` placement can be wrong.
 - Coverage added in `src/tests/core/TestFuncs.scad`:

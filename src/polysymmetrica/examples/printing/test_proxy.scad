@@ -9,7 +9,7 @@ IR = 20 * SC;
 
 p = poly_antiprism(n = 7, p = 3, angle = 15);
 
-SHOW_FACES = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+SHOW_FACES = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; // [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
 
 // Optional exact neighboring face proxies to instantiate around each target.
 // `undef` means "all other faces".
@@ -54,7 +54,7 @@ module face_proxy() {
 }
 
 module edge_proxy_strip() {
-    cube([$ps_edge_len + EDGE_STRIP_PAD, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
+    #cube([$ps_edge_len + EDGE_STRIP_PAD, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
 }
 
 module vertex_proxy() {

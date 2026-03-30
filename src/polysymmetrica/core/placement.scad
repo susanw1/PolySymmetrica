@@ -218,7 +218,10 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef
     scale = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
     verts = poly_verts(poly);
     faces = poly_faces(poly);
-    edges = _ps_edges_from_faces(faces);
+    faces0 = ps_orient_all_faces_outward(verts, faces);
+    edges = _ps_edges_from_faces(faces0);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [ for (f = faces0) ps_face_normal(verts, f) ];
     cls = _ps_resolve_classify(poly, classify, classify_opts);
     family_counts = is_undef(cls) ? undef : ps_classify_counts(cls);
     edge_family_ids = is_undef(cls) ? [] : ps_classify_edge_ids(cls, len(edges));
@@ -233,9 +236,23 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef
 
         center = (v0 + v1) / 2;          // edge midpoint (world)
         ex     = v_norm(v1 - v0);        // along edge
-        ez0    = v_norm(center);         // radial reference
-        ey     = v_norm(v_cross(ez0, ex)); // orthonormal
-        ez     = v_norm(v_cross(ex, ey));  // orthonormal
+        adj_faces_idx = edge_faces[ei];
+        radial_ref = v_norm(center);
+        bisector_raw =
+            (len(adj_faces_idx) < 2)
+                ? radial_ref
+                : face_n[adj_faces_idx[0]] + face_n[adj_faces_idx[1]];
+        bisector_signed =
+            (norm(bisector_raw) <= 1e-12)
+                ? radial_ref
+                : ((v_dot(bisector_raw, radial_ref) < 0) ? -bisector_raw : bisector_raw);
+        ez_proj = bisector_signed - ex * v_dot(bisector_signed, ex);
+        ez_dir =
+            (norm(ez_proj) <= 1e-12)
+                ? radial_ref - ex * v_dot(radial_ref, ex)
+                : ez_proj;
+        ez = v_norm(ez_dir);
+        ey = v_norm(v_cross(ez, ex));
 
         edge_midradius   = norm(center);
         edge_len_actual  = norm(v1 - v0);
@@ -249,17 +266,15 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef
         // Edge endpoints in LOCAL coords
         edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]];
 
-        // Adjacent faces (indices)
-        adj_faces_idx = [
-            for (fi = [0 :  1 : len(faces)-1])
-                if (ps_face_has_edge(faces[fi], e[0], e[1])) fi
-        ];
-
         // Metadata for children (edge-local)
         $ps_edge_idx            = ei;
         $ps_edge_len            = edge_len_actual;      // actual length of this edge (vs supplied edge_len = scaling factor arg)
         $ps_edge_midradius      = edge_midradius;
         $ps_poly_center_local   = poly_center_local;
+        $ps_edge_center_world   = center;
+        $ps_edge_ex_world       = ex;
+        $ps_edge_ey_world       = ey;
+        $ps_edge_ez_world       = ez;
 
         $ps_edge_pts_local      = edge_pts_local;
         $ps_edge_verts_idx      = e;

@@ -144,6 +144,42 @@ module test_place_on_edges__indices_filters_exact_edge() {
     }
 }
 
+module test_place_on_edges__ez_world_matches_adjacent_face_bisector() {
+    verts = [
+        [-1.0, -1.0, -1.0],
+        [ 1.0, -1.0, -1.0],
+        [ 0.0,  1.0, -1.0],
+        [-0.1, -0.6,  1.0],
+        [ 2.1, -1.1,  1.0],
+        [ 0.8,  0.7,  1.0]
+    ];
+    faces = [
+        [0, 1, 2],
+        [5, 4, 3],
+        [0, 3, 4, 1],
+        [1, 4, 5, 2],
+        [2, 5, 3, 0]
+    ];
+    p = make_poly(verts, faces, 1);
+    verts0 = poly_verts(p);
+    faces0 = ps_orient_all_faces_outward(verts0, poly_faces(p));
+    edges0 = _ps_edges_from_faces(faces0);
+    edge_faces0 = ps_edge_faces_table(faces0, edges0);
+    face_n0 = [for (f = faces0) ps_face_normal(verts0, f)];
+    ei = ps_find_edge_index(edges0, 0, 1);
+    adj = edge_faces0[ei];
+    radial = v_norm((verts0[0] + verts0[1]) / 2);
+    ex = v_norm(verts0[1] - verts0[0]);
+    bis0 = face_n0[adj[0]] + face_n0[adj[1]];
+    bis1 = (v_dot(bis0, radial) < 0) ? -bis0 : bis0;
+    bis_proj = bis1 - ex * v_dot(bis1, ex);
+    expected_ez = v_norm(bis_proj);
+
+    place_on_edges(p, indices = [ei]) {
+        assert_vec3_near($ps_edge_ez_world, expected_ez, 1e-8, "edge ez should bisect adjacent face normals");
+    }
+}
+
 module test_place_on_vertices__indices_filters_exact_vertex() {
     p = hexahedron();
     place_on_vertices(p, indices = [5]) {
@@ -538,6 +574,7 @@ module run_TestPlacement() {
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_edges__indices_filters_exact_edge();
+    test_place_on_edges__ez_world_matches_adjacent_face_bisector();
     test_place_on_vertices__indices_filters_exact_vertex();
     test_place_on_face_segments__star_face_split();
     test_place_on_face_segments__default_nonzero_keeps_filled_star();
