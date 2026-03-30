@@ -250,6 +250,194 @@ then we can decide whether to:
 
 The fast path must match the exact path, not replace it speculatively.
 
+## Alternative Direction: Proxy Interaction Contract
+
+The current analytic path is trying to infer all admissible face segmentation
+from planes, loops, and lofted region approximations. That remains useful for:
+
+- topology / visibility analysis
+- cut provenance
+- pairing / run metadata
+- debug labeling
+
+But there is a second plausible path for fabrication-oriented consumers:
+
+- build **proxy occupancy solids**
+- subtract those directly with ordinary OpenSCAD CSG
+
+This should be treated as a separate interaction engine, not a replacement for
+the topology layer.
+
+### Core Idea
+
+For one feature family, define canonical local proxy geometry:
+
+- child `0`: face proxy
+- child `1`: edge proxy
+- child `2`: vertex proxy
+
+These are **proposal solids**, not already-clipped final geometry.
+
+For a target face:
+
+1. instantiate the target face proxy in the target face frame
+2. instantiate neighboring face / edge / vertex proxies that can reach that
+   face
+3. clip those neighbors to a local influence bound
+4. subtract the union of those clipped neighbors from the target face proxy
+
+That gives a fabrication interaction result directly from SCAD solids, rather
+than inferring every detail analytically.
+
+### Important Constraint
+
+The proxy path must use **raw proposals only**.
+
+Do **not** recursively build already-clipped neighbors and subtract those.
+That creates a circular problem:
+
+- face A depends on face B's final shape
+- face B depends on face A's final shape
+
+Instead:
+
+- each feature contributes one local raw occupancy proxy
+- interaction is resolved only at the target being built
+
+### Why This Could Help
+
+This path naturally handles:
+
+- split cut spans
+- punch-throughs
+- future edge/vertex structure
+- finite extents of real user geometry
+
+because the proxy already encodes finite occupancy.
+
+It also matches the actual fabrication question more directly:
+
+- "what other geometry would physically intrude into this feature volume?"
+
+instead of:
+
+- "what plane/loop approximation should stand in for that intrusion?"
+
+### Why This Does Not Replace the Analytic Path
+
+The analytic path is still needed for:
+
+- visible-cell enumeration
+- world-stable cut pairing
+- split cut span metadata (`cut_run_id`)
+- feature classification
+- debugging / labels / reasoning about where interference comes from
+
+So the likely end state is:
+
+- **analytic layer**: determine candidate interacting features and local bounds
+- **proxy CSG layer**: perform the actual fabrication subtraction using proxy
+  solids
+
+### Proposed API Contract
+
+Introduce a new family of proxy-interaction modules that consume up to three
+children:
+
+```scad
+ps_proxy_interaction_face(... ) {
+    // child 0: face proxy
+    // child 1: edge proxy
+    // child 2: vertex proxy
+}
+```
+
+The current signature sketch for this work lives in:
+
+- `src/polysymmetrica/core/proxy_interaction.scad`
+
+Or, more explicitly:
+
+```scad
+ps_clip_face_by_feature_proxies(
+    poly,
+    face_idx,
+    face_bounds = [z0, z1],
+    edge_radius = ...,
+    edge_length = ...,
+    vertex_radius = ...,
+    include_faces = true,
+    include_edges = true,
+    include_vertices = true,
+    filter = ...
+) {
+    children();
+}
+```
+
+Conceptually:
+
+- child `0` is required if face-face interaction is desired
+- child `1` is optional edge proxy
+- child `2` is optional vertex proxy
+
+The implementation would:
+
+- instantiate the target face proxy in the target face frame
+- instantiate interfering proxies on neighboring faces / edges / vertices
+- clip each interfering proxy to its influence bound
+- subtract the union of those clipped interfering proxies from the target face
+  proxy
+
+### Bounds Contract
+
+Because proxy geometry is user-defined, the core API must ask for explicit
+influence bounds:
+
+- `face_bounds = [z0, z1]`
+  - local face-normal extent of the face proxy
+- `edge_radius`
+  - how far an edge proxy may influence surrounding face/edge space
+- `edge_length`
+  - how far along the edge tangent the proxy should be considered
+- `vertex_radius`
+  - spherical / local bound for vertex proxies
+
+These are not stylistic parameters; they are interaction bounds so that the
+CSG problem stays local and finite.
+
+### Scope Rules
+
+The first proxy-interaction implementation should be conservative:
+
+- build one target at a time
+- use only raw neighboring proposals
+- do not recurse
+- do not attempt fixed-point convergence
+- do not use final decorative geometry as the interaction proxy unless the user
+  explicitly wants that
+
+The recommended default is:
+
+- use a simplified interaction proxy
+- then separately render / clip the final decorative geometry through that
+  result
+
+### Practical Implication
+
+If this path works, a large part of the current segmentation-specific math
+becomes:
+
+- analytic help for deciding **what interacts**
+
+rather than:
+
+- the sole mechanism for constructing the final removed volume
+
+That is promising for future face/edge/vertex fabrication work, especially
+where explicit SCAD solids are easier to reason about than ever-more-complicated
+plane intersection logic.
+
 ## What We Learned From Recent Attempts
 
 1. The topology side is mostly fine.

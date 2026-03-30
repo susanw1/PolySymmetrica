@@ -100,13 +100,27 @@ That split is deliberate:
 - `segments.scad` answers "what are the cells and cuts?"
 - `face_regions.scad` answers "what volume is legal to keep?"
 
+There is also a plausible future **proxy interaction** path for fabrication:
+
+- keep the analytic layer for visibility / provenance / feature classification
+- but let user-supplied face / edge / vertex proxy solids drive the actual
+  interference subtraction through ordinary CSG
+- the current signature sketch for that work lives in
+  `core/proxy_interaction.scad`
+
+That would be a separate higher-level construction path, not a replacement for
+the analytic topology layer described here.
+
 ## What Ended Up Working
 
 The important practical lesson from the recent segmentation work is:
 
 - visible cells from `segments.scad` can still be **nonconvex**
-- the exact half-plane-clipped loop at one `z` is then only the **convex
-  kernel** of that cell, not the full visible region
+- a half-plane-clipped loop at one `z` is only trustworthy for a convex cell
+  or convex atom
+- for a nonconvex visible cell, that clipped loop is at best the **convex
+  kernel** of the cell, and may even be empty once half-plane orientation is
+  handled strictly
 
 That means a direct "replace the live loop with the clipped loop" fix is wrong
 for nonconvex cells. It shrinks the cell to its kernel and destroys real
@@ -270,20 +284,6 @@ Each entry describes one full-depth endpoint plane for a split cut span:
 This is currently an analysis/debug helper. It exists so future endpoint
 handling can be keyed to finite cut spans rather than treating one cutter face
 as an infinite join across the whole cell.
-
-### `ps_face_visible_cell_loop_at_z_from_region_planes(...)`
-
-Derives a 2D loop at a chosen `z` directly from the region planes.
-
-This is the useful 2D acceptance helper:
-
-- `ps_face_visible_cell_loop_at_z_clipped(...)` gives trusted 2D half-plane
-  truth for the convex kernel at a chosen `z`
-- `ps_face_visible_cell_loop_at_z_from_region_planes(...)` checks whether a
-  plane-set model reproduces that same cross-section
-
-The abandoned exact 3D CSG probe was removed once it proved too misleading to
-guide fixes.
 
 ### `ps_clip_to_visible_face_cell_ctx(...)`
 
