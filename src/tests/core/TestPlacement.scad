@@ -1,4 +1,5 @@
 use <../../polysymmetrica/core/placement.scad>
+use <../../polysymmetrica/core/proxy_interaction.scad>
 use <../../polysymmetrica/core/classify.scad>
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/prisms.scad>
@@ -12,6 +13,32 @@ module assert_int_eq(a, b, msg="") {
 module assert_vec3_near(v, w, eps=1e-9, msg="") {
     assert(norm(v - w) <= eps, str(msg, " expected=", w, " got=", v));
 }
+
+function _test_face_cut_ctx(poly, fi) =
+    let(
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        face = faces[fi],
+        center = poly_face_center(poly, fi, 1),
+        ex = poly_face_ex(poly, fi, 1),
+        ey = poly_face_ey(poly, fi, 1),
+        ez = poly_face_ez(poly, fi, 1),
+        face_verts_local = [
+            for (vid = face)
+                let(p = verts[vid] - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        poly_verts_local_raw = [
+            for (vi = [0:1:len(verts)-1])
+                let(p = verts[vi] - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        zvals = [for (p = face_verts_local) p[2]],
+        zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals),
+        face_pts2d = [for (p = face_verts_local) [p[0], p[1]]],
+        poly_verts_local = [for (p = poly_verts_local_raw) [p[0], p[1], p[2] - zmean]]
+    )
+    [face_pts2d, poly_verts_local, center, ex, ey];
 
 module test_place_on_faces__family_ids_and_counts_from_classify() {
     p = rhombicuboctahedron();
@@ -71,6 +98,13 @@ module test_place_on_faces__auto_classify_matches_precomputed() {
     }
 }
 
+module test_place_on_faces__indices_filters_exact_face() {
+    p = hexahedron();
+    place_on_faces(p, indices = [2]) {
+        assert_int_eq($ps_face_idx, 2, "face index filter should visit only requested face");
+    }
+}
+
 module test_place_on_all__cube_single_family() {
     p = hexahedron();
     cls = poly_classify(p, 1, 1e-6, 1, false);
@@ -103,11 +137,61 @@ module test_place_on_edges__no_auto_classify_by_default() {
     }
 }
 
+module test_place_on_edges__indices_filters_exact_edge() {
+    p = hexahedron();
+    place_on_edges(p, indices = [3]) {
+        assert_int_eq($ps_edge_idx, 3, "edge index filter should visit only requested edge");
+    }
+}
+
+module test_place_on_edges__ez_world_matches_adjacent_face_bisector() {
+    verts = [
+        [-1.0, -1.0, -1.0],
+        [ 1.0, -1.0, -1.0],
+        [ 0.0,  1.0, -1.0],
+        [-0.1, -0.6,  1.0],
+        [ 2.1, -1.1,  1.0],
+        [ 0.8,  0.7,  1.0]
+    ];
+    faces = [
+        [0, 1, 2],
+        [5, 4, 3],
+        [0, 3, 4, 1],
+        [1, 4, 5, 2],
+        [2, 5, 3, 0]
+    ];
+    p = make_poly(verts, faces, 1);
+    verts0 = poly_verts(p);
+    faces0 = ps_orient_all_faces_outward(verts0, poly_faces(p));
+    edges0 = _ps_edges_from_faces(faces0);
+    edge_faces0 = ps_edge_faces_table(faces0, edges0);
+    face_n0 = [for (f = faces0) ps_face_normal(verts0, f)];
+    ei = ps_find_edge_index(edges0, 0, 1);
+    adj = edge_faces0[ei];
+    radial = v_norm((verts0[0] + verts0[1]) / 2);
+    ex = v_norm(verts0[1] - verts0[0]);
+    bis0 = face_n0[adj[0]] + face_n0[adj[1]];
+    bis1 = (v_dot(bis0, radial) < 0) ? -bis0 : bis0;
+    bis_proj = bis1 - ex * v_dot(bis1, ex);
+    expected_ez = v_norm(bis_proj);
+
+    place_on_edges(p, indices = [ei]) {
+        assert_vec3_near($ps_edge_ez_world, expected_ez, 1e-8, "edge ez should bisect adjacent face normals");
+    }
+}
+
+module test_place_on_vertices__indices_filters_exact_vertex() {
+    p = hexahedron();
+    place_on_vertices(p, indices = [5]) {
+        assert_int_eq($ps_vertex_idx, 5, "vertex index filter should visit only requested vertex");
+    }
+}
+
 module test_place_on_face_segments__star_face_split() {
     p = poly_antiprism(5, 2);
     place_on_faces(p) {
         if ($ps_face_idx == 0) {
-            place_on_face_segments() {
+            place_on_face_segments(mode="evenodd") {
                 assert(!is_undef($ps_seg_idx), "segment idx should be defined");
                 assert(!is_undef($ps_seg_count), "segment count should be defined");
                 assert($ps_seg_count > 1, "star face should split into multiple segments");
@@ -116,6 +200,17 @@ module test_place_on_face_segments__star_face_split() {
                 assert(len($ps_seg_pts3d_local) == $ps_seg_vertex_count, "segment pts3d count");
                 assert(len($ps_seg_parent_face_edge_idx) == $ps_seg_vertex_count, "segment parent-edge mapping");
                 assert($ps_face_has_segments == ($ps_seg_count > 1), "segment split flag consistency");
+            }
+        }
+    }
+}
+
+module test_place_on_face_segments__default_nonzero_keeps_filled_star() {
+    p = poly_antiprism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 0) {
+            place_on_face_segments() {
+                assert_int_eq($ps_seg_count, 1, "default nonzero face segments should keep filled star as one region");
             }
         }
     }
@@ -182,7 +277,7 @@ module test_seg_face_tris3__concave_area_preserved() {
 module test_seg_face_tris3__star_area_matches_segments() {
     // Pentagram-style self-intersecting face loop.
     pts3 = [[0,9,0], [-5,-5,0], [8,3,0], [-8,3,0], [5,-5,0]];
-    tris = _ps_seg_face_tris3([0,1,2,3,4], pts3, 1e-9);
+    tris = _ps_seg_face_tris3([0,1,2,3,4], pts3, 1e-9, "evenodd");
     segs = ps_face_segments(pts3, "evenodd", 1e-9);
     area_tris = _list_sum([
         for (t = tris)
@@ -238,6 +333,21 @@ module test_ps_face_visible_segments__star_antiprism_side_reduced() {
     }
 }
 
+module test_ps_face_visible_segments__star_prism_side_keeps_two_side_quads() {
+    p = poly_prism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            assert_int_eq(len(vis), 2, "star prism side should keep two visible side panels");
+            for (s = vis) {
+                assert_int_eq(len(s[0]), 4, "each star prism side panel should be a quad");
+                assert(abs(_ps_seg_poly_area2(s[0])) > 1e-6, "star prism side panel visible area should stay positive");
+                assert(sum([for (k = s[3]) (k == "cut") ? 1 : 0]) >= 1, "star prism side panels should include cut edges");
+            }
+        }
+    }
+}
+
 module test_ps_face_visible_segments__cells_preserve_parent_winding() {
     p = poly_antiprism(5, 2);
     faces = poly_faces(p);
@@ -256,6 +366,138 @@ module test_ps_face_visible_segments__cells_preserve_parent_winding() {
     }
 }
 
+module test_ps_face_visible_segments__star_prism_cut_edges_reference_cut_entries() {
+    p = poly_prism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2) {
+            entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            assert(len(entries) > 0, "star prism side should have cut entries");
+            for (s = vis) {
+                assert_int_eq(len(s[3]), len(s[4]), "star prism visible edge kind/id arity");
+                for (k = [0:1:len(s[3])-1]) {
+                    if (s[3][k] == "cut") {
+                        cid = s[4][k];
+                        assert(!is_undef(cid), "star prism cut edge should carry cut-entry id");
+                        assert(cid >= 0 && cid < len(entries), str("star prism cut-entry id out of range cid=", cid, " len=", len(entries)));
+                    } else {
+                        assert(is_undef(s[4][k]), "star prism parent edge should not carry cut-entry id");
+                    }
+                }
+            }
+        }
+    }
+}
+
+module test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries() {
+    p = poly_antiprism(5, 2);
+    faces = poly_faces(p);
+    tri_faces = [for (i = [0:1:len(faces)-1]) if (len(faces[i]) == 3) i];
+    target = tri_faces[0];
+    place_on_faces(p) {
+        if ($ps_face_idx == target) {
+            entries = ps_face_geom_cut_entries($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            vis = ps_face_visible_segments($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, 1e-8, "nonzero", true);
+            assert(len(entries) > 0, "star antiprism side should have cut entries");
+            assert(
+                sum([
+                    for (s = vis)
+                        sum([for (k = [0:1:len(s[3])-1]) (s[3][k] == "cut") ? 1 : 0])
+                ]) > 0,
+                "star antiprism visible cells should include cut edges"
+            );
+            for (s = vis) {
+                assert_int_eq(len(s[3]), len(s[4]), "star antiprism visible edge kind/id arity");
+                for (k = [0:1:len(s[3])-1]) {
+                    if (s[3][k] == "cut") {
+                        cid = s[4][k];
+                        assert(!is_undef(cid), "star antiprism cut edge should carry cut-entry id");
+                        assert(cid >= 0 && cid < len(entries), str("star antiprism cut-entry id out of range cid=", cid, " len=", len(entries)));
+                    } else {
+                        assert(is_undef(s[4][k]), "star antiprism parent edge should not carry cut-entry id");
+                    }
+                }
+            }
+        }
+    }
+}
+
+module test_ps_face_visible_segments__cut_pair_ids_defined_in_ctx() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    place_on_faces(p) {
+        if ($ps_face_idx == 2 || $ps_face_idx == 5) {
+            place_on_face_visible_segments() {
+                for (k = [0:1:len($ps_vis_seg_edge_kinds)-1]) {
+                    if ($ps_vis_seg_edge_kinds[k] == "cut") {
+                        assert(
+                            !is_undef($ps_vis_seg_cut_pair_ids[k]),
+                            str("cut pair id should be defined face=", $ps_face_idx, " cell=", $ps_vis_seg_idx, " edge=", k)
+                        );
+                        assert(
+                            !is_undef($ps_vis_seg_cut_run_ids[k]),
+                            str("cut run id should be defined face=", $ps_face_idx, " cell=", $ps_vis_seg_idx, " edge=", k)
+                        );
+                    } else {
+                        assert(is_undef($ps_vis_seg_cut_pair_ids[k]), "parent edge should not carry cut pair id");
+                        assert(is_undef($ps_vis_seg_cut_run_ids[k]), "parent edge should not carry cut run id");
+                    }
+                }
+            }
+        }
+    }
+}
+
+module test_ps_face_geom_cut_pair_ids__matching_faces_share_join_id() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    faces = poly_faces(p);
+
+    ctx2 = _test_face_cut_ctx(p, 2);
+    entries2 = ps_face_geom_cut_entries(ctx2[0], 2, faces, ctx2[1], 1e-8, "nonzero", true);
+    pairs2 = ps_face_geom_cut_pair_ids(entries2, 2, ctx2[2], ctx2[3], ctx2[4]);
+
+    ctx5 = _test_face_cut_ctx(p, 5);
+    entries5 = ps_face_geom_cut_entries(ctx5[0], 5, faces, ctx5[1], 1e-8, "nonzero", true);
+    pairs5 = ps_face_geom_cut_pair_ids(entries5, 5, ctx5[2], ctx5[3], ctx5[4]);
+
+    common = [
+        for (pid = pairs2)
+            if (!is_undef(pid) && len([for (q = pairs5) if (q == pid) 1]) > 0)
+                pid
+    ];
+
+    assert(len(common) > 0, "matching cut entries across faces should share at least one join id");
+}
+
+module test_ps_face_visible_cell_cut_run_ids__wraparound_same_cutter_merges() {
+    kinds = ["cut", "cut", "cut"];
+    cids = [4, 7, 4];
+    runs = ps_face_visible_cell_cut_run_ids(kinds, cids);
+    assert_int_eq(runs[0], runs[2], "wrap-around split cut span should keep same run across cycle seam");
+    assert(runs[1] != runs[0], "middle distinct cutter contribution should keep distinct run id");
+}
+
+module test_ps_face_visible_segments__split_cut_spans_get_distinct_run_ids() {
+    p = poly_antiprism(n=7, p=3, angle=15);
+    faces = poly_faces(p);
+    ctx2 = _test_face_cut_ctx(p, 2);
+    entries2 = ps_face_geom_cut_entries(ctx2[0], 2, faces, ctx2[1], 1e-8, "nonzero", true);
+    vis2 = ps_face_visible_segments(ctx2[0], 2, faces, ctx2[1], 1e-8, "nonzero", true);
+    cell = vis2[0];
+    f11_edges = [
+        for (k = [0:1:len(cell[3])-1])
+            if (
+                cell[3][k] == "cut" &&
+                ps_cut_entry_cutter_face_idx(entries2[cell[4][k]]) == 11
+            )
+                k
+    ];
+
+    assert_int_eq(len(f11_edges), 2, str("f2/c0 should see two split f11 cut spans edges=", f11_edges));
+    assert(!is_undef(cell[5][f11_edges[0]]), "first split cut span should have run id");
+    assert(!is_undef(cell[5][f11_edges[1]]), "second split cut span should have run id");
+    assert(cell[5][f11_edges[0]] != cell[5][f11_edges[1]], str("split cut spans from same cutter must keep distinct run ids runs=", cell[5]));
+}
+
 module test_ps_face_geom_cut_segments__respects_fill_mode() {
     // Target square in z=0 plane plus a star-shaped cutter face tilted through the plane.
     target = [[-6,-6], [6,-6], [6,6], [-6,6]];
@@ -270,8 +512,57 @@ module test_ps_face_geom_cut_segments__respects_fill_mode() {
     );
     segs_evenodd = ps_face_geom_cut_segments(target, 0, faces, verts_local, 1e-8, "evenodd", true);
     segs_nonzero = ps_face_geom_cut_segments(target, 0, faces, verts_local, 1e-8, "nonzero", true);
+    len_evenodd = norm(segs_evenodd[0][1] - segs_evenodd[0][0]);
+    len_nonzero = norm(segs_nonzero[0][1] - segs_nonzero[0][0]);
     assert(len(segs_evenodd) > 0, "synthetic star cutter should generate some cut geometry");
-    assert(len(segs_nonzero) > len(segs_evenodd), str("nonzero star cutter should yield more cut segments than evenodd evenodd=", len(segs_evenodd), " nonzero=", len(segs_nonzero)));
+    assert(len(segs_nonzero) > 0, "synthetic star cutter should generate some nonzero cut geometry");
+    assert(segs_nonzero[0] != segs_evenodd[0], str("nonzero and evenodd cut segments should differ evenodd=", segs_evenodd, " nonzero=", segs_nonzero));
+    assert(len_nonzero > len_evenodd + 1e-6, str("nonzero star cutter should span a longer merged cut evenodd=", len_evenodd, " nonzero=", len_nonzero));
+}
+
+module test_seg_merge_face_cut_group__preserves_disjoint_spans() {
+    group = [
+        [[[0, 0], [2, 0]], 7, 110],
+        [[[4, 0], [6, 0]], 7, 120]
+    ];
+    merged = _ps_seg_merge_face_cut_group(group, 1e-8);
+    assert_int_eq(len(merged), 2, str("disjoint same-face cut spans must remain separate merged=", merged));
+}
+
+module test_seg_merge_face_cut_group__merges_touching_spans() {
+    group = [
+        [[[0, 0], [2, 0]], 7, 110],
+        [[[2, 0], [5, 0]], 7, 120]
+    ];
+    merged = _ps_seg_merge_face_cut_group(group, 1e-8);
+    assert_int_eq(len(merged), 1, str("touching same-face cut spans should merge merged=", merged));
+    assert(_ps_seg2_eq(merged[0][0], [[0, 0], [5, 0]], 1e-8), str("merged touching span endpoints wrong merged=", merged));
+    assert(merged[0][2] == 120, str("merged touching span dihedral should keep max merged=", merged));
+}
+
+module test_ps_clip_face_by_feature_proxies__smoke_selected_indices() {
+    p = hexahedron();
+
+    ps_clip_face_by_feature_proxies(
+        p,
+        0,
+        edge_len = 1,
+        face_bounds = [-0.2, 0.2],
+        face_proxy_mode = "sweep_to_bounds",
+        edge_radius = 0.2,
+        edge_length = 1.2,
+        vertex_radius = 0.18,
+        face_indices = [1],
+        edge_indices = [0, 1, 2],
+        vertex_indices = [0, 1, 2]
+    ) {
+        translate([0, 0, -0.1])
+            cube([0.9, 0.9, 0.2], center = true);
+        cube([0.8, 0.25, 0.25], center = true);
+        sphere(r = 0.2);
+    }
+
+    assert(true, "proxy face smoke");
 }
 
 module run_TestPlacement() {
@@ -279,17 +570,32 @@ module run_TestPlacement() {
     test_place_on_edges__family_ids_and_counts_from_classify();
     test_place_on_vertices__family_ids_and_counts_from_classify();
     test_place_on_faces__auto_classify_matches_precomputed();
+    test_place_on_faces__indices_filters_exact_face();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
+    test_place_on_edges__indices_filters_exact_edge();
+    test_place_on_edges__ez_world_matches_adjacent_face_bisector();
+    test_place_on_vertices__indices_filters_exact_vertex();
     test_place_on_face_segments__star_face_split();
+    test_place_on_face_segments__default_nonzero_keeps_filled_star();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
     test_seg_cycle_probe_point__concave_inside();
     test_seg_face_tris3__concave_area_preserved();
     test_seg_face_tris3__star_area_matches_segments();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
+    test_ps_face_visible_segments__star_prism_side_keeps_two_side_quads();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
+    test_ps_face_visible_segments__star_prism_cut_edges_reference_cut_entries();
+    test_ps_face_visible_segments__star_antiprism_cut_edges_reference_cut_entries();
+    test_ps_face_visible_segments__cut_pair_ids_defined_in_ctx();
+    test_ps_face_geom_cut_pair_ids__matching_faces_share_join_id();
+    test_ps_face_visible_cell_cut_run_ids__wraparound_same_cutter_merges();
+    test_ps_face_visible_segments__split_cut_spans_get_distinct_run_ids();
     test_ps_face_geom_cut_segments__respects_fill_mode();
+    test_seg_merge_face_cut_group__preserves_disjoint_spans();
+    test_seg_merge_face_cut_group__merges_touching_spans();
+    test_ps_clip_face_by_feature_proxies__smoke_selected_indices();
 }
 
 run_TestPlacement();
