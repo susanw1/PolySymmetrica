@@ -7,16 +7,27 @@ The idea is to keep the current analytic layer for:
 - cut_pair_id / cut_run_id
 - feature classification
 
-and add a separate fabrication-oriented path that consumes raw proposal solids:
-- child 0: face proxy
-- child 1: edge proxy
-- child 2: vertex proxy
+and add a separate fabrication-oriented path that consumes raw proposal solids.
+
+Important distinction:
+- occupancy proxies describe material that really exists in the finished part
+- clearance proxies describe empty space intentionally reserved for fit/tolerance
+
+This file is currently about occupancy only:
+- child 0: face occupancy proxy
+- child 1: edge occupancy proxy
+- child 2: vertex occupancy proxy
 
 These proxies are local interaction proxies, not already-clipped final
 geometry. The face path below is intentionally non-recursive: neighboring raw
 feature proxies are instantiated in their own exact placement frames, clipped to
 simple local influence bounds, transformed into the target face-local frame, and
 subtracted from the target face proxy.
+
+In other words:
+- inter-poly cutting should subtract foreign occupancy
+- local face/edge/vertex seating should eventually be handled by a separate
+  clearance path, not mixed into occupancy by default
 */
 
 use <placement.scad>
@@ -105,12 +116,13 @@ module _ps_proxy_place_vertices_in_target_frame(poly, target_edge_len, target_in
 }
 
 /*
-Clip one face-local proxy by raw neighboring face / edge / vertex proxies.
+Clip one face-local occupancy proxy by raw neighboring face / edge / vertex
+occupancy proxies.
 
 Children:
-- child 0: face proxy
-- child 1: edge proxy
-- child 2: vertex proxy
+- child 0: face occupancy proxy
+- child 1: edge occupancy proxy
+- child 2: vertex occupancy proxy
 */
 module ps_clip_face_by_feature_proxies(
     poly,

@@ -162,6 +162,10 @@ This repo is OpenSCAD-first; there is no separate build system.
 - A plausible future fabrication path is **proxy interaction**: keep the analytic layer for visibility/provenance, but let user-supplied raw face/edge/vertex proxy solids drive interference subtraction with ordinary CSG. If pursued, proxies must be raw proposals only, bounded by explicit local influence extents, and must not recurse on already-clipped neighbors.
 - For face-face interference in that proxy path, a useful early mode is `face_proxy_mode="sweep_to_bounds"`: project the neighboring face proxy to its local XY footprint and extrude it through `face_bounds` to form a bounded subtractor volume.
 - Signature sketches for that proxy path live in `src/polysymmetrica/core/proxy_interaction.scad`; keep that file at the API-contract level until there is a clear first implementation.
+- Proxy interaction needs a hard semantic split:
+  - **occupancy proxies** describe material that really exists and should cut foreign intersecting polys
+  - **clearance proxies** describe intentional fit/seat/tolerance gaps and should stay separate by default
+- Do not reuse local face/edge seating clearance as the foreign inter-poly cutter. Inter-poly subtraction should be driven by foreign occupancy, with any desired extra fit gap represented explicitly as a separate clearance/dilation step.
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
 

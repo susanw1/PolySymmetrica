@@ -111,6 +111,23 @@ There is also a plausible future **proxy interaction** path for fabrication:
 That would be a separate higher-level construction path, not a replacement for
 the analytic topology layer described here.
 
+That proxy path should explicitly distinguish:
+
+- **occupancy**
+  - the material that really exists in the finished face / edge / vertex
+    structure
+- **clearance**
+  - the empty space intentionally reserved for fitting, seating, or tolerance
+
+The intended rule is:
+
+- foreign intersecting polys should cut each other using **occupancy**
+- local seats / inset gaps / skeleton strips should be created using
+  **clearance**
+
+So a future proxy workflow should avoid reusing local seat-cutting strips as
+the inter-poly cutter. Those are different semantics.
+
 ## What Ended Up Working
 
 The important practical lesson from the recent segmentation work is:

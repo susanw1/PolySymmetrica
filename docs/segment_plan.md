@@ -268,13 +268,48 @@ But there is a second plausible path for fabrication-oriented consumers:
 This should be treated as a separate interaction engine, not a replacement for
 the topology layer.
 
+### Occupancy vs Clearance
+
+The proxy path must distinguish between two different kinds of solids:
+
+- **occupancy proxies**
+  - material that really exists in the finished part
+  - face occupancy
+  - edge/frame occupancy
+  - vertex occupancy
+- **clearance proxies**
+  - empty space intentionally reserved for fit/tolerance
+  - face inset seats
+  - edge seating strips / skeleton gap
+  - vertex relief
+
+These solve different problems:
+
+- **inter-poly subtraction**
+  - subtract foreign occupancy
+  - this is what should make one intersecting poly cut through another
+- **intra-poly fitting**
+  - subtract local clearance
+  - this is what creates seats/gaps so parts fit around a local frame
+
+So the intended model is:
+
+- foreign cutters should be built from the other poly's occupied structure,
+  not from local seat-cutting strips
+- local inset/skeleton gaps should be created by dedicated clearance proxies,
+  not baked into face occupancy by default
+
+Do not mix occupancy and clearance by default. If an inter-poly fit gap is
+needed, it should be represented explicitly as a separate clearance/dilation
+step, not by reusing the local seating proxy.
+
 ### Core Idea
 
-For one feature family, define canonical local proxy geometry:
+For one feature family, define canonical local occupancy proxy geometry:
 
-- child `0`: face proxy
-- child `1`: edge proxy
-- child `2`: vertex proxy
+- child `0`: face occupancy proxy
+- child `1`: edge occupancy proxy
+- child `2`: vertex occupancy proxy
 
 These are **proposal solids**, not already-clipped final geometry.
 
@@ -341,14 +376,14 @@ So the likely end state is:
 
 ### Proposed API Contract
 
-Introduce a new family of proxy-interaction modules that consume up to three
-children:
+Introduce a new family of occupancy-proxy interaction modules that consume up
+to three children:
 
 ```scad
 ps_proxy_interaction_face(... ) {
-    // child 0: face proxy
-    // child 1: edge proxy
-    // child 2: vertex proxy
+    // child 0: face occupancy proxy
+    // child 1: edge occupancy proxy
+    // child 2: vertex occupancy proxy
 }
 ```
 
@@ -381,9 +416,9 @@ ps_clip_face_by_feature_proxies(
 
 Conceptually:
 
-- child `0` is required if face-face interaction is desired
-- child `1` is optional edge proxy
-- child `2` is optional vertex proxy
+- child `0` is required if face-face occupancy interaction is desired
+- child `1` is optional edge occupancy proxy
+- child `2` is optional vertex occupancy proxy
 
 The implementation would:
 
@@ -414,6 +449,13 @@ Exact site lists are first-class inputs to the proxy path:
 
 `undef` means “all candidate features of that family”, while a list means
 “instantiate exactly these known influencing sites”.
+
+A future clearance path may mirror that structure, but it should stay a
+separate API or an explicitly separate mode:
+
+- face clearance proxy
+- edge clearance proxy
+- vertex clearance proxy
 
 ### Bounds Contract
 
