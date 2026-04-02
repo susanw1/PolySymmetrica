@@ -57,6 +57,39 @@ The harder future exact-region work is still about replacing the sampled/lofted
 convex-atom builder with a more exact one, not about collapsing nonconvex cells
 to their kernels.
 
+## Proxy Edge Baseline
+
+The working proxy baseline is deliberately simpler than the earlier ownership
+prototype:
+
+- take a raw edge-space proxy from real indexed `place_on_edges(...)`
+- subtract it directly from the target face proxy
+- do not add extra pre-subtraction corridor or span clipping unless a concrete
+  need survives review
+
+That baseline is the one to preserve and extend. The earlier clip-mode staging
+(`"slab"`, `"span"`, `"zone"`) was useful for diagnosis, but it did not
+survive as active design:
+
+- the raw edge-space proxy was the only consistently good path
+- every extra face-local constraint risked reintroducing the same regression:
+  the strip only affecting the middle or being reshaped before subtraction
+
+One concrete trap is now known:
+
+- do not pass a short `edge_length` influence bound such as `IR` into the edge
+  proxy path unless you intentionally want to truncate the strip along its own
+  `x` axis
+- that was the actual cause of the old "middle part works, ends missing"
+  regression
+
+So the current proxy rule is:
+
+- edge proxy shape comes from the edge module itself
+- real placement comes from indexed `place_on_edges(...)`
+- only keep extra influence bounds that are genuinely required by a working
+  consumer
+
 There is now a second, narrower refinement problem too:
 
 - even when the side planes are correct, the **endpoints of a cut span** can
@@ -456,6 +489,25 @@ separate API or an explicitly separate mode:
 - face clearance proxy
 - edge clearance proxy
 - vertex clearance proxy
+
+### Ownership Zones
+
+Ownership zones remain a plausible future direction, but they are currently
+parked.
+
+Reason:
+
+- the first zone/corridor experiments repeatedly over-constrained the raw edge
+  strip before subtraction
+- that reshaping was exactly what broke the previously good edge-separation
+  behavior
+
+So for now:
+
+- keep ownership/corridor work out of the active proxy baseline
+- keep the idea documented as a future refinement
+- do not let corridor logic reshape the raw edge proxy until there is a clear
+  consumer and a proof that it improves rather than distorts the result
 
 ### Bounds Contract
 

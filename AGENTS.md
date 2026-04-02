@@ -166,6 +166,11 @@ This repo is OpenSCAD-first; there is no separate build system.
   - **occupancy proxies** describe material that really exists and should cut foreign intersecting polys
   - **clearance proxies** describe intentional fit/seat/tolerance gaps and should stay separate by default
 - Do not reuse local face/edge seating clearance as the foreign inter-poly cutter. Inter-poly subtraction should be driven by foreign occupancy, with any desired extra fit gap represented explicitly as a separate clearance/dilation step.
+- Ownership/corridor work in `proxy_interaction.scad` is still experimental. Keep the working baseline on the simple `ps_clip_face_by_feature_proxies(...)` path:
+  - raw face-local target proxy
+  - edge clearance instantiated in real indexed `place_on_edges(...)` dihedral-centered frames
+  - no extra pre-subtraction corridor/clip modes unless a concrete need survives review
+- One concrete trap already found: do not pass a short `edge_length` influence clip (for example `IR`) into edge proxy subtraction unless you really intend to truncate the strip along its own `x` axis. That was the cause of the “middle part of the edge works, ends missing” regression.
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
 

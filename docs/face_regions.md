@@ -128,6 +128,16 @@ The intended rule is:
 So a future proxy workflow should avoid reusing local seat-cutting strips as
 the inter-poly cutter. Those are different semantics.
 
+The current working proxy baseline is intentionally simpler than the earlier
+ownership/corridor experiments:
+
+- face-local target proxy
+- edge clearance instantiated in real indexed `place_on_edges(...)` frames
+- direct subtraction, with no extra corridor logic active by default
+
+That simpler path is the one to preserve until there is a clear reason to
+reintroduce ownership masking or local corridor clipping.
+
 ## What Ended Up Working
 
 The important practical lesson from the recent segmentation work is:

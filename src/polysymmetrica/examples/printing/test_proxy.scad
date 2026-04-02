@@ -9,18 +9,21 @@ IR = 20 * SC;
 
 p = poly_antiprism(n = 7, p = 3, angle = 15);
 
-SHOW_FACES = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; // [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+// Keep the default view to one ordinary face. Add face 0 back when testing
+// star-face punch-throughs, but do not make that the default baseline.
+SHOW_FACES = [1,2,4]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 
-// Optional exact neighboring face proxies to instantiate around each target.
 // `undef` means "all other faces".
 FACE_PROXY_INDICES = undef;
 faces = poly_faces(p);
 edges = _ps_edges_from_faces(faces);
 VERTEX_PROXY_INDICES = [];
 
-SHOW_FACE_PROXIES = true;
+// Baseline: show the edge-space subtraction alone. Turn face proxies back on
+// once the seat itself is visually understood.
+SHOW_FACE_PROXIES = false;
 SHOW_EDGE_PROXIES = true;
-SHOW_VERTEX_PROXIES = len(VERTEX_PROXY_INDICES) > 0;
+SHOW_VERTEX_PROXIES = false;
 
 function target_edge_indices(face_idx) =
     let(target_face = faces[face_idx])
@@ -37,6 +40,7 @@ VERTEX_PROXY_R = 2.2 * SC;
 EDGE_STRIP_W = 1.2 * SC;
 EDGE_STRIP_H = FACE_T + PILLOW_THK + 1.0 * SC;
 EDGE_STRIP_PAD = 6 * SC;
+EDGE_INFLUENCE_LEN = undef;
 
 module face_proxy() {
     let(
@@ -54,7 +58,7 @@ module face_proxy() {
 }
 
 module edge_proxy_strip() {
-    #cube([$ps_edge_len + EDGE_STRIP_PAD, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
+    cube([$ps_edge_len + EDGE_STRIP_PAD, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
 }
 
 module vertex_proxy() {
@@ -64,24 +68,24 @@ module vertex_proxy() {
 for (i = [0 : 1 : len(SHOW_FACES) - 1]) {
     fi = SHOW_FACES[i];
     color(["deepskyblue", "limegreen", "gold", "tomato", "plum"][i % 5])
-    ps_clip_face_by_feature_proxies(
-        p,
-        fi,
-        inter_radius = IR,
-        face_bounds = [BASE_Z, BASE_Z + FACE_T + PILLOW_THK],
-        face_proxy_mode = "sweep_to_bounds",
-        edge_radius = EDGE_T / 2,
-        edge_length = IR,
-        vertex_radius = VERTEX_PROXY_R,
-        include_faces = SHOW_FACE_PROXIES,
-        include_edges = SHOW_EDGE_PROXIES,
-        include_vertices = SHOW_VERTEX_PROXIES,
-        face_indices = FACE_PROXY_INDICES,
-        edge_indices = target_edge_indices(fi),
-        vertex_indices = VERTEX_PROXY_INDICES
-    ) {
-        face_proxy();
-        edge_proxy_strip();
-        vertex_proxy();
-    }
+        ps_clip_face_by_feature_proxies(
+            p,
+            fi,
+            inter_radius = IR,
+            face_bounds = [BASE_Z, BASE_Z + FACE_T + PILLOW_THK],
+            face_proxy_mode = "sweep_to_bounds",
+            edge_radius = EDGE_T / 2,
+            edge_length = EDGE_INFLUENCE_LEN,
+            vertex_radius = VERTEX_PROXY_R,
+            include_faces = SHOW_FACE_PROXIES,
+            include_edges = SHOW_EDGE_PROXIES,
+            include_vertices = SHOW_VERTEX_PROXIES,
+            face_indices = FACE_PROXY_INDICES,
+            edge_indices = target_edge_indices(fi),
+            vertex_indices = VERTEX_PROXY_INDICES
+        ) {
+            face_proxy();
+            edge_proxy_strip();
+            vertex_proxy();
+        }
 }
