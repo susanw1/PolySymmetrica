@@ -256,6 +256,14 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef
 
         edge_midradius   = norm(center);
         edge_len_actual  = norm(v1 - v0);
+        edge_dihedral =
+            (len(adj_faces_idx) < 2)
+                ? undef
+                : let(
+                    dotn = v_dot(face_n[adj_faces_idx[0]], face_n[adj_faces_idx[1]]),
+                    c = ps_clamp(dotn, -1, 1)
+                )
+                180 - acos(c);
 
         // vector from edge centre to poly centre in local coords
         poly_center_local = [
@@ -270,6 +278,7 @@ module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef
         $ps_edge_idx            = ei;
         $ps_edge_len            = edge_len_actual;      // actual length of this edge (vs supplied edge_len = scaling factor arg)
         $ps_edge_midradius      = edge_midradius;
+        $ps_dihedral            = edge_dihedral;        // internal dihedral angle (degrees) for this edge; undef on boundaries
         $ps_poly_center_local   = poly_center_local;
         $ps_edge_center_world   = center;
         $ps_edge_ex_world       = ex;

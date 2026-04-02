@@ -11,7 +11,7 @@ p = poly_antiprism(n = 7, p = 3, angle = 15);
 
 // Keep the default view to one ordinary face. Add face 0 back when testing
 // star-face punch-throughs, but do not make that the default baseline.
-SHOW_FACES = [1,2,4]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+SHOW_FACES = [0,2,4]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 
 // `undef` means "all other faces".
 FACE_PROXY_INDICES = undef;
@@ -38,9 +38,19 @@ BASE_Z = -FACE_T / 4;
 PILLOW_THK = 0.4 * SC;
 VERTEX_PROXY_R = 2.2 * SC;
 EDGE_STRIP_W = 1.2 * SC;
-EDGE_STRIP_H = FACE_T + PILLOW_THK + 1.0 * SC;
-EDGE_STRIP_PAD = 6 * SC;
+EDGE_STRIP_PAD = 0;
 EDGE_INFLUENCE_LEN = undef;
+
+function edge_strip_height(zMax, strip_w, dihedral, eps = 1e-9) =
+    let(
+        alpha = (180 - dihedral) / 2,
+        y_proj = abs(sin(alpha)),
+        z_proj = abs(cos(alpha)),
+        rem = max(0, 2 * zMax - strip_w * y_proj)
+    )
+    (z_proj <= eps)
+        ? 2 * zMax
+        : rem / z_proj;
 
 module face_proxy() {
     let(
@@ -58,7 +68,8 @@ module face_proxy() {
 }
 
 module edge_proxy_strip() {
-    cube([$ps_edge_len + EDGE_STRIP_PAD, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
+    strip_h = edge_strip_height(FACE_T + PILLOW_THK, EDGE_STRIP_W, $ps_dihedral);
+    #cube([$ps_edge_len, EDGE_STRIP_W, strip_h], center = true);
 }
 
 module vertex_proxy() {

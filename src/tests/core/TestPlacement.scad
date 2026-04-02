@@ -174,9 +174,12 @@ module test_place_on_edges__ez_world_matches_adjacent_face_bisector() {
     bis1 = (v_dot(bis0, radial) < 0) ? -bis0 : bis0;
     bis_proj = bis1 - ex * v_dot(bis1, ex);
     expected_ez = v_norm(bis_proj);
+    dotn = v_dot(face_n0[adj[0]], face_n0[adj[1]]);
+    expected_dihedral = 180 - acos(ps_clamp(dotn, -1, 1));
 
     place_on_edges(p, indices = [ei]) {
         assert_vec3_near($ps_edge_ez_world, expected_ez, 1e-8, "edge ez should bisect adjacent face normals");
+        assert(abs($ps_dihedral - expected_dihedral) <= 1e-8, str("edge dihedral wrong expected=", expected_dihedral, " got=", $ps_dihedral));
     }
 }
 
