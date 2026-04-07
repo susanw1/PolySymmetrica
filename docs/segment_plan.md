@@ -57,38 +57,152 @@ The harder future exact-region work is still about replacing the sampled/lofted
 convex-atom builder with a more exact one, not about collapsing nonconvex cells
 to their kernels.
 
-## Proxy Edge Baseline
+## Proxy Fabrication Model
 
-The working proxy baseline is deliberately simpler than the earlier ownership
-prototype:
+The current proxy design should be described in three distinct layers:
 
-- take a raw edge-space proxy from real indexed `place_on_edges(...)`
-- subtract it directly from the target face proxy
-- do not add extra pre-subtraction corridor or span clipping unless a concrete
-  need survives review
+- **anti-interference shield**
+  - one bisector half-space per adjacent edge
+- **foreign occupied volume**
+  - non-adjacent intersecting faces / edges / vertices only
+- **local clearance**
+  - the target face's own seating / inset subtraction
 
-That baseline is the one to preserve and extend. The earlier clip-mode staging
-(`"slab"`, `"span"`, `"zone"`) was useful for diagnosis, but it did not
-survive as active design:
+The important correction is that adjacent faces should not be treated as
+foreign cutters once the bisector shields are active. Their role is already
+accounted for by the target face's own anti-interference planes.
 
-- the raw edge-space proxy was the only consistently good path
-- every extra face-local constraint risked reintroducing the same regression:
-  the strip only affecting the middle or being reshaped before subtraction
+Using compact notation:
 
-One concrete trap is now known:
+- `F_raw(i)` = supplied face geometry for face `i`
+- `Z(i)` = face slab `z0..z1`
+- `B(i,e)` = "stay on my side" bisector half-space for edge `e`
+- `C_local(i)` = local edge / vertex clearance for face `i`
+- `I(i)` = non-adjacent intersecting features for face `i`
+- `Occ(x)` = occupied solid of feature `x`
 
-- do not pass a short `edge_length` influence bound such as `IR` into the edge
-  proxy path unless you intentionally want to truncate the strip along its own
-  `x` axis
-- that was the actual cause of the old "middle part works, ends missing"
-  regression
+Then the intended target model is:
 
-So the current proxy rule is:
+- `F_shield(i) = F_raw(i) ∩ Z(i) ∩ ⋂[e in boundary(i)] B(i,e)`
+- `V(i) = ⋃[x in I(i)] Occ(x)`
+- `F_final(i) = F_shield(i) - V(i) - C_local(i)`
 
-- edge proxy shape comes from the edge module itself
-- real placement comes from indexed `place_on_edges(...)`
-- only keep extra influence bounds that are genuinely required by a working
-  consumer
+OpenSCAD-ish pseudocode:
+
+```scad
+module face_shielded(i) {
+    intersection() {
+        face_raw(i);
+        z_slab(i);
+
+        for (e = boundary_edges(i))
+            bisector_halfspace(i, e, eps = EPS);
+    }
+}
+
+module intersecting_vols(i) {
+    union() {
+        for (x = ps_intersections(i))   // non-adjacent only
+            occupied_feature(x);
+    }
+}
+
+module local_clearance(i) {
+    union() {
+        for (e = boundary_edges(i))
+            edge_clearance(i, e);
+
+        for (v = boundary_vertices(i))
+            vertex_clearance(i, v);
+    }
+}
+
+module face_final(i) {
+    difference() {
+        face_shielded(i);
+        intersecting_vols(i);
+        local_clearance(i);
+    }
+}
+```
+
+This is the basis for future proxy work. It deliberately avoids the older,
+failed corridor/ownership experiments where extra face-local clipping reshaped
+the clearance strips before subtraction.
+
+## Nonconvex / Self-Intersecting Faces
+
+The shielded-face model above needs one important refinement for star and other
+self-intersecting faces.
+
+For a self-intersecting face, the naive global form:
+
+- `F_shield(i) = F_raw(i) ∩ Z(i) ∩ ⋂ B(i,e)`
+
+is wrong, because intersecting all edge half-spaces collapses the face to its
+convex kernel and destroys the protruding filled arms.
+
+So the next real starting point is not more cutter tuning. It is a face-local
+arrangement step:
+
+1. split the original face walk at self-intersections
+2. create pseudo-vertices at those crossings
+3. classify the filled planar regions using the chosen fill rule
+   (`"nonzero"` is the intended normal case)
+4. distinguish:
+   - **true filled-boundary segments**
+   - **internal crossing segments**
+5. use only the true filled-boundary segments for:
+   - anti-interference shields
+   - local edge-clearance placement
+
+That means the useful future helper is not just:
+
+- `ps_face_self_intersectors(...)`
+
+but something closer to:
+
+- `ps_face_filled_arrangement(...)`
+- or `ps_face_filled_boundary_segments(...)`
+
+returning subsegments with inherited metadata from their source face edges.
+
+Because those filled regions may still be nonconvex, the final shielded-face
+construction should then be:
+
+- decompose the filled face region into convex atoms/cells
+- apply the relevant bisector shields to each convex atom
+- union the results back together
+
+So for star/self-intersecting faces, the target model becomes:
+
+- `F_shield(i) = ⋃ atom_shield(atom_k)`
+
+rather than one monolithic half-space intersection.
+
+This is the right place to start next. It is more fundamental than any further
+clearance/cutter ordering tweaks, because it determines what the real face
+boundary even is for shielding and local seating.
+
+Practical notes already established:
+
+- local edge-clearance strips should come from real indexed
+  `place_on_edges(...)` placement
+- do not pass a short `edge_length` influence bound such as `IR` into that
+  path unless you intentionally want to truncate the strip along its own `x`
+  axis
+- anti-interference is conceptually just the dihedral/2 half-space; it is not
+  the same thing as local seat clearance
+
+The first landed constructive/debug step on top of that baseline is still:
+
+- `ps_partition_face_by_feature_proxies(...)` /
+  `ps_partition_face_by_feature_proxies_ctx(...)` in
+  `core/proxy_interaction.scad`
+
+That path recursively splits one target face proxy by the selected proxy
+cutters and emits the resulting cells as separate solids. It is diagnostic
+rather than the final fabrication path.
 
 There is now a second, narrower refinement problem too:
 
@@ -122,6 +236,235 @@ That fails when:
 - loop arity changes with `z`
 
 which is exactly what stellations will do all the time.
+
+## Proxy Execution Plan
+
+This is the implementation order that should now be followed. The point is to
+land one geometrically meaningful layer at a time and avoid mixing adjacency
+shielding, foreign cutters, and local clearance in one patch.
+
+### Phase 0: Freeze The Known-Good Baseline
+
+Goal:
+
+- keep the current simple proxy carve path working while new pieces are built
+  alongside it
+
+Deliverables:
+
+- preserve the raw indexed `place_on_edges(...)` local-clearance strip path
+- keep `test_proxy.scad` able to show a known-good simple face carve
+- do not add new corridor/span ownership shaping to the live strip path
+
+Exit criteria:
+
+- one ordinary convex face still carves correctly with local clearance only
+- no return of the old "middle works, ends missing" regression
+
+### Phase 1: Face Arrangement Extraction
+
+Goal:
+
+- turn one self-intersecting face walk into a usable filled planar arrangement
+
+Deliverables:
+
+- helper to split original face edges at self-intersections
+- pseudo-vertices at crossing points
+- filled-region classification using the chosen fill rule (`"nonzero"`)
+- boundary-vs-internal segment classification
+
+Suggested helper surface:
+
+- `ps_face_filled_arrangement(...)`
+- or `ps_face_filled_boundary_segments(...)`
+
+Per-segment metadata should include:
+
+- endpoints
+- source original edge index
+- inherited source dihedral / edge parameters
+- boundary/internal classification
+
+Exit criteria:
+
+- a pentagram/star face yields true boundary subsegments for the filled arms
+- internal crossing segments are no longer treated as face boundaries
+
+### Phase 2: Convex Atomization Of Filled Face Regions
+
+Goal:
+
+- convert the filled planar face result into convex pieces suitable for
+  shielding
+
+Deliverables:
+
+- helper to decompose the filled 2D arrangement into convex atoms/cells
+- stable mapping from each atom edge back to its source boundary metadata where
+  applicable
+
+Why this phase exists:
+
+- even after arrangement extraction, the filled face may still be nonconvex
+- one global half-space intersection is still wrong for shield construction
+
+Exit criteria:
+
+- one nonconvex filled face can be represented as `union(convex_atoms)`
+- atom boundaries retain enough metadata to know which edges are real boundary
+  segments
+
+### Phase 3: Shielded Face Construction
+
+Goal:
+
+- build `F_shield(i)` correctly from the arrangement-derived boundary
+
+Deliverables:
+
+- `face_shielded(i)` built as:
+  - face slab clip `Z(i)`
+  - per-boundary-segment bisector half-spaces `B(i,e)`
+  - applied per convex atom, then unioned
+
+Important rule:
+
+- adjacent-edge anti-interference belongs here
+- adjacent faces are not yet in the foreign cutter set
+
+Exit criteria:
+
+- convex faces shield correctly
+- star/self-intersecting faces keep their filled arms instead of collapsing to
+  the convex kernel
+
+### Phase 4: Intersecting Feature Query
+
+Goal:
+
+- produce the exact non-adjacent hit-list for one target face
+
+Deliverables:
+
+- `ps_intersections(face_i, ...)` or equivalent helper
+- returns candidate non-adjacent:
+  - faces
+  - edges
+  - vertices
+- bounded by:
+  - target face slab thickness
+  - maximum edge radius / vertex radius assumptions where needed
+
+Important rule:
+
+- exclude adjacent faces already handled by shield planes
+- exclude the target face's own boundary edges/vertices from the foreign set
+
+Exit criteria:
+
+- for a target face, the helper returns the small finite set of truly relevant
+  foreign features
+
+### Phase 5: Foreign Occupied Volume Builder
+
+Goal:
+
+- build `V(i)` from actual occupied geometry, not raw adjacency
+
+Deliverables:
+
+- helper that instantiates and unions foreign:
+  - face occupancy
+  - edge occupancy
+  - vertex occupancy
+- initially, this can still be face-led if that is what is available, but the
+  abstraction should be "occupied feature", not "raw face slab"
+
+Important rule:
+
+- this is foreign occupied volume only
+- local clearance is not reused as the foreign cutter
+
+Exit criteria:
+
+- `V(i)` can be rendered independently for one target face and inspected
+
+### Phase 6: Final Face Carve
+
+Goal:
+
+- build the finished printable face shape from the three agreed layers
+
+Deliverables:
+
+- `face_final(i) = face_shielded(i) - V(i) - C_local(i)`
+- local edge/vertex clearance remains on the target face's own boundary only
+
+Important rule:
+
+- foreign cutters subtract from the shielded face
+- local clearance is the final target-local subtraction
+- do not reintroduce "clip local clearance by adjacent faces" behavior
+
+Exit criteria:
+
+- adjacent anti-interference is handled by shields alone
+- truly penetrating non-adjacent features remove material
+- local seating still works afterward
+
+### Phase 7: Frame / Seat Consumer Integration
+
+Goal:
+
+- make the face result usable by the frame-building path
+
+Deliverables:
+
+- explicit distinction between:
+  - `face_shielded(i)`
+  - `face_final(i)` / seated face
+- frame subtraction should use the smaller seated face where appropriate
+
+Exit criteria:
+
+- frame seats use the intended smaller face shape
+- anti-interference and seating are no longer conflated
+
+### Phase 8: Only Then Revisit Endpoint / Run-End Geometry
+
+Goal:
+
+- return to the harder analytic cut-span endpoint problem once the proxy face
+  model is settled
+
+Important rule:
+
+- do not mix this back into Phases 1-7
+- run-end planes and repeated-cut-span relief are a separate analytic problem
+
+Why deferred:
+
+- the current proxy effort is about the correct occupied/seated face shape
+- run-end plane work belongs to admissible-region exactness in
+  `face_regions.scad`
+
+## Guardrails For Execution
+
+At each phase:
+
+- land one helper family at a time
+- keep a visible example/probe for the current phase
+- add focused tests for new helpers, not just render smoke where a geometric
+  assertion is possible
+- do not mix:
+  - arrangement extraction
+  - foreign hit-list generation
+  - local clearance tuning
+  - endpoint relief
+  in one patch
+
+The immediate start point is Phase 1, not more clearance/cutter tweaking.
 
 ## Plan That Should Work
 

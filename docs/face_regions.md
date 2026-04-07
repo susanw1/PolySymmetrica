@@ -128,15 +128,48 @@ The intended rule is:
 So a future proxy workflow should avoid reusing local seat-cutting strips as
 the inter-poly cutter. Those are different semantics.
 
-The current working proxy baseline is intentionally simpler than the earlier
-ownership/corridor experiments:
+The next proxy step should be built around three layers:
 
-- face-local target proxy
-- edge clearance instantiated in real indexed `place_on_edges(...)` frames
-- direct subtraction, with no extra corridor logic active by default
+- **shielded face**
+  - supplied face geometry, clipped by the face slab and by one dihedral/2
+    half-space per adjacent edge
+- **foreign occupied volume**
+  - non-adjacent intersecting faces / edges / vertices only
+- **local clearance**
+  - the target face's own seating / inset subtraction
 
-That simpler path is the one to preserve until there is a clear reason to
-reintroduce ownership masking or local corridor clipping.
+In compact notation:
+
+- `F_shield(i) = F_raw(i) ∩ Z(i) ∩ ⋂[e in boundary(i)] B(i,e)`
+- `V(i) = ⋃[x in I(i)] Occ(x)`
+- `F_final(i) = F_shield(i) - V(i) - C_local(i)`
+
+The important rule is:
+
+- adjacent faces should not be treated as foreign cutters once the bisector
+  shields are active
+
+That proxy model is now the design basis. The older corridor/ownership
+experiments should be treated as failed diagnostics, not active design.
+
+One important complication remains for star and other self-intersecting faces:
+
+- a global intersection of edge-derived bisector half-spaces produces the
+  convex kernel, not the intended filled face shape
+
+So proxy shielding for those faces must not operate on the original
+self-crossing walk directly. Instead, it should:
+
+1. split face edges at self-intersections
+2. create pseudo-vertices at crossing points
+3. classify the filled planar arrangement using the chosen fill rule
+4. keep only the subsegments that form the true filled boundary
+5. apply shields/clearance from those boundary subsegments, not from internal
+   crossing lines
+
+Because the filled result may still be nonconvex, the shielded face should then
+be built as a union of convex atom/cell results rather than one monolithic
+half-space intersection.
 
 ## What Ended Up Working
 

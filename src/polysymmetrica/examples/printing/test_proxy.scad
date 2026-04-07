@@ -1,7 +1,6 @@
 use <../../core/prisms.scad>
 use <../../core/funcs.scad>
 use <../../core/proxy_interaction.scad>
-use <../../core/render.scad>
 use <../../core/segments.scad>
 
 SC = 1;
@@ -11,21 +10,27 @@ p = poly_antiprism(n = 7, p = 3, angle = 15);
 
 // Keep the default view to one ordinary face. Add face 0 back when testing
 // star-face punch-throughs, but do not make that the default baseline.
-SHOW_FACES = [0,2,4]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+SHOW_FACES = [0]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 
-// `undef` means "all other faces".
-FACE_PROXY_INDICES = undef;
+// Default to one known intersecting face so the carved result is visually
+// obvious. `undef` means "all other faces".
+CUTTER_FACE_INDICES = [15];
 faces = poly_faces(p);
 edges = _ps_edges_from_faces(faces);
-VERTEX_PROXY_INDICES = [];
+CUTTER_VERTEX_INDICES = [];
 
-// Baseline: show the edge-space subtraction alone. Turn face proxies back on
-// once the seat itself is visually understood.
-SHOW_FACE_PROXIES = false;
-SHOW_EDGE_PROXIES = true;
-SHOW_VERTEX_PROXIES = false;
+// There are two distinct concepts here:
+// - local edge-seat clearance, aligned to the target face boundary
+// - foreign penetrating occupancy from other faces/edges/vertices
+//
+// This example now shows only the real composed path:
+// clipped face occupancy minus clipped local clearance.
+SHOW_CUTTER_FACES = true;
+SHOW_LOCAL_EDGE_CLEARANCE = true;
+SHOW_CUTTER_VERTICES = false;
+SHOW_CARVED_RESULT = true;
 
-function target_edge_indices(face_idx) =
+function target_boundary_edge_indices(face_idx) =
     let(target_face = faces[face_idx])
         [
             for (k = [0 : 1 : len(target_face) - 1])
@@ -38,19 +43,8 @@ BASE_Z = -FACE_T / 4;
 PILLOW_THK = 0.4 * SC;
 VERTEX_PROXY_R = 2.2 * SC;
 EDGE_STRIP_W = 1.2 * SC;
-EDGE_STRIP_PAD = 0;
+EDGE_STRIP_H = 100 * SC;
 EDGE_INFLUENCE_LEN = undef;
-
-function edge_strip_height(zMax, strip_w, dihedral, eps = 1e-9) =
-    let(
-        alpha = (180 - dihedral) / 2,
-        y_proj = abs(sin(alpha)),
-        z_proj = abs(cos(alpha)),
-        rem = max(0, 2 * zMax - strip_w * y_proj)
-    )
-    (z_proj <= eps)
-        ? 2 * zMax
-        : rem / z_proj;
 
 module face_proxy() {
     let(
@@ -68,8 +62,7 @@ module face_proxy() {
 }
 
 module edge_proxy_strip() {
-    strip_h = edge_strip_height(FACE_T + PILLOW_THK, EDGE_STRIP_W, $ps_dihedral);
-    #cube([$ps_edge_len, EDGE_STRIP_W, strip_h], center = true);
+    #cube([$ps_edge_len, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
 }
 
 module vertex_proxy() {
@@ -79,7 +72,7 @@ module vertex_proxy() {
 for (i = [0 : 1 : len(SHOW_FACES) - 1]) {
     fi = SHOW_FACES[i];
     color(["deepskyblue", "limegreen", "gold", "tomato", "plum"][i % 5])
-        ps_clip_face_by_feature_proxies(
+        ps_carve_face_by_feature_proxies(
             p,
             fi,
             inter_radius = IR,
@@ -88,13 +81,20 @@ for (i = [0 : 1 : len(SHOW_FACES) - 1]) {
             edge_radius = EDGE_T / 2,
             edge_length = EDGE_INFLUENCE_LEN,
             vertex_radius = VERTEX_PROXY_R,
-            include_faces = SHOW_FACE_PROXIES,
-            include_edges = SHOW_EDGE_PROXIES,
-            include_vertices = SHOW_VERTEX_PROXIES,
-            face_indices = FACE_PROXY_INDICES,
-            edge_indices = target_edge_indices(fi),
-            vertex_indices = VERTEX_PROXY_INDICES
+            include_local_edges = SHOW_LOCAL_EDGE_CLEARANCE,
+            include_local_vertices = false,
+            include_cutter_faces = SHOW_CUTTER_FACES,
+            include_cutter_edges = false,
+            include_cutter_vertices = SHOW_CUTTER_VERTICES,
+            cutter_face_indices = CUTTER_FACE_INDICES,
+            cutter_edge_indices = [],
+            cutter_vertex_indices = CUTTER_VERTEX_INDICES,
+            local_edge_indices = target_boundary_edge_indices(fi),
+            local_vertex_indices = []
         ) {
+            face_proxy();
+            edge_proxy_strip();
+            vertex_proxy();
             face_proxy();
             edge_proxy_strip();
             vertex_proxy();

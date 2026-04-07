@@ -568,6 +568,67 @@ module test_ps_clip_face_by_feature_proxies__smoke_selected_indices() {
     assert(true, "proxy face smoke");
 }
 
+module test_ps_carve_face_by_feature_proxies__smoke_selected_indices() {
+    p = hexahedron();
+
+    ps_carve_face_by_feature_proxies(
+        p,
+        0,
+        edge_len = 1,
+        face_bounds = [-0.2, 0.2],
+        face_proxy_mode = "sweep_to_bounds",
+        edge_radius = 0.2,
+        edge_length = undef,
+        vertex_radius = 0.18,
+        include_local_edges = true,
+        include_local_vertices = false,
+        include_cutter_faces = true,
+        include_cutter_edges = false,
+        include_cutter_vertices = false,
+        cutter_face_indices = [1],
+        local_edge_indices = [0, 1]
+    ) {
+        translate([0, 0, -0.1])
+            cube([0.9, 0.9, 0.2], center = true);
+        cube([0.8, 0.25, 0.25], center = true);
+        sphere(r = 0.2);
+        translate([0, 0, -0.1])
+            cube([0.9, 0.9, 0.2], center = true);
+        cube([0.8, 0.25, 0.25], center = true);
+        sphere(r = 0.2);
+    }
+
+    assert(true, "proxy face carve smoke");
+}
+
+module test_ps_partition_face_by_feature_proxies__smoke_selected_indices() {
+    p = hexahedron();
+
+    ps_partition_face_by_feature_proxies(
+        p,
+        0,
+        edge_len = 1,
+        face_bounds = [-0.2, 0.2],
+        face_proxy_mode = "sweep_to_bounds",
+        edge_radius = 0.2,
+        edge_length = undef,
+        vertex_radius = 0.18,
+        include_faces = false,
+        include_edges = true,
+        include_vertices = false,
+        edge_indices = [0, 1],
+        color_cells = false,
+        max_cutters = 4
+    ) {
+        translate([0, 0, -0.1])
+            cube([0.9, 0.9, 0.2], center = true);
+        cube([0.8, 0.25, 0.25], center = true);
+        sphere(r = 0.2);
+    }
+
+    assert(true, "proxy face partition smoke");
+}
+
 module run_TestPlacement() {
     test_place_on_faces__family_ids_and_counts_from_classify();
     test_place_on_edges__family_ids_and_counts_from_classify();
@@ -599,6 +660,8 @@ module run_TestPlacement() {
     test_seg_merge_face_cut_group__preserves_disjoint_spans();
     test_seg_merge_face_cut_group__merges_touching_spans();
     test_ps_clip_face_by_feature_proxies__smoke_selected_indices();
+    test_ps_carve_face_by_feature_proxies__smoke_selected_indices();
+    test_ps_partition_face_by_feature_proxies__smoke_selected_indices();
 }
 
 run_TestPlacement();
