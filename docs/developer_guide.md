@@ -204,6 +204,16 @@ This is also the intended low-level selector for the proxy-interaction path in
 faces, edges, and vertices that can reach a target feature, then instantiate
 only those raw proxies in the correct placement frames.
 
+For self-intersecting faces, `segments.scad` also exposes nested placement on
+the true filled perimeter rather than the original self-crossing walk:
+
+- `place_on_face_filled_boundary_segments(...)`
+- `place_on_face_filled_boundary_edges(...)`
+
+The latter is the preferred basis for local edge-clearance on star/self-crossing
+faces because it keeps the familiar dihedral-centered edge frame while following
+the actual filled boundary subsegments.
+
 The face proxy path also supports a simple face-interferer realization mode:
 
 - `face_proxy_mode = "raw"`: use the neighboring face proxy geometry as-is,

@@ -174,6 +174,13 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Local edge-clearance strips still belong on the simple indexed `place_on_edges(...)` path in dihedral-centered frames. Do not reshape them with extra corridor/span clipping unless a concrete need survives review.
 - For self-intersecting/star faces, do not apply those shields to the original self-crossing walk directly. First split at self-intersections, create pseudo-vertices, classify the filled arrangement, keep only the true filled-boundary subsegments, then apply shielding/clearance from those boundary subsegments.
 - In other words: the next principled proxy step is face-local arrangement/boundary extraction for nonconvex/self-crossing faces, not more cutter/clearance tuning.
+- First landed Phase-1 helper surface in `segments.scad`:
+  - `ps_face_filled_cells(...)` for the non-zero filled arrangement cells
+  - `ps_face_filled_boundary_segments(...)` for the true filled-boundary subsegments with inherited source-edge ids/params
+  - `place_on_face_filled_boundary_segments(...)` for stable local placement on those true filled-boundary subsegments, with source-edge metadata and dihedral exposed as `$ps_*` vars
+  - `place_on_face_filled_boundary_edges(...)` for dihedral-centered edge-style placement on those same true filled-boundary subsegments
+- First landed Phase-2 helper surface in `segments.scad`:
+  - `ps_face_filled_atoms(...)` for conservative convex atomization of the filled arrangement, with atom edges marked as `"boundary"` or `"inner"`
 - Preferred proxy execution order is now:
   1. face-local arrangement extraction
   2. convex atomization of the filled face region
@@ -185,6 +192,21 @@ This repo is OpenSCAD-first; there is no separate build system.
 - One concrete trap already found: do not pass a short `edge_length` influence clip (for example `IR`) into edge proxy subtraction unless you really intend to truncate the strip along its own `x` axis. That was the cause of the “middle part of the edge works, ends missing” regression.
 - First landed cell-builder on that proxy baseline: `ps_partition_face_by_feature_proxies(...)` / `_ctx(...)` in `core/proxy_interaction.scad` recursively partition the target face proxy by the actual proxy cutters and emit the resulting cells as separate solids. Keep cutter counts explicit and small (`face_indices`, `edge_indices`, `vertex_indices`, `max_cutters`) because the split is exponential in the number of cutters.
 - First landed composed fabrication helper on that same baseline: `ps_carve_face_by_feature_proxies(...)` clips face occupancy and local clearance separately by the same foreign occupancy cutters, then subtracts the clipped local clearance from the clipped face occupancy. Keep lower-level `clip`/`cells` helpers as internal debugging aids only; the example path should use the composed carve.
+- The local-clearance branch in `core/proxy_interaction.scad` should now place edge clearance on `place_on_face_filled_boundary_edges(...)`, not on the original face-walk edges. That keeps star/self-crossing face seating aligned to the true filled perimeter.
+- Face-side anti-interference is now in better shape than the first shield experiments: the dedicated `test_interference.scad` probe is the reference surface, and the face branch in `core/proxy_interaction.scad` is now using that interference volume. The unresolved part is the edge-side interior-corner cleanup ("armpit hair"), not the face-side bevel direction.
+- Current edge-interference principle: the correct edge cutter is **not** an ad hoc tapered block. It should come from the same face-cell logic as later cell-removal work. In compact form:
+  - `E(i,b) = E0(i,b) - X(i,b)`
+  - where `E0` is the simple default cutter for boundary segment `b`
+  - and `X` is the union of the other filled face cells crossing that cutter
+  For execution, the simpler first form is:
+  - `E(i,b) = E0(i,b) ∩ owner_cell_prism(i,b)`
+  - where `owner_cell_prism` is the slab extrusion of the filled cell that owns boundary segment `b`
+  This is the next intended fix for the remaining interior-corner artifacts.
+- Important failure notes from the interference passes:
+  - a single global boundary-half-space shield on a star/heptagram collapses it to its convex kernel
+  - giving every atom all parent-cell boundary cutters also over-constrains the star and collapses it again
+  - atom-local cutters preserve the arms and the correct bevel direction, but still leave the interior-corner seam artifacts
+  - the hard problem was not `eps`; it was assigning the right nonconvex boundary constraints without reintroducing kernel collapse
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
 

@@ -1,5 +1,6 @@
 use <../../polysymmetrica/core/placement.scad>
 use <../../polysymmetrica/core/proxy_interaction.scad>
+use <../../polysymmetrica/core/face_regions.scad>
 use <../../polysymmetrica/core/classify.scad>
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/prisms.scad>
@@ -217,6 +218,152 @@ module test_place_on_face_segments__default_nonzero_keeps_filled_star() {
             }
         }
     }
+}
+
+module test_place_on_face_filled_boundary_segments__triangle_tracks_face_edges() {
+    p = tetrahedron();
+    place_on_faces(p, indices = [0]) {
+        assert_int_eq(len(ps_face_filled_boundary_segments($ps_face_pts3d_local, 1e-9)), 3,
+            "triangle face should report three filled boundary segments");
+        place_on_face_filled_boundary_segments() {
+            assert_int_eq($ps_face_boundary_seg_count, 3, "triangle should have three true boundary segments");
+            assert(!is_undef($ps_face_boundary_seg_source_edge_idx), "triangle boundary segment should keep source edge idx");
+            assert(!is_undef($ps_face_boundary_seg_dihedral), "triangle boundary segment should expose source dihedral");
+            assert($ps_face_boundary_seg_len > 0, "triangle boundary segment should have positive length");
+            assert(abs(norm($ps_face_boundary_seg_left_normal2d) - 1) < 1e-8, "triangle boundary left normal should be unit");
+            assert(abs(norm($ps_face_boundary_seg_inward2d) - 1) < 1e-8, "triangle boundary inward normal should be unit");
+            assert(abs(abs(v_dot($ps_face_boundary_seg_left_normal2d, $ps_face_boundary_seg_inward2d)) - 1) < 1e-8,
+                "triangle inward direction should align with +/- left normal");
+            assert(abs(v_dot($ps_face_boundary_seg2d[1] - $ps_face_boundary_seg2d[0], $ps_face_boundary_seg_inward2d)) < 1e-8,
+                "triangle inward should be perpendicular to segment");
+        }
+    }
+}
+
+module test_place_on_face_filled_boundary_segments__pentagram_returns_decagon_segments() {
+    p = poly_antiprism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 0) {
+            segs = ps_face_filled_boundary_segments($ps_face_pts3d_local, 1e-9);
+            src_counts = [for (ei = [0:1:4]) sum([for (s = segs) (s[1] == ei) ? 1 : 0])];
+
+            assert_int_eq(len(segs), 10, "star face should report ten true boundary subsegments");
+            for (cnt = src_counts)
+                assert_int_eq(cnt, 2, "each star edge should contribute two true boundary subsegments");
+
+            place_on_face_filled_boundary_segments() {
+                assert_int_eq($ps_face_boundary_seg_count, 10, "star face should expose ten true boundary subsegments");
+                assert($ps_face_boundary_seg_len > 0, "star boundary subsegment should have positive length");
+                assert(!is_undef($ps_face_boundary_seg_source_edge_idx), "star boundary subsegment should keep source edge idx");
+                assert($ps_face_boundary_seg_source_t0 >= -1e-8 && $ps_face_boundary_seg_source_t0 <= 1 + 1e-8,
+                    str("star t0 out of range ", $ps_face_boundary_seg_source_t0));
+                assert($ps_face_boundary_seg_source_t1 >= -1e-8 && $ps_face_boundary_seg_source_t1 <= 1 + 1e-8,
+                    str("star t1 out of range ", $ps_face_boundary_seg_source_t1));
+                assert(abs($ps_face_boundary_seg_source_t1 - $ps_face_boundary_seg_source_t0) > 1e-8,
+                    "star boundary subsegment should have non-zero param span");
+            }
+        }
+    }
+}
+
+module test_place_on_face_filled_boundary_edges__triangle_maps_to_edge_frame() {
+    p = tetrahedron();
+    place_on_faces(p, indices = [0]) {
+        place_on_face_filled_boundary_edges() {
+            assert_int_eq(len($ps_edge_adj_faces_idx), 2, "triangle boundary edge should carry adjacent face pair");
+            assert(!is_undef($ps_dihedral), "triangle boundary edge should expose dihedral");
+            assert(abs($ps_edge_len - $ps_face_boundary_seg_len) < 1e-8, "boundary edge frame should use subsegment length");
+            assert(abs(norm($ps_edge_ex_world) - 1) < 1e-8, "boundary edge ex should be unit");
+            assert(abs(norm($ps_edge_ey_world) - 1) < 1e-8, "boundary edge ey should be unit");
+            assert(abs(norm($ps_edge_ez_world) - 1) < 1e-8, "boundary edge ez should be unit");
+            assert(abs(v_dot($ps_edge_ex_world, $ps_edge_ey_world)) < 1e-8, "boundary edge ex/ey should be orthogonal");
+            assert(abs(v_dot($ps_edge_ex_world, $ps_edge_ez_world)) < 1e-8, "boundary edge ex/ez should be orthogonal");
+            assert(abs(v_dot($ps_edge_ey_world, $ps_edge_ez_world)) < 1e-8, "boundary edge ey/ez should be orthogonal");
+            assert(abs(v_dot($ps_edge_ez_world, [0, 0, 1])) < 1, "boundary edge ez should tilt away from face z when dihedral is finite");
+        }
+    }
+}
+
+module test_place_on_face_filled_boundary_edges__pentagram_uses_true_subsegments() {
+    p = poly_antiprism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 0) {
+            segs = ps_face_filled_boundary_segments($ps_face_pts3d_local, 1e-9);
+            assert_int_eq(len(segs), 10, "star boundary edge frame baseline should have ten subsegments");
+
+            place_on_face_filled_boundary_edges() {
+                assert_int_eq($ps_face_boundary_seg_count, 10, "star boundary edge frame should iterate ten subsegments");
+                assert(!is_undef($ps_edge_idx), "star boundary edge frame should carry source edge idx");
+                assert(!is_undef($ps_dihedral), "star boundary edge frame should carry source dihedral");
+                assert(abs($ps_edge_len - $ps_face_boundary_seg_len) < 1e-8, "star boundary edge frame should use subsegment length");
+                assert(abs(norm($ps_edge_ez_world) - 1) < 1e-8, "star boundary edge ez should be unit");
+                assert(abs(v_dot($ps_edge_ex_world, $ps_edge_ez_world)) < 1e-8, "star boundary edge ex/ez should be orthogonal");
+            }
+        }
+    }
+}
+
+module test_ps_face_filled_boundary_segments__triangle_returns_three_edges() {
+    pts3 = [[0, 0, 0], [4, 0, 0], [1, 3, 0]];
+    segs = ps_face_filled_boundary_segments(pts3, 1e-9);
+    src_counts = [for (ei = [0:1:2]) sum([for (s = segs) (s[1] == ei) ? 1 : 0])];
+
+    assert_int_eq(len(segs), 3, "triangle should have three filled boundary segments");
+    assert_int_eq(_ps_distinct_count([for (s = segs) s[1]]), 3, "triangle source edge ids should be distinct");
+    for (cnt = src_counts)
+        assert_int_eq(cnt, 1, "triangle should contribute one boundary segment per source edge");
+    for (s = segs) {
+        assert(!is_undef(s[1]), "triangle boundary segment should have source edge id");
+        assert(!is_undef(s[2]) && !is_undef(s[3]), "triangle boundary segment should carry source params");
+        assert(s[2] >= -1e-8 && s[2] <= 1 + 1e-8, str("triangle t0 out of range ", s[2]));
+        assert(s[3] >= -1e-8 && s[3] <= 1 + 1e-8, str("triangle t1 out of range ", s[3]));
+        assert(abs(s[3] - s[2]) > 1e-8, "triangle boundary segment should have non-zero param span");
+    }
+}
+
+module test_ps_face_filled_boundary_segments__pentagram_returns_decagon_boundary() {
+    pts3 = [[0,9,0], [-5,-5,0], [8,3,0], [-8,3,0], [5,-5,0]];
+    cells = ps_face_filled_cells(pts3, 1e-9);
+    segs = ps_face_filled_boundary_segments(pts3, 1e-9);
+    src_counts = [for (ei = [0:1:4]) sum([for (s = segs) (s[1] == ei) ? 1 : 0])];
+    tri_count = sum([for (c = cells) (len(c[0]) == 3) ? 1 : 0]);
+    pent_count = sum([for (c = cells) (len(c[0]) == 5) ? 1 : 0]);
+
+    assert_int_eq(len(cells), 6, "nonzero pentagram should yield five arm triangles plus one center pentagon");
+    assert_int_eq(tri_count, 5, "nonzero pentagram should have five triangular arm cells");
+    assert_int_eq(pent_count, 1, "nonzero pentagram should have one central pentagon cell");
+    assert_int_eq(len(segs), 10, "nonzero pentagram should have ten true boundary subsegments");
+    for (cnt = src_counts)
+        assert_int_eq(cnt, 2, "each original pentagram edge should contribute two boundary subsegments");
+    for (s = segs) {
+        assert(!is_undef(s[1]), "pentagram boundary segment should have source edge id");
+        assert(!is_undef(s[2]) && !is_undef(s[3]), "pentagram boundary segment should carry source params");
+        assert(s[2] >= -1e-8 && s[2] <= 1 + 1e-8, str("pentagram t0 out of range ", s[2]));
+        assert(s[3] >= -1e-8 && s[3] <= 1 + 1e-8, str("pentagram t1 out of range ", s[3]));
+        assert(abs(s[3] - s[2]) > 1e-8, "pentagram boundary segment should have non-zero param span");
+    }
+}
+
+module test_ps_face_filled_atoms__triangle_stays_single_boundary_atom() {
+    pts3 = [[0, 0, 0], [4, 0, 0], [1, 3, 0]];
+    atoms = ps_face_filled_atoms(pts3, 1e-9);
+
+    assert_int_eq(len(atoms), 1, "triangle should remain one convex atom");
+    assert_int_eq(len(atoms[0][0]), 3, "triangle atom should have three vertices");
+    assert_int_eq(sum([for (k = atoms[0][3]) (k == "boundary") ? 1 : 0]), 3, "triangle atom edges should all be boundary");
+    assert_int_eq(sum([for (k = atoms[0][3]) (k == "inner") ? 1 : 0]), 0, "triangle atom should have no inner edges");
+}
+
+module test_ps_face_filled_atoms__concave_hex_splits_and_preserves_area() {
+    pts3 = [[0,0,0], [4,0,0], [4,1,0], [1,1,0], [1,4,0], [0,4,0]];
+    atoms = ps_face_filled_atoms(pts3, 1e-9);
+    area_poly = abs(_ps_seg_poly_area2([for (p = pts3) [p[0], p[1]]]));
+    area_atoms = _list_sum([for (a = atoms) abs(_ps_seg_poly_area2(a[0]))]);
+    inner_edges = sum([for (a = atoms) sum([for (k = a[3]) (k == "inner") ? 1 : 0])]);
+
+    assert(len(atoms) > 1, "concave hex should split into multiple convex atoms");
+    assert(abs(area_atoms - area_poly) < 1e-6, str("concave atom area mismatch poly=", area_poly, " atoms=", area_atoms));
+    assert(inner_edges > 0, "concave atomization should introduce inner edges");
 }
 
 module test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts() {
@@ -601,6 +748,47 @@ module test_ps_carve_face_by_feature_proxies__smoke_selected_indices() {
     assert(true, "proxy face carve smoke");
 }
 
+module test_ps_clip_face_local_clearance_by_feature_proxies__star_uses_boundary_edge_frames() {
+    p = poly_antiprism(5, 2);
+
+    ps_clip_face_local_clearance_by_feature_proxies(
+        p,
+        0,
+        inter_radius = 20,
+        face_bounds = [-0.2, 0.2],
+        edge_radius = 0.2,
+        edge_length = undef,
+        vertex_radius = 0.18,
+        include_local_edges = true,
+        include_local_vertices = false,
+        include_cutter_faces = false,
+        include_cutter_edges = false,
+        include_cutter_vertices = false,
+        local_edge_indices = [0]
+    ) {
+        assert_int_eq($ps_edge_idx, 0, "star local clearance should honor source edge filter");
+        assert(!is_undef($ps_dihedral), "star local clearance boundary frame should expose dihedral");
+        assert($ps_edge_len > 0, "star local clearance boundary frame should have positive subsegment length");
+        cube([0.5, 0.05, 0.05], center = true);
+    }
+
+    assert(true, "star local clearance smoke");
+}
+
+module test_ps_face_interference_volume_ctx__smoke() {
+    p = poly_antiprism(n = 7, p = 3, angle = 15);
+
+    place_on_faces(p, inter_radius = 20, indices = [2]) {
+        ps_face_interference_volume_ctx(-0.4, 1.6);
+    }
+
+    place_on_faces(p, inter_radius = 20, indices = [0]) {
+        ps_face_interference_volume_ctx(-0.4, 1.6);
+    }
+
+    assert(true, "face interference smoke");
+}
+
 module test_ps_partition_face_by_feature_proxies__smoke_selected_indices() {
     p = hexahedron();
 
@@ -642,6 +830,12 @@ module run_TestPlacement() {
     test_place_on_vertices__indices_filters_exact_vertex();
     test_place_on_face_segments__star_face_split();
     test_place_on_face_segments__default_nonzero_keeps_filled_star();
+    test_place_on_face_filled_boundary_segments__triangle_tracks_face_edges();
+    test_place_on_face_filled_boundary_segments__pentagram_returns_decagon_segments();
+    test_ps_face_filled_boundary_segments__triangle_returns_three_edges();
+    test_ps_face_filled_boundary_segments__pentagram_returns_decagon_boundary();
+    test_ps_face_filled_atoms__triangle_stays_single_boundary_atom();
+    test_ps_face_filled_atoms__concave_hex_splits_and_preserves_area();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
     test_seg_cycle_probe_point__concave_inside();
     test_seg_face_tris3__concave_area_preserved();
@@ -661,6 +855,8 @@ module run_TestPlacement() {
     test_seg_merge_face_cut_group__merges_touching_spans();
     test_ps_clip_face_by_feature_proxies__smoke_selected_indices();
     test_ps_carve_face_by_feature_proxies__smoke_selected_indices();
+    test_ps_clip_face_local_clearance_by_feature_proxies__star_uses_boundary_edge_frames();
+    test_ps_face_interference_volume_ctx__smoke();
     test_ps_partition_face_by_feature_proxies__smoke_selected_indices();
 }
 

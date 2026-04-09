@@ -27,11 +27,13 @@ where:
 - local face/edge/vertex seating is a separate clearance path
 
 This file still contains lower-level experimental helpers, but that model is
-the basis future work should follow.
+the basis future work should follow rather than current fully-landed behavior.
 */
 
 use <placement.scad>
 use <funcs.scad>
+use <segments.scad>
+use <face_regions.scad>
 
 function _ps_proxy_frame_inverse_matrix(center, ex, ey, ez) = [
     [ex[0], ex[1], ex[2], -v_dot(ex, center)],
@@ -44,6 +46,22 @@ function _ps_proxy_resolve_face_indices(poly, face_indices, target_face_idx) =
     is_undef(face_indices)
         ? [for (fi = [0 : 1 : len(poly_faces(poly)) - 1]) if (fi != target_face_idx) fi]
         : [for (fi = face_indices) if (fi != target_face_idx) fi];
+
+function _ps_proxy_resolve_nonadjacent_face_indices(poly, face_indices, target_face_idx, target_face_neighbors_idx) =
+    let(
+        face_count = len(poly_faces(poly)),
+        candidates =
+            is_undef(face_indices)
+                ? [for (fi = [0 : 1 : face_count - 1]) fi]
+                : face_indices,
+        excluded = concat(
+            [target_face_idx],
+            is_undef(target_face_neighbors_idx)
+                ? []
+                : [for (adj = target_face_neighbors_idx) if (!is_undef(adj)) adj]
+        )
+    )
+    [for (fi = candidates) if (!_ps_list_contains(excluded, fi)) fi];
 
 function _ps_proxy_resolve_edge_indices(poly, edge_indices) =
     is_undef(edge_indices)
@@ -138,6 +156,12 @@ module _ps_proxy_place_edges_in_target_frame(poly, target_edge_len, target_inv, 
         place_on_edges(poly, edge_len = target_edge_len, indices = edge_indices)
             _ps_proxy_edge_influence(edge_radius, edge_length)
                 children();
+}
+
+module _ps_proxy_place_local_boundary_edges_in_target_face(edge_radius, edge_length, source_edge_indices, eps = 1e-8) {
+    place_on_face_filled_boundary_edges(source_edge_indices = source_edge_indices, eps = eps)
+        _ps_proxy_edge_influence(edge_radius, edge_length)
+            children();
 }
 
 module _ps_proxy_place_vertices_in_target_frame(poly, target_edge_len, target_inv, vertex_radius, vertex_indices) {
@@ -362,14 +386,15 @@ module _ps_proxy_partition_face_cells(
 }
 
 /*
-Clip one face-local occupancy proxy by raw neighboring face / edge / vertex
-occupancy proxies.
+Clip one face-local occupancy proxy by raw non-adjacent neighboring face /
+edge / vertex occupancy proxies, after applying the local anti-interference
+shield to that target face.
 
 Children:
 - child 0: face occupancy proxy
   This convenience wrapper also reuses child 0 as the foreign face cutter
-  proxy. Use `ps_clip_target_by_feature_proxies(...)` if target and foreign
-  face proxies differ.
+  proxy. Use `ps_clip_interference_target_by_feature_proxies(...)` if target
+  and foreign face proxies differ.
 - child 1: edge occupancy proxy
 - child 2: vertex occupancy proxy
 */
@@ -392,7 +417,7 @@ module ps_clip_face_by_feature_proxies(
     filter = undef,
     eps = 1e-8
 ) {
-    ps_clip_target_by_feature_proxies(
+    ps_clip_interference_target_by_feature_proxies(
         poly,
         face_idx,
         inter_radius = inter_radius,
@@ -419,8 +444,126 @@ module ps_clip_face_by_feature_proxies(
 }
 
 /*
-Clip one arbitrary face-local target proxy by raw neighboring face / edge /
-vertex occupancy proxies.
+Clip one arbitrary face-local target proxy by raw non-adjacent neighboring
+face / edge / vertex occupancy proxies, after applying the local
+anti-interference shield to that target face.
+
+Children:
+- child 0: target proxy to keep and clip
+- child 1: face occupancy cutter proxy
+- child 2: edge occupancy cutter proxy
+- child 3: vertex occupancy cutter proxy
+*/
+module ps_clip_interference_target_by_feature_proxies(
+    poly,
+    face_idx,
+    inter_radius = 1,
+    edge_len = undef,
+    face_bounds = [-1, 1],
+    face_proxy_mode = "raw",
+    edge_radius = undef,
+    edge_length = undef,
+    vertex_radius = undef,
+    include_faces = true,
+    include_edges = true,
+    include_vertices = true,
+    face_indices = undef,
+    edge_indices = undef,
+    vertex_indices = undef,
+    filter = undef,
+    eps = 1e-8
+) {
+    place_on_faces(poly, inter_radius = inter_radius, edge_len = edge_len, indices = [face_idx])
+        ps_clip_interference_target_by_feature_proxies_ctx(
+            poly = poly,
+            face_bounds = face_bounds,
+            face_proxy_mode = face_proxy_mode,
+            edge_radius = edge_radius,
+            edge_length = edge_length,
+            vertex_radius = vertex_radius,
+            include_faces = include_faces,
+            include_edges = include_edges,
+            include_vertices = include_vertices,
+            face_indices = face_indices,
+            edge_indices = edge_indices,
+            vertex_indices = vertex_indices,
+            filter = filter,
+            eps = eps
+        )
+        {
+            if ($children > 0) children(0);
+            if ($children > 1) children(1);
+            if ($children > 2) children(2);
+            if ($children > 3) children(3);
+        }
+}
+
+/*
+Context wrapper variant intended for use inside `place_on_faces(...)`.
+*/
+module ps_clip_interference_target_by_feature_proxies_ctx(
+    poly,
+    face_bounds = [-1, 1],
+    face_proxy_mode = "raw",
+    edge_radius = undef,
+    edge_length = undef,
+    vertex_radius = undef,
+    include_faces = true,
+    include_edges = true,
+    include_vertices = true,
+    face_indices = undef,
+    edge_indices = undef,
+    vertex_indices = undef,
+    filter = undef,
+    eps = 1e-8
+) {
+    target_edge_len = $ps_edge_len;
+    target_inv = _ps_proxy_frame_inverse_matrix(
+        $ps_face_center_world,
+        $ps_face_ex_world,
+        $ps_face_ey_world,
+        $ps_face_ez_world
+    );
+    resolved_face_indices = _ps_proxy_resolve_nonadjacent_face_indices(
+        poly,
+        face_indices,
+        $ps_face_idx,
+        $ps_face_neighbors_idx
+    );
+    resolved_edge_indices = _ps_proxy_resolve_edge_indices(poly, edge_indices);
+    resolved_vertex_indices = _ps_proxy_resolve_vertex_indices(poly, vertex_indices);
+    assert(!is_undef(target_edge_len), "ps_clip_interference_target_by_feature_proxies_ctx must be used inside place_on_faces(...)");
+    assert(is_undef(filter), "ps_clip_interference_target_by_feature_proxies_ctx: filter is reserved and not yet implemented");
+
+    difference() {
+        intersection() {
+            children(0);
+            ps_face_interference_volume_ctx(face_bounds[0], face_bounds[1], eps);
+        }
+
+        _ps_proxy_emit_cutter_union_in_target_frame(
+            poly,
+            target_edge_len,
+            target_inv,
+            face_bounds,
+            face_proxy_mode,
+            include_edges ? edge_radius : undef,
+            include_edges ? edge_length : undef,
+            include_vertices ? vertex_radius : undef,
+            include_faces ? resolved_face_indices : [],
+            include_edges ? resolved_edge_indices : [],
+            include_vertices ? resolved_vertex_indices : []
+        ) {
+            if ($children > 1) children(1);
+            if ($children > 2) children(2);
+            if ($children > 3) children(3);
+        }
+    }
+}
+
+/*
+Clip one arbitrary face-local target proxy by raw non-adjacent neighboring
+face / edge / vertex occupancy proxies.
 
 Children:
 - child 0: target proxy to keep and clip
@@ -534,7 +677,7 @@ module ps_clip_target_by_feature_proxies_ctx(
 Clip local edge / vertex clearance geometry for one face by foreign occupancy.
 
 Children:
-- child 0: local edge clearance proxy (placed on the target face boundary edges)
+- child 0: local edge clearance proxy (placed on the target face's true filled-boundary edges)
 - child 1: local vertex clearance proxy (placed on the target face vertices)
 - child 2: foreign face occupancy cutter proxy
 - child 3: foreign edge occupancy cutter proxy
@@ -645,13 +788,11 @@ module ps_clip_face_local_clearance_by_feature_proxies_ctx(
     difference() {
         union() {
             if ($children > 0)
-                _ps_proxy_place_edges_in_target_frame(
-                    poly,
-                    target_edge_len,
-                    target_inv,
+                _ps_proxy_place_local_boundary_edges_in_target_face(
                     edge_radius,
                     edge_length,
-                    resolved_local_edge_indices
+                    resolved_local_edge_indices,
+                    eps
                 )
                     children(0);
 
@@ -687,9 +828,8 @@ module ps_clip_face_local_clearance_by_feature_proxies_ctx(
 }
 
 /*
-Build a printable face by clipping its occupancy and its local clearance
-separately against the same foreign occupancy, then subtracting the clipped
-clearance from the clipped occupancy.
+Build a printable face by clipping shielded face occupancy against foreign
+occupancy, then subtracting the clipped local clearance.
 
 Children:
 - child 0: face occupancy proxy
@@ -723,7 +863,7 @@ module ps_carve_face_by_feature_proxies(
     eps = 1e-8
 ) {
     difference() {
-        ps_clip_target_by_feature_proxies(
+        ps_clip_interference_target_by_feature_proxies(
             poly,
             face_idx,
             inter_radius = inter_radius,

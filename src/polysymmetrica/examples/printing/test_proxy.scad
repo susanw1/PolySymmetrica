@@ -10,11 +10,11 @@ p = poly_antiprism(n = 7, p = 3, angle = 15);
 
 // Keep the default view to one ordinary face. Add face 0 back when testing
 // star-face punch-throughs, but do not make that the default baseline.
-SHOW_FACES = [0]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+SHOW_FACES = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 
 // Default to one known intersecting face so the carved result is visually
 // obvious. `undef` means "all other faces".
-CUTTER_FACE_INDICES = [15];
+CUTTER_FACE_INDICES = [];
 faces = poly_faces(p);
 edges = _ps_edges_from_faces(faces);
 CUTTER_VERTEX_INDICES = [];
@@ -23,9 +23,9 @@ CUTTER_VERTEX_INDICES = [];
 // - local edge-seat clearance, aligned to the target face boundary
 // - foreign penetrating occupancy from other faces/edges/vertices
 //
-// This example now shows only the real composed path:
-// clipped face occupancy minus clipped local clearance.
-SHOW_CUTTER_FACES = true;
+// This example shows the composed proxy carve path:
+// face occupancy clipped by foreign occupancy, minus local clearance.
+SHOW_CUTTER_FACES = false;
 SHOW_LOCAL_EDGE_CLEARANCE = true;
 SHOW_CUTTER_VERTICES = false;
 SHOW_CARVED_RESULT = true;
@@ -43,7 +43,7 @@ BASE_Z = -FACE_T / 4;
 PILLOW_THK = 0.4 * SC;
 VERTEX_PROXY_R = 2.2 * SC;
 EDGE_STRIP_W = 1.2 * SC;
-EDGE_STRIP_H = 100 * SC;
+EDGE_STRIP_H = 10 * SC;
 EDGE_INFLUENCE_LEN = undef;
 
 module face_proxy() {

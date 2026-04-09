@@ -28,6 +28,13 @@ function _ps_fr_norm2(v, eps=1e-9) =
     let(L = norm(v))
     (L <= eps) ? [0, 0] : v / L;
 
+function _ps_fr_face_span2(face_pts2d) =
+    let(
+        xs = [for (p = face_pts2d) p[0]],
+        ys = [for (p = face_pts2d) p[1]]
+    )
+    norm([max(xs) - min(xs), max(ys) - min(ys)]);
+
 function _ps_fr_line_keep(line, p, eps=1e-9) =
     (is_undef(p) || is_undef(line) || len(line) < 3 || is_undef(line[0]) || len(line[0]) != 2 || is_undef(line[1]) || is_undef(line[2])) ? false :
     let(
@@ -193,6 +200,213 @@ module ps_face_region_volume_ctx(z0, z1, mode="nonzero", eps=1e-8) {
     assert(!is_undef($ps_face_pts2d), "ps_face_region_volume_ctx: requires place_on_faces context ($ps_face_pts2d)");
     assert(!is_undef($ps_face_dihedrals), "ps_face_region_volume_ctx: requires place_on_faces context ($ps_face_dihedrals)");
     ps_face_region_volume($ps_face_pts2d, $ps_face_dihedrals, z0, z1, mode, eps);
+}
+
+module _ps_fr_raw_filled_face_volume(face_pts3d_local, z0, z1, eps=1e-8) {
+    z_min = min(z0, z1);
+    z_max = max(z0, z1);
+
+    translate([0, 0, z_min])
+        linear_extrude(height = z_max - z_min)
+            union() {
+                for (cell = ps_face_filled_cells(face_pts3d_local, eps))
+                    ps_polygon(points = cell[0]);
+            }
+}
+
+module _ps_fr_atom_prism(atom, z0, z1) {
+    z_min = min(z0, z1);
+    z_max = max(z0, z1);
+
+    translate([0, 0, z_min])
+        linear_extrude(height = z_max - z_min)
+            ps_polygon(points = atom[0]);
+}
+
+module _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign=1) {
+    along_far = max(1, 4 * face_span, 4 * abs(z1 - z0));
+    outward_far = max(1, 2 * face_span, 4 * abs(z1 - z0));
+    z_far = max(1, 4 * face_span, 4 * abs(z1 - z0));
+
+    // Keep-side depends on the segment winding.
+    // If inward_sign > 0 then local +Y is the keep side; otherwise local -Y is.
+    // So the cutter must remove the opposite half-space.
+    translate([0, -inward_sign * outward_far / 2, 0])
+        cube([2 * along_far, outward_far, z_far], center = true);
+}
+
+function _ps_fr_atom_edge_inward_sign(atom_pts2d, seg2d, eps=1e-9) =
+    let(
+        mid = _ps_seg_boundary_midpoint(seg2d),
+        left_n = _ps_seg_boundary_left_normal(seg2d, eps),
+        probe = _ps_seg_cycle_probe_point(atom_pts2d, eps)
+    )
+    (v_dot(probe - mid, left_n) >= 0) ? 1 : -1;
+
+module _ps_fr_atom_boundary_interference_cutters(atom, face_diheds, face_span, z0, z1, eps=1e-8) {
+    pts2d = atom[0];
+    source_edge_ids = atom[2];
+    edge_kinds = atom[3];
+    n = len(pts2d);
+
+    for (k = [0:1:n-1]) {
+        edge_kind = _ps_seg_safe_at(edge_kinds, k, "inner");
+
+        if (edge_kind == "boundary") {
+            p0 = pts2d[k];
+            p1 = pts2d[(k + 1) % n];
+            seg2d = [p0, p1];
+            seg_len = norm(p1 - p0);
+            ex2 = (seg_len <= eps) ? [1, 0] : (p1 - p0) / seg_len;
+            ey2 = _ps_seg_boundary_left_normal(seg2d, eps);
+            inward_sign = _ps_fr_atom_edge_inward_sign(pts2d, seg2d, eps);
+            inward2 = ey2 * inward_sign;
+            source_edge_idx = _ps_seg_safe_at(source_edge_ids, k, undef);
+            dihed = _ps_seg_safe_at(face_diheds, source_edge_idx, 180);
+            mid = _ps_seg_boundary_midpoint(seg2d);
+            ex3 = [ex2[0], ex2[1], 0];
+            ez3 = _ps_seg_boundary_edge_ez3(inward2, dihed, eps);
+            ey3 = v_norm(v_cross(ez3, ex3));
+
+            multmatrix(ps_frame_matrix([mid[0], mid[1], 0], ex3, ey3, ez3))
+                _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign);
+        }
+    }
+}
+
+module ps_face_interference_atom_boundary_cutter_ctx(atom_idx, edge_idx, z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_interference_atom_boundary_cutter_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_atom_boundary_cutter_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+    assert(atom_idx >= 0 && atom_idx < len(atoms), str("ps_face_interference_atom_boundary_cutter_ctx: atom_idx out of range ", atom_idx));
+
+    atom = atoms[atom_idx];
+    pts2d = atom[0];
+    source_edge_ids = atom[2];
+    edge_kinds = atom[3];
+    n = len(pts2d);
+
+    assert(edge_idx >= 0 && edge_idx < n, str("ps_face_interference_atom_boundary_cutter_ctx: edge_idx out of range ", edge_idx));
+    assert(_ps_seg_safe_at(edge_kinds, edge_idx, "inner") == "boundary", str("ps_face_interference_atom_boundary_cutter_ctx: edge ", edge_idx, " is not a boundary edge"));
+
+    p0 = pts2d[edge_idx];
+    p1 = pts2d[(edge_idx + 1) % n];
+    seg2d = [p0, p1];
+    seg_len = norm(p1 - p0);
+    ex2 = (seg_len <= eps) ? [1, 0] : (p1 - p0) / seg_len;
+    ey2 = _ps_seg_boundary_left_normal(seg2d, eps);
+    inward_sign = _ps_fr_atom_edge_inward_sign(pts2d, seg2d, eps);
+    inward2 = ey2 * inward_sign;
+    source_edge_idx = _ps_seg_safe_at(source_edge_ids, edge_idx, undef);
+    dihed = _ps_seg_safe_at($ps_face_dihedrals, source_edge_idx, 180);
+    mid = _ps_seg_boundary_midpoint(seg2d);
+    ex3 = [ex2[0], ex2[1], 0];
+    ez3 = _ps_seg_boundary_edge_ez3(inward2, dihed, eps);
+    ey3 = v_norm(v_cross(ez3, ex3));
+
+    multmatrix(ps_frame_matrix([mid[0], mid[1], 0], ex3, ey3, ez3))
+        _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign);
+}
+
+module place_on_face_interference_atom_boundary_cutters_ctx(atom_idx, eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "place_on_face_interference_atom_boundary_cutters_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    assert(atom_idx >= 0 && atom_idx < len(atoms), str("place_on_face_interference_atom_boundary_cutters_ctx: atom_idx out of range ", atom_idx));
+
+    atom = atoms[atom_idx];
+    edge_kinds = atom[3];
+    n = len(atom[0]);
+
+    for (ei = [0 : 1 : n - 1]) {
+        if (_ps_seg_safe_at(edge_kinds, ei, "inner") == "boundary") {
+            $ps_face_interference_atom_boundary_edge_idx = ei;
+            children();
+        }
+    }
+}
+
+// Debug/helper surface for the actual interference cutters applied to a face.
+// This exposes the same cutter union used by ps_face_interference_volume_ctx(...),
+// but without differencing it from the face body.
+module ps_face_interference_cutters_ctx(z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_interference_cutters_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_cutters_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+
+    union() {
+        for (atom = atoms)
+            _ps_fr_atom_boundary_interference_cutters(atom, $ps_face_dihedrals, face_span, z0, z1, eps);
+    }
+}
+
+module ps_face_interference_atom_prisms_ctx(z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_atom_prisms_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+
+    union() {
+        for (atom = atoms)
+            _ps_fr_atom_prism(atom, z0, z1);
+    }
+}
+
+module ps_face_interference_atom_prism_ctx(atom_idx, z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_atom_prism_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    assert(atom_idx >= 0 && atom_idx < len(atoms), str("ps_face_interference_atom_prism_ctx: atom_idx out of range ", atom_idx));
+
+    _ps_fr_atom_prism(atoms[atom_idx], z0, z1);
+}
+
+module ps_face_interference_atom_cutters_ctx(atom_idx, z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_interference_atom_cutters_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_atom_cutters_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+    assert(atom_idx >= 0 && atom_idx < len(atoms), str("ps_face_interference_atom_cutters_ctx: atom_idx out of range ", atom_idx));
+
+    _ps_fr_atom_boundary_interference_cutters(atoms[atom_idx], $ps_face_dihedrals, face_span, z0, z1, eps);
+}
+
+module ps_face_interference_atom_volume_ctx(atom_idx, z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_interference_atom_volume_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_atom_volume_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+    assert(atom_idx >= 0 && atom_idx < len(atoms), str("ps_face_interference_atom_volume_ctx: atom_idx out of range ", atom_idx));
+
+    difference() {
+        _ps_fr_atom_prism(atoms[atom_idx], z0, z1);
+        _ps_fr_atom_boundary_interference_cutters(atoms[atom_idx], $ps_face_dihedrals, face_span, z0, z1, eps);
+    }
+}
+
+// Interference-only face volume:
+// the raw filled face slab, minus one-sided dihedral/2 cutters placed on the
+// true filled-boundary subsegments. This intentionally excludes foreign cutters
+// and local seat/clearance geometry.
+module ps_face_interference_volume_ctx(z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_interference_volume_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_interference_volume_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    atoms = ps_face_filled_atoms($ps_face_pts3d_local, eps);
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+
+    union() {
+        for (atom = atoms)
+            difference() {
+                _ps_fr_atom_prism(atom, z0, z1);
+                _ps_fr_atom_boundary_interference_cutters(atom, $ps_face_dihedrals, face_span, z0, z1, eps);
+            }
+    }
 }
 
 // Intersect arbitrary child geometry with the local admissible face region.

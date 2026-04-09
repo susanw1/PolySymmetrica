@@ -171,6 +171,37 @@ Because the filled result may still be nonconvex, the shielded face should then
 be built as a union of convex atom/cell results rather than one monolithic
 half-space intersection.
 
+Current proxy-interference status:
+
+- the face-side interference volume is now working in the dedicated
+  `test_interference.scad` probe and is wired into the proxy face branch
+- the remaining unresolved issue is the edge-side interior-corner cleanup
+  ("armpit hair")
+- that remaining problem should now be treated as an arrangement/cell-clipping
+  problem for the edge cutter, not as a request for more ad hoc taper geometry
+
+In particular, the next edge-side model should be:
+
+- start from the default dihedral-centered edge cutter `E0`
+- clip it to the owning filled face cell, or equivalently subtract the crossing
+  filled face cells inside the active slab
+
+So the intended first execution form is:
+
+- `E(i,b) = E0(i,b) ∩ owner_cell_prism(i,b)`
+
+rather than inventing a special hand-tapered cutter end.
+
+Important failure notes to remember if revisiting older shield ideas:
+
+- a global intersection of all boundary-derived bisector half-spaces collapses
+  a star/self-intersecting face to its convex kernel
+- broadening each convex atom to use all parent-cell boundary cutters
+  over-constrains the star and collapses it again
+- the remaining seam artifacts are not primarily an `eps` problem; they come
+  from how the cutter shape ignores the true filled-cell ownership at
+  re-entrant corners
+
 ## What Ended Up Working
 
 The important practical lesson from the recent segmentation work is:

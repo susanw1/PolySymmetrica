@@ -130,6 +130,90 @@ This is the basis for future proxy work. It deliberately avoids the older,
 failed corridor/ownership experiments where extra face-local clipping reshaped
 the clearance strips before subtraction.
 
+Current implementation direction:
+
+- target face occupancy should be intersected with a shield volume built from
+  arrangement atoms
+- adjacent faces should be excluded from the foreign face-cutter set
+- local clearance should stay a separate final subtraction, placed on the true
+  filled-boundary edge subsegments
+
+### Edge Interference Principle
+
+The edge-side anti-interference cutter should follow the same logic as the
+planned face-cell removal path:
+
+- start from a simple default edge cutter in the dihedral-centered boundary-edge
+  frame
+- then remove the parts of that cutter occupied by crossing face cells
+
+So for one true filled-boundary segment `b` on face `i`:
+
+- `E0(i,b)` = default edge interference cutter
+- `owner_cell(i,b)` = the filled cell that owns boundary segment `b`
+- `X(i,b)` = union of the other filled face cells of `i` that cross `E0(i,b)`
+- `E(i,b) = E0(i,b) - X(i,b)`
+
+For execution, the simpler first implementation is:
+
+- build `owner_cell_prism(i,b)` by extruding the owning filled cell through the
+  active face slab
+- then define:
+  - `E(i,b) = E0(i,b) ∩ owner_cell_prism(i,b)`
+
+Within the face slab, that is equivalent to subtracting the other crossing
+cells, but it avoids explicit crossing-edge detection in the first pass.
+
+This is the preferred next execution model for the remaining "armpit hair"
+corner artifacts. The correct shape should come from clipping the default edge
+cutter by crossing face-cell volumes, not by inventing ad hoc tapered end
+geometry.
+
+Consequences:
+
+- for ordinary convex faces, `X(i,b)` is empty, so `E(i,b) = E0(i,b)`
+- for star/self-intersecting faces, crossing cells automatically trim the edge
+  cutter into the correct corner shape
+- the edge cutter should be treated as another cell-removal problem, not as a
+  special-case bevel/taper problem
+- there is no need to reason about crossing edges explicitly in the first
+  implementation; the owning filled cell already encodes the right keep region
+
+### What Proved Hard
+
+The hard part was not "draw a sloping cutter". It was assigning the right
+constraints to a nonconvex/self-crossing face without collapsing it or leaving
+local seams.
+
+What failed:
+
+- a single global intersection of all boundary-derived bisector half-spaces
+  collapsed star/heptagram faces to their convex kernels
+- broadening each convex atom to use all parent-cell boundary cutters also
+  over-constrained the face and collapsed the star again
+- keeping cutters atom-local preserved the arms and fixed the main bevel
+  direction, but left the remaining interior-corner "armpit hair" because the
+  default rectangular edge cutter was still blind to crossing face cells
+- treating the problem as an `eps` or strip-height issue was a dead end; those
+  only changed the symptoms
+
+What turned out to matter:
+
+- the boundary-edge frame orientation had to be fixed at the source, not by
+  blind sign-flipping of individual cutters
+- the face-side interference problem is now good enough in isolation
+  (`test_interference.scad`) and in the proxy face branch
+- the remaining corner cleanup belongs to the edge cutter, not to more global
+  shield heuristics
+
+If the older ideas are revisited later, the real questions are:
+
+- how to distribute boundary constraints across nonconvex filled cells without
+  reintroducing kernel collapse
+- how to make atom unions meet cleanly without leaving seam artifacts
+- and how to do that without turning the model into a pile of mode flags or
+  hand-designed taper cases
+
 ## Nonconvex / Self-Intersecting Faces
 
 The shielded-face model above needs one important refinement for star and other
@@ -279,6 +363,23 @@ Suggested helper surface:
 - `ps_face_filled_arrangement(...)`
 - or `ps_face_filled_boundary_segments(...)`
 
+First landed step:
+
+- `ps_face_filled_cells(...)`
+- `ps_face_filled_boundary_segments(...)`
+- `ps_face_filled_atoms(...)`
+- `place_on_face_filled_boundary_segments(...)`
+- `place_on_face_filled_boundary_edges(...)`
+
+These now expose the non-zero filled arrangement as simple cells plus the true
+filled-boundary subsegments with inherited source-edge ids/parameters, plus a
+conservative convex atomization where atom edges are marked as `"boundary"` or
+`"inner"`. The segment-placement helper iterates those true boundary
+subsegments in stable local frames, and the boundary-edge helper lifts them
+into dihedral-centered edge frames using the inherited source-edge dihedral.
+That gives later clearance/shield logic a way to follow the actual filled
+perimeter rather than the original self-crossing walk.
+
 Per-segment metadata should include:
 
 - endpoints
@@ -290,6 +391,8 @@ Exit criteria:
 
 - a pentagram/star face yields true boundary subsegments for the filled arms
 - internal crossing segments are no longer treated as face boundaries
+- local edge-clearance placement can be driven from those true boundary
+  subsegments instead of the original face walk
 
 ### Phase 2: Convex Atomization Of Filled Face Regions
 
@@ -338,6 +441,13 @@ Exit criteria:
 - convex faces shield correctly
 - star/self-intersecting faces keep their filled arms instead of collapsing to
   the convex kernel
+
+Current status:
+
+- face-side anti-interference now works in a dedicated probe and is wired into
+  the proxy face branch
+- the remaining unresolved part is the edge-side corner cleanup described in
+  the edge-interference principle above
 
 ### Phase 4: Intersecting Feature Query
 

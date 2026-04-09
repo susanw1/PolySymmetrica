@@ -453,6 +453,222 @@ module ps_polygon(points, mode="nonzero", eps=1e-8) {
     }
 }
 
+// Semantic wrapper for the normal filled face arrangement.
+// This is the current Phase-1 proxy basis: a face-local filled arrangement
+// under the intended non-zero fill rule, before any foreign cutters or local
+// clearance are considered.
+function ps_face_filled_cells(face_pts3d_local, eps=1e-8) =
+    ps_face_segments(face_pts3d_local, "nonzero", eps);
+
+function _ps_seg_filled_boundary_records(face_pts3d_local, filled_cells, eps=1e-8) =
+    let(
+        face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]],
+        n = len(face_pts2d)
+    )
+    [
+        for (ci = [0:1:len(filled_cells)-1])
+            let(
+                cell = filled_cells[ci],
+                pts2d = cell[0],
+                edge_ids = cell[2],
+                m = len(pts2d)
+            )
+            for (ei = [0:1:m-1])
+                let(
+                    p0 = pts2d[ei],
+                    p1 = pts2d[(ei + 1) % m],
+                    src_edge_idx = _ps_seg_safe_at(edge_ids, ei, undef),
+                    src_a = is_undef(src_edge_idx) ? undef : face_pts2d[src_edge_idx],
+                    src_b = is_undef(src_edge_idx) ? undef : face_pts2d[(src_edge_idx + 1) % n],
+                    t0 = (is_undef(src_a) || is_undef(src_b)) ? undef : _ps_seg_point_param_on_segment(p0, src_a, src_b, eps),
+                    t1 = (is_undef(src_a) || is_undef(src_b)) ? undef : _ps_seg_point_param_on_segment(p1, src_a, src_b, eps)
+                )
+                [[p0, p1], src_edge_idx, t0, t1, ci]
+    ];
+
+function _ps_seg_record_geom_count(records, seg2d, eps=1e-8) =
+    len([for (r = records) if (_ps_seg2_eq(r[0], seg2d, eps)) 1]);
+
+// True filled-boundary subsegments for a possibly self-intersecting face.
+//
+// Return entries:
+//   [seg2d, source_edge_idx, source_t0, source_t1, filled_cell_idx]
+//
+// where:
+// - seg2d is one boundary subsegment in face-local 2D
+// - source_edge_idx is the original face-walk edge this subsegment came from
+// - source_t0/source_t1 are parameters along that original edge
+// - filled_cell_idx identifies which filled cell contributed the boundary edge
+//
+// Segments shared by two filled cells are treated as internal and filtered out.
+function ps_face_filled_boundary_segments(face_pts3d_local, eps=1e-8) =
+    let(
+        filled_cells = ps_face_filled_cells(face_pts3d_local, eps),
+        raw_records = _ps_seg_filled_boundary_records(face_pts3d_local, filled_cells, eps)
+    )
+    [
+        for (r = raw_records)
+            if (_ps_seg_record_geom_count(raw_records, r[0], eps) == 1) r
+    ];
+
+function _ps_seg_boundary_left_normal(seg2d, eps=1e-9) =
+    let(
+        d = seg2d[1] - seg2d[0],
+        L = norm(d)
+    )
+    (L <= eps) ? [0, 0] : [-d[1] / L, d[0] / L];
+
+function _ps_seg_boundary_midpoint(seg2d) =
+    (seg2d[0] + seg2d[1]) / 2;
+
+function _ps_seg_boundary_inward_sign(seg2d, filled_cell, eps=1e-9) =
+    let(
+        mid = _ps_seg_boundary_midpoint(seg2d),
+        left_n = _ps_seg_boundary_left_normal(seg2d, eps),
+        probe = _ps_seg_cycle_probe_point(filled_cell[0], eps)
+    )
+    (v_dot(probe - mid, left_n) >= 0) ? 1 : -1;
+
+function _ps_seg_boundary_seg_len(seg2d) =
+    norm(seg2d[1] - seg2d[0]);
+
+// Nested true filled-boundary segment iterator. Call inside place_on_faces(...).
+//
+// Unlike `place_on_face_segments(...)`, this iterates the actual filled
+// boundary subsegments after self-intersection splitting and nonzero fill
+// classification. For star/self-crossing faces, this is the real perimeter
+// data that later clearance/shield logic should follow.
+module place_on_face_filled_boundary_segments(eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "place_on_face_filled_boundary_segments: requires place_on_faces context");
+    filled_cells = ps_face_filled_cells($ps_face_pts3d_local, eps);
+    segs = ps_face_filled_boundary_segments($ps_face_pts3d_local, eps);
+
+    for (si = [0:1:len(segs)-1]) {
+        s = segs[si];
+        seg2d = s[0];
+        cell_idx = s[4];
+        cell = filled_cells[cell_idx];
+        p0 = seg2d[0];
+        p1 = seg2d[1];
+        mid = _ps_seg_boundary_midpoint(seg2d);
+        seg_len = _ps_seg_boundary_seg_len(seg2d);
+        ex2 = (seg_len <= eps) ? [1, 0] : (p1 - p0) / seg_len;
+        ey2 = _ps_seg_boundary_left_normal(seg2d, eps);
+        inward_sign = _ps_seg_boundary_inward_sign(seg2d, cell, eps);
+        inward2 = ey2 * inward_sign;
+        source_edge_idx = s[1];
+        source_dihedral = is_undef($ps_face_dihedrals) ? undef : _ps_seg_safe_at($ps_face_dihedrals, source_edge_idx, undef);
+        source_neighbor_face_idx = is_undef($ps_face_neighbors_idx) ? undef : _ps_seg_safe_at($ps_face_neighbors_idx, source_edge_idx, undef);
+
+        $ps_face_boundary_seg_idx = si;
+        $ps_face_boundary_seg_count = len(segs);
+        $ps_face_boundary_seg2d = seg2d;
+        $ps_face_boundary_seg_pts3d_local = [[p0[0], p0[1], 0], [p1[0], p1[1], 0]];
+        $ps_face_boundary_seg_len = seg_len;
+        $ps_face_boundary_seg_midpoint2d = mid;
+        $ps_face_boundary_seg_source_edge_idx = source_edge_idx;
+        $ps_face_boundary_seg_source_t0 = s[2];
+        $ps_face_boundary_seg_source_t1 = s[3];
+        $ps_face_boundary_seg_filled_cell_idx = cell_idx;
+        $ps_face_boundary_seg_left_normal2d = ey2;
+        $ps_face_boundary_seg_inward2d = inward2;
+        $ps_face_boundary_seg_inward_is_positive_ey = inward_sign > 0;
+        $ps_face_boundary_seg_dihedral = source_dihedral;
+        $ps_face_boundary_seg_neighbor_face_idx = source_neighbor_face_idx;
+        $ps_face_has_filled_boundary_segments = len(segs) > len($ps_face_pts2d);
+
+        multmatrix(ps_frame_matrix(
+            [mid[0], mid[1], 0],
+            [ex2[0], ex2[1], 0],
+            [ey2[0], ey2[1], 0],
+            [0, 0, 1]
+        ))
+            children();
+    }
+}
+
+function _ps_seg_boundary_edge_ez3(inward2, dihedral, eps=1e-9) =
+    let(
+        alpha = is_undef(dihedral) ? 0 : (180 - dihedral) / 2,
+        s = sin(alpha),
+        c = cos(alpha)
+    )
+    // Match place_on_edges(...): edge-local +Z is the bisector of the outward
+    // adjacent-face normals, which tilts away from the face interior.
+    v_norm([-inward2[0] * s, -inward2[1] * s, c]);
+
+// Nested true filled-boundary edge iterator. Call inside place_on_faces(...).
+//
+// This reuses the true filled-boundary subsegments, but rotates the child frame
+// into the same dihedral-centered cross-section logic used by edge-space
+// clearance strips. For ordinary convex faces this matches the old edge walk;
+// for star/self-crossing faces it follows the real filled perimeter instead.
+module place_on_face_filled_boundary_edges(source_edge_indices=undef, eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "place_on_face_filled_boundary_edges: requires place_on_faces context");
+    filled_cells = ps_face_filled_cells($ps_face_pts3d_local, eps);
+    segs = ps_face_filled_boundary_segments($ps_face_pts3d_local, eps);
+
+    for (si = [0:1:len(segs)-1]) {
+        s = segs[si];
+        seg2d = s[0];
+        cell_idx = s[4];
+        cell = filled_cells[cell_idx];
+        p0 = seg2d[0];
+        p1 = seg2d[1];
+        mid = _ps_seg_boundary_midpoint(seg2d);
+        seg_len = _ps_seg_boundary_seg_len(seg2d);
+        ex2 = (seg_len <= eps) ? [1, 0] : (p1 - p0) / seg_len;
+        ey2 = _ps_seg_boundary_left_normal(seg2d, eps);
+        inward_sign = _ps_seg_boundary_inward_sign(seg2d, cell, eps);
+        inward2 = ey2 * inward_sign;
+        source_edge_idx = s[1];
+        use_seg =
+            is_undef(source_edge_indices) ||
+            _ps_list_contains(source_edge_indices, source_edge_idx);
+        source_dihedral = is_undef($ps_face_dihedrals) ? undef : _ps_seg_safe_at($ps_face_dihedrals, source_edge_idx, undef);
+        source_neighbor_face_idx = is_undef($ps_face_neighbors_idx) ? undef : _ps_seg_safe_at($ps_face_neighbors_idx, source_edge_idx, undef);
+
+        if (use_seg) {
+            ex3 = [ex2[0], ex2[1], 0];
+            ez3 = _ps_seg_boundary_edge_ez3(inward2, source_dihedral, eps);
+            ey3 = v_norm(v_cross(ez3, ex3));
+
+            $ps_face_boundary_seg_idx = si;
+            $ps_face_boundary_seg_count = len(segs);
+            $ps_face_boundary_seg2d = seg2d;
+            $ps_face_boundary_seg_pts3d_local = [[p0[0], p0[1], 0], [p1[0], p1[1], 0]];
+            $ps_face_boundary_seg_len = seg_len;
+            $ps_face_boundary_seg_midpoint2d = mid;
+            $ps_face_boundary_seg_source_edge_idx = source_edge_idx;
+            $ps_face_boundary_seg_source_t0 = s[2];
+            $ps_face_boundary_seg_source_t1 = s[3];
+            $ps_face_boundary_seg_filled_cell_idx = cell_idx;
+            $ps_face_boundary_seg_left_normal2d = ey2;
+            $ps_face_boundary_seg_inward2d = inward2;
+            $ps_face_boundary_seg_inward_is_positive_ey = inward_sign > 0;
+            $ps_face_boundary_seg_dihedral = source_dihedral;
+            $ps_face_boundary_seg_neighbor_face_idx = source_neighbor_face_idx;
+            $ps_face_has_filled_boundary_segments = len(segs) > len($ps_face_pts2d);
+
+            $ps_edge_idx = source_edge_idx;
+            $ps_edge_len = seg_len;
+            $ps_dihedral = source_dihedral;
+            $ps_edge_pts_local = [[-seg_len / 2, 0, 0], [seg_len / 2, 0, 0]];
+            $ps_edge_adj_faces_idx = is_undef(source_neighbor_face_idx)
+                ? [$ps_face_idx]
+                : [$ps_face_idx, source_neighbor_face_idx];
+            $ps_edge_midradius = norm(mid);
+            $ps_edge_center_world = [mid[0], mid[1], 0];
+            $ps_edge_ex_world = ex3;
+            $ps_edge_ey_world = ey3;
+            $ps_edge_ez_world = ez3;
+
+            multmatrix(ps_frame_matrix([mid[0], mid[1], 0], ex3, ey3, ez3))
+                children();
+        }
+    }
+}
+
 
 function _ps_seg_close2(a, b, eps=1e-8) =
     norm([a[0] - b[0], a[1] - b[1]]) <= eps;
@@ -674,6 +890,77 @@ function _ps_seg_triangulate_simple_poly_idx(pts2d, eps=1e-9) =
         sign = (area >= 0) ? 1 : -1
     )
     (n < 3) ? [] : _ps_seg_ear_tris(idxs, pts2d, sign, eps, 0);
+
+function _ps_seg_boundary_meta_for_edge(boundary_records, a, b, eps=1e-8) =
+    let(
+        fwd = [
+            for (r = boundary_records)
+                if (_ps_seg_close2(r[0][0], a, eps) && _ps_seg_close2(r[0][1], b, eps))
+                    [r[1], "boundary", r[2], r[3], r[4]]
+        ],
+        rev = [
+            for (r = boundary_records)
+                if (_ps_seg_close2(r[0][0], b, eps) && _ps_seg_close2(r[0][1], a, eps))
+                    [r[1], "boundary", r[3], r[2], r[4]]
+        ]
+    )
+    (len(fwd) > 0) ? fwd[0] :
+    (len(rev) > 0) ? rev[0] :
+    [undef, "inner", undef, undef, undef];
+
+function _ps_seg_atom_from_indices(pts2d, pts3d, idxs, boundary_records, cell_idx, eps=1e-8) =
+    let(
+        m = len(idxs),
+        atom_pts2d = [for (ii = idxs) pts2d[ii]],
+        atom_pts3d = [for (ii = idxs) pts3d[ii]],
+        metas = [
+            for (k = [0:1:m-1])
+                _ps_seg_boundary_meta_for_edge(
+                    boundary_records,
+                    atom_pts2d[k],
+                    atom_pts2d[(k + 1) % m],
+                    eps
+                )
+        ]
+    )
+    [
+        atom_pts2d,
+        atom_pts3d,
+        [for (m0 = metas) m0[0]],
+        [for (m0 = metas) m0[1]],
+        [for (m0 = metas) m0[2]],
+        [for (m0 = metas) m0[3]],
+        cell_idx
+    ];
+
+function _ps_seg_cell_atoms_from_boundary_records(cell, boundary_records, cell_idx, eps=1e-8) =
+    let(
+        pts2d = cell[0],
+        pts3d = cell[1],
+        tris = _ps_seg_triangulate_simple_poly_idx(pts2d, eps)
+    )
+    _ps_poly_is_convex2(pts2d, eps)
+        ? [_ps_seg_atom_from_indices(pts2d, pts3d, [for (i = [0:1:len(pts2d)-1]) i], boundary_records, cell_idx, eps)]
+        : [for (tri = tris) _ps_seg_atom_from_indices(pts2d, pts3d, tri, boundary_records, cell_idx, eps)];
+
+// Convex atomization of the non-zero filled face arrangement.
+//
+// Return atoms:
+//   [pts2d, pts3d_local, source_edge_ids, edge_kinds, source_t0, source_t1, filled_cell_idx]
+//
+// where:
+// - `edge_kinds[k]` is `"boundary"` for a true filled-boundary subsegment and
+//   `"inner"` for an internal triangulation/shared edge
+// - boundary metadata is inherited from `ps_face_filled_boundary_segments(...)`
+function ps_face_filled_atoms(face_pts3d_local, eps=1e-8) =
+    let(
+        filled_cells = ps_face_filled_cells(face_pts3d_local, eps),
+        boundary_records = ps_face_filled_boundary_segments(face_pts3d_local, eps)
+    )
+    [
+        for (ci = [0:1:len(filled_cells)-1])
+            each _ps_seg_cell_atoms_from_boundary_records(filled_cells[ci], boundary_records, ci, eps)
+    ];
 
 // Triangulate a face in face-local coordinates.
 // Unlike a simple fan, this path handles concave/self-intersecting loops by:
