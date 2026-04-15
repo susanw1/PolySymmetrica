@@ -145,39 +145,52 @@ planned face-cell removal path:
 
 - start from a simple default edge cutter in the dihedral-centered boundary-edge
   frame
-- then remove the parts of that cutter occupied by crossing face cells
+- then remove the parts of that cutter occupied by the crossing face material
+  that actually punches through it
 
 So for one true filled-boundary segment `b` on face `i`:
 
 - `E0(i,b)` = default edge interference cutter
-- `owner_cell(i,b)` = the filled cell that owns boundary segment `b`
-- `X(i,b)` = union of the other filled face cells of `i` that cross `E0(i,b)`
+- `X(i,b)` = union of the crossing removal lobes that intersect `E0(i,b)`
 - `E(i,b) = E0(i,b) - X(i,b)`
 
-For execution, the simpler first implementation is:
+The key refinement is that the natural subtraction unit is **not** "one body per
+crossing source edge". For star/heptagram faces, the correct subtraction unit is
+a **crossing span / lobe** along the target edge. In the `{7/3}` case this means
+that for one target edge, the punch-through material may come from paired
+crossing edges such as `(5,4)` or `(2,3)`, not from one crossing edge in
+isolation.
 
-- build `owner_cell_prism(i,b)` by extruding the owning filled cell through the
-  active face slab
-- then define:
-  - `E(i,b) = E0(i,b) ∩ owner_cell_prism(i,b)`
+So the next intended execution form is:
 
-Within the face slab, that is equivalent to subtracting the other crossing
-cells, but it avoids explicit crossing-edge detection in the first pass.
+- find the strict crossings of the target source edge with the other source
+  edges of the same filled face walk
+- sort those crossings by `t` along the target edge
+- pair consecutive crossings into occupied spans on the target edge
+- for each span, build a bounded **crossing lobe**:
+  - the segment on the target edge between the two crossing points
+  - plus the boundary path between the paired crossing edges
+  - plus a fake closing edge if needed to make a bounded polygon
+- extrude that lobe through the active face slab
+- apply phase-1 interference only to the real boundary edges on that lobe path;
+  the fake closing edge stays flat
+- subtract the union of those lobe bodies from `E0(i,b)`
 
 This is the preferred next execution model for the remaining "armpit hair"
 corner artifacts. The correct shape should come from clipping the default edge
-cutter by crossing face-cell volumes, not by inventing ad hoc tapered end
-geometry.
+cutter by crossing face material, not by inventing ad hoc tapered end geometry.
 
 Consequences:
 
 - for ordinary convex faces, `X(i,b)` is empty, so `E(i,b) = E0(i,b)`
-- for star/self-intersecting faces, crossing cells automatically trim the edge
-  cutter into the correct corner shape
+- for star/self-intersecting faces, crossing **lobes** trim the edge cutter into
+  the correct corner shape
 - the edge cutter should be treated as another cell-removal problem, not as a
   special-case bevel/taper problem
-- there is no need to reason about crossing edges explicitly in the first
-  implementation; the owning filled cell already encodes the right keep region
+- the crossing geometry is face-local; there is no foreign hit-list problem here
+- face-walk/source-edge numbering must be kept explicit, because it is easy to
+  confuse source-edge ids with other edge-numbering conventions when reasoning
+  about star polygons by hand
 
 ### What Proved Hard
 
@@ -194,6 +207,9 @@ What failed:
 - keeping cutters atom-local preserved the arms and fixed the main bevel
   direction, but left the remaining interior-corner "armpit hair" because the
   default rectangular edge cutter was still blind to crossing face cells
+- treating "one body per crossing source edge" as the phase-2 subtraction unit
+  was also wrong: it either removed the wrong broad wing of material or missed
+  the intended central punch-through span entirely
 - treating the problem as an `eps` or strip-height issue was a dead end; those
   only changed the symptoms
 
@@ -201,8 +217,11 @@ What turned out to matter:
 
 - the boundary-edge frame orientation had to be fixed at the source, not by
   blind sign-flipping of individual cutters
+- phase 1 (one edge's own interference-only cutter/body) is now substantially
+  sound and should be treated as the stable base layer
 - the face-side interference problem is now good enough in isolation
-  (`test_interference.scad`) and in the proxy face branch
+  (`examples/experiments/face-interference/test_interference.scad`) and in the
+  proxy face branch
 - the remaining corner cleanup belongs to the edge cutter, not to more global
   shield heuristics
 
@@ -337,7 +356,8 @@ Goal:
 Deliverables:
 
 - preserve the raw indexed `place_on_edges(...)` local-clearance strip path
-- keep `test_proxy.scad` able to show a known-good simple face carve
+- keep `examples/experiments/face-interference/test_proxy.scad` able to show a
+  known-good simple face carve
 - do not add new corridor/span ownership shaping to the live strip path
 
 Exit criteria:

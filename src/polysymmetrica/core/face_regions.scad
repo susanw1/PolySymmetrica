@@ -223,16 +223,26 @@ module _ps_fr_atom_prism(atom, z0, z1) {
             ps_polygon(points = atom[0]);
 }
 
-module _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign=1) {
+module _ps_fr_filled_cell_prism(cell, z0, z1) {
+    z_min = min(z0, z1);
+    z_max = max(z0, z1);
+
+    translate([0, 0, z_min])
+        linear_extrude(height = z_max - z_min)
+            ps_polygon(points = cell[0]);
+}
+
+module _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign=1, eps=1e-8) {
     along_far = max(1, 4 * face_span, 4 * abs(z1 - z0));
     outward_far = max(1, 2 * face_span, 4 * abs(z1 - z0));
     z_far = max(1, 4 * face_span, 4 * abs(z1 - z0));
+    cut_eps = max(eps, 1e-6);
 
     // Keep-side depends on the segment winding.
     // If inward_sign > 0 then local +Y is the keep side; otherwise local -Y is.
     // So the cutter must remove the opposite half-space.
-    translate([0, -inward_sign * outward_far / 2, 0])
-        cube([2 * along_far, outward_far, z_far], center = true);
+    translate([0, -inward_sign * (outward_far - cut_eps) / 2, 0])
+        cube([2 * along_far + 2 * cut_eps, outward_far + cut_eps, z_far + 2 * cut_eps], center = true);
 }
 
 function _ps_fr_atom_edge_inward_sign(atom_pts2d, seg2d, eps=1e-9) =
@@ -269,7 +279,7 @@ module _ps_fr_atom_boundary_interference_cutters(atom, face_diheds, face_span, z
             ey3 = v_norm(v_cross(ez3, ex3));
 
             multmatrix(ps_frame_matrix([mid[0], mid[1], 0], ex3, ey3, ez3))
-                _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign);
+                _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign, eps);
         }
     }
 }
@@ -307,7 +317,95 @@ module ps_face_interference_atom_boundary_cutter_ctx(atom_idx, edge_idx, z0, z1,
     ey3 = v_norm(v_cross(ez3, ex3));
 
     multmatrix(ps_frame_matrix([mid[0], mid[1], 0], ex3, ey3, ez3))
-        _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign);
+        _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign, eps);
+}
+
+// Default interference cutter for the current true filled-boundary segment,
+// assuming we are already in that segment's edge frame.
+module ps_face_boundary_seg_default_interference_cutter_local_ctx(z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_boundary_seg_default_interference_cutter_local_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_boundary_seg_inward_is_positive_ey), "ps_face_boundary_seg_default_interference_cutter_local_ctx: requires place_on_face_filled_boundary_* context");
+
+    inward_sign = $ps_face_boundary_seg_inward_is_positive_ey ? 1 : -1;
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+
+    _ps_fr_interference_boundary_cutter(face_span, z0, z1, -inward_sign, eps);
+}
+
+// Boundary cutter orientation for material bodies derived from the face region
+// itself, for example crossing lobes used in phase-2 subtraction.
+module ps_face_boundary_seg_body_interference_cutter_local_ctx(z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_boundary_seg_body_interference_cutter_local_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_boundary_seg_inward_is_positive_ey), "ps_face_boundary_seg_body_interference_cutter_local_ctx: requires place_on_face_filled_boundary_* context");
+
+    inward_sign = $ps_face_boundary_seg_inward_is_positive_ey ? 1 : -1;
+    face_span = _ps_fr_face_span2($ps_face_pts2d);
+
+    _ps_fr_interference_boundary_cutter(face_span, z0, z1, inward_sign, eps);
+}
+
+// Default interference cutter for one true filled-boundary segment.
+// Call inside place_on_face_filled_boundary_segments(...).
+module ps_face_boundary_seg_default_interference_cutter_ctx(z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_boundary_seg_default_interference_cutter_ctx: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_boundary_seg2d), "ps_face_boundary_seg_default_interference_cutter_ctx: requires place_on_face_filled_boundary_segments context");
+    assert(!is_undef($ps_face_boundary_seg_inward2d), "ps_face_boundary_seg_default_interference_cutter_ctx: requires place_on_face_filled_boundary_segments context");
+
+    seg2d = $ps_face_boundary_seg2d;
+    p0 = seg2d[0];
+    p1 = seg2d[1];
+    mid = _ps_seg_boundary_midpoint(seg2d);
+    seg_len = _ps_seg_boundary_seg_len(seg2d);
+    ex2 = (seg_len <= eps) ? [1, 0] : (p1 - p0) / seg_len;
+    inward2 = $ps_face_boundary_seg_inward2d;
+    dihed = $ps_face_boundary_seg_dihedral;
+    ex3 = [ex2[0], ex2[1], 0];
+    ez3 = _ps_seg_boundary_edge_ez3(inward2, dihed, eps);
+    ey3 = v_norm(v_cross(ez3, ex3));
+
+    multmatrix(ps_frame_matrix([mid[0], mid[1], 0], ex3, ey3, ez3))
+        ps_face_boundary_seg_default_interference_cutter_local_ctx(z0, z1, eps);
+}
+
+// First-order face body for one source edge:
+// owning filled-cell prism minus that edge's own default interference cutter.
+// This stays in face-local coordinates and is intended as the phase-1 body
+// used to trim other crossing edge cutters.
+module ps_face_source_edge_phase1_body_ctx(source_edge_idx, z0, z1, eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_source_edge_phase1_body_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
+
+    cells = ps_face_filled_cells($ps_face_pts3d_local, eps);
+    segs = ps_face_filled_boundary_segments($ps_face_pts3d_local, eps);
+    matches = [for (s = segs) if (s[1] == source_edge_idx) s];
+
+    assert(len(matches) > 0, str("ps_face_source_edge_phase1_body_ctx: no boundary record for source edge ", source_edge_idx));
+
+    union()
+        for (rec = matches) {
+            cell_idx = rec[4];
+            assert(cell_idx >= 0 && cell_idx < len(cells), str("ps_face_source_edge_phase1_body_ctx: cell_idx out of range ", cell_idx));
+
+            difference() {
+                _ps_fr_filled_cell_prism(cells[cell_idx], z0, z1);
+
+                place_on_face_filled_boundary_source_edges(source_edge_indices = [source_edge_idx], eps = eps)
+                    ps_face_boundary_seg_default_interference_cutter_local_ctx(z0, z1, eps);
+            }
+        }
+}
+
+// Bounded lobe body used for phase-2 target-edge trimming:
+// a lobe polygon extruded through the face slab, with phase-1 interference
+// applied only to the real boundary source edges that bound that lobe.
+module ps_face_crossing_lobe_body_ctx(poly2d, source_edge_ids, z0, z1, eps=1e-8) {
+    difference() {
+        translate([0, 0, z0])
+            linear_extrude(height = z1 - z0)
+                ps_polygon(points = poly2d);
+
+        place_on_face_filled_boundary_source_edges(source_edge_indices = source_edge_ids, eps = eps)
+            ps_face_boundary_seg_body_interference_cutter_local_ctx(z0, z1, eps);
+    }
 }
 
 module place_on_face_interference_atom_boundary_cutters_ctx(atom_idx, eps=1e-8) {

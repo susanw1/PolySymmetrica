@@ -88,6 +88,176 @@ function _ps_proxy_target_face_vertex_indices(poly, face_idx) =
     let(faces0 = ps_orient_all_faces_outward(poly_verts(poly), poly_faces(poly)))
         faces0[face_idx];
 
+function _ps_proxy_face_edge_seg2d(face_pts2d, edge_idx) =
+    let(n = len(face_pts2d))
+    (is_undef(edge_idx) || edge_idx < 0 || edge_idx >= n)
+        ? undef
+        : [face_pts2d[edge_idx], face_pts2d[(edge_idx + 1) % n]];
+
+function _ps_proxy_seg_shares_endpoint(seg_a, seg_b, eps=1e-8) =
+    is_undef(seg_a) || is_undef(seg_b) ? false :
+    _ps_seg_close2(seg_a[0], seg_b[0], eps) ||
+    _ps_seg_close2(seg_a[0], seg_b[1], eps) ||
+    _ps_seg_close2(seg_a[1], seg_b[0], eps) ||
+    _ps_seg_close2(seg_a[1], seg_b[1], eps);
+
+function _ps_proxy_seg_crosses_strict(seg_a, seg_b, eps=1e-8) =
+    is_undef(seg_a) || is_undef(seg_b) ? false :
+    _ps_proxy_seg_shares_endpoint(seg_a, seg_b, eps) ? false :
+    let(
+        a = seg_a[0],
+        b = seg_a[1],
+        c = seg_b[0],
+        d = seg_b[1],
+        o1 = _ps_orient2(a, b, c),
+        o2 = _ps_orient2(a, b, d),
+        o3 = _ps_orient2(c, d, a),
+        o4 = _ps_orient2(c, d, b)
+    )
+    (((o1 > eps) && (o2 < -eps)) || ((o1 < -eps) && (o2 > eps))) &&
+    (((o3 > eps) && (o4 < -eps)) || ((o3 < -eps) && (o4 > eps)));
+
+function _ps_proxy_source_edges_cross(face_pts2d, edge_idx_a, edge_idx_b, eps=1e-8) =
+    let(
+        seg_a = _ps_proxy_face_edge_seg2d(face_pts2d, edge_idx_a),
+        seg_b = _ps_proxy_face_edge_seg2d(face_pts2d, edge_idx_b)
+    )
+    _ps_proxy_seg_crosses_strict(seg_a, seg_b, eps);
+
+function _ps_proxy_source_edge_cross_hit(face_pts2d, target_edge_idx, source_edge_idx, eps=1e-8) =
+    let(
+        seg_a = _ps_proxy_face_edge_seg2d(face_pts2d, target_edge_idx),
+        seg_b = _ps_proxy_face_edge_seg2d(face_pts2d, source_edge_idx),
+        hit =
+            is_undef(seg_a) || is_undef(seg_b)
+                ? undef
+                : _ps_seg_proper_intersection(seg_a[0], seg_a[1], seg_b[0], seg_b[1], eps)
+    )
+    hit;
+
+function _ps_proxy_poly_area2(pts2d) =
+    let(n = len(pts2d))
+    (n < 3) ? 0 :
+    sum([
+        for (i = [0 : 1 : n - 1])
+            let(j = (i + 1) % n)
+                pts2d[i][0] * pts2d[j][1] - pts2d[j][0] * pts2d[i][1]
+    ]) / 2;
+
+function _ps_proxy_sign_eps(v, eps=1e-8) =
+    (v > eps) ? 1 : ((v < -eps) ? -1 : 0);
+
+function _ps_proxy_remove_at(list, idx) =
+    [for (i = [0 : 1 : len(list) - 1]) if (i != idx) list[i]];
+
+function _ps_proxy_cross_rec_min_idx(recs, idx=0, best=0) =
+    (idx >= len(recs)) ? best :
+    _ps_proxy_cross_rec_min_idx(
+        recs,
+        idx + 1,
+        (recs[idx][0] < recs[best][0]) ? idx : best
+    );
+
+function _ps_proxy_sort_cross_recs(recs, acc=[]) =
+    (len(recs) == 0) ? acc :
+    let(mi = _ps_proxy_cross_rec_min_idx(recs))
+        _ps_proxy_sort_cross_recs(
+            _ps_proxy_remove_at(recs, mi),
+            concat(acc, [recs[mi]])
+        );
+
+function _ps_proxy_crossing_records(face_pts2d, target_edge_idx, source_edge_indices=undef, exclude_edge_idx=undef, eps=1e-8) =
+    _ps_proxy_sort_cross_recs([
+        for (source_edge_idx = [0 : 1 : len(face_pts2d) - 1])
+            let(hit = _ps_proxy_source_edge_cross_hit(face_pts2d, target_edge_idx, source_edge_idx, eps))
+            if (
+                (is_undef(source_edge_indices) || _ps_list_contains(source_edge_indices, source_edge_idx)) &&
+                (source_edge_idx != exclude_edge_idx) &&
+                _ps_proxy_source_edges_cross(face_pts2d, target_edge_idx, source_edge_idx, eps) &&
+                !is_undef(hit)
+            )
+                [hit[0], source_edge_idx, hit[2]]
+    ]);
+
+function _ps_proxy_path_edge_ids_forward(nface, edge_a, edge_b) =
+    let(span = (edge_b - edge_a + nface) % nface)
+    [for (step = [0 : 1 : span]) (edge_a + step) % nface];
+
+function _ps_proxy_path_edge_ids_backward(nface, edge_a, edge_b) =
+    let(span = (edge_a - edge_b + nface) % nface)
+    [for (step = [0 : 1 : span]) (edge_a - step + nface) % nface];
+
+function _ps_proxy_path_pts_forward(face_pts2d, edge_a, edge_b, hit_a, hit_b) =
+    let(
+        nface = len(face_pts2d),
+        span = (edge_b - edge_a + nface) % nface,
+        mids = [for (step = [1 : 1 : span]) face_pts2d[(edge_a + step) % nface]]
+    )
+    concat([hit_a], mids, [hit_b]);
+
+function _ps_proxy_path_pts_backward(face_pts2d, edge_a, edge_b, hit_a, hit_b) =
+    let(
+        nface = len(face_pts2d),
+        span = (edge_a - edge_b + nface) % nface,
+        mids = [for (step = [0 : 1 : span - 1]) face_pts2d[(edge_a - step + nface) % nface]]
+    )
+    concat([hit_a], mids, [hit_b]);
+
+function _ps_proxy_target_edge_owner_side_sign(face_pts2d, target_edge_idx, eps=1e-8) =
+    let(
+        nface = len(face_pts2d),
+        seg = _ps_proxy_face_edge_seg2d(face_pts2d, target_edge_idx),
+        s_next = _ps_proxy_sign_eps(_ps_orient2(seg[0], seg[1], face_pts2d[(target_edge_idx + 2) % nface]), eps),
+        s_prev = _ps_proxy_sign_eps(_ps_orient2(seg[0], seg[1], face_pts2d[(target_edge_idx - 1 + nface) % nface]), eps)
+    )
+    (s_next != 0) ? s_next : s_prev;
+
+function _ps_proxy_path_side_score(path_pts, target_seg, desired_sign, eps=1e-8) =
+    sum([
+        for (p = path_pts)
+            let(s = _ps_proxy_sign_eps(_ps_orient2(target_seg[0], target_seg[1], p), eps))
+                (s == desired_sign) ? 1 : ((s == -desired_sign) ? -1 : 0)
+    ]);
+
+function _ps_proxy_lobe_rec_from_pair(face_pts2d, target_edge_idx, rec_a, rec_b, eps=1e-8) =
+    let(
+        nface = len(face_pts2d),
+        target_seg = _ps_proxy_face_edge_seg2d(face_pts2d, target_edge_idx),
+        owner_side = _ps_proxy_target_edge_owner_side_sign(face_pts2d, target_edge_idx, eps),
+        desired_side = -owner_side,
+        edge_a = rec_a[1],
+        edge_b = rec_b[1],
+        hit_a = rec_a[2],
+        hit_b = rec_b[2],
+        poly_fwd = _ps_proxy_path_pts_forward(face_pts2d, edge_a, edge_b, hit_a, hit_b),
+        poly_bwd = _ps_proxy_path_pts_backward(face_pts2d, edge_a, edge_b, hit_a, hit_b),
+        fwd_score = _ps_proxy_path_side_score(poly_fwd, target_seg, desired_side, eps),
+        bwd_score = _ps_proxy_path_side_score(poly_bwd, target_seg, desired_side, eps),
+        area_fwd = abs(_ps_proxy_poly_area2(poly_fwd)),
+        area_bwd = abs(_ps_proxy_poly_area2(poly_bwd)),
+        use_fwd =
+            (fwd_score > bwd_score) ? true :
+            (bwd_score > fwd_score) ? false :
+            (area_fwd <= area_bwd),
+        poly2d = use_fwd ? poly_fwd : poly_bwd,
+        edge_ids = use_fwd
+            ? _ps_proxy_path_edge_ids_forward(nface, edge_a, edge_b)
+            : _ps_proxy_path_edge_ids_backward(nface, edge_a, edge_b)
+    )
+    [poly2d, edge_ids, [edge_a, edge_b], [rec_a[0], rec_b[0]]];
+
+function _ps_proxy_target_edge_lobe_recs(face_pts2d, target_edge_idx, source_edge_indices=undef, exclude_edge_idx=undef, eps=1e-8) =
+    let(
+        recs = _ps_proxy_crossing_records(face_pts2d, target_edge_idx, source_edge_indices, exclude_edge_idx, eps),
+        _even = assert((len(recs) % 2) == 0, str("_ps_proxy_target_edge_lobe_recs: odd crossing count for edge ", target_edge_idx))
+    )
+    (len(recs) < 2)
+        ? []
+        : [
+            for (ri = [0 : 2 : len(recs) - 2])
+                _ps_proxy_lobe_rec_from_pair(face_pts2d, target_edge_idx, recs[ri], recs[ri + 1], eps)
+        ];
+
 function _ps_proxy_cell_color(mask) = [
     0.3 + 0.6 * abs(sin(17 * mask + 0.1)),
     0.3 + 0.6 * abs(sin(29 * mask + 0.6)),
@@ -158,9 +328,102 @@ module _ps_proxy_place_edges_in_target_frame(poly, target_edge_len, target_inv, 
                 children();
 }
 
-module _ps_proxy_place_local_boundary_edges_in_target_face(edge_radius, edge_length, source_edge_indices, eps = 1e-8) {
-    place_on_face_filled_boundary_edges(source_edge_indices = source_edge_indices, eps = eps)
+module ps_clip_local_boundary_edge_by_own_interference_ctx(edge_radius, edge_length, face_bounds, eps = 1e-8) {
+    z0 = face_bounds[0];
+    z1 = face_bounds[1];
+
+    difference() {
         _ps_proxy_edge_influence(edge_radius, edge_length)
+            children();
+
+        ps_face_boundary_seg_default_interference_cutter_local_ctx(z0, z1, eps);
+    }
+}
+
+module _ps_proxy_emit_crossing_local_boundary_lobe_bodies_in_current_edge_frame(face_bounds, edge_radius, edge_length, source_edge_indices, lobe_indices, exclude_seg_idx, eps = 1e-8) {
+    z0 = face_bounds[0];
+    z1 = face_bounds[1];
+    target_face_pts2d = $ps_face_pts2d;
+    target_source_edge_idx = $ps_face_boundary_seg_source_edge_idx;
+    target_inv = _ps_proxy_frame_inverse_matrix(
+        $ps_edge_center_world,
+        $ps_edge_ex_world,
+        $ps_edge_ey_world,
+        $ps_edge_ez_world
+    );
+    lobes = _ps_proxy_target_edge_lobe_recs(target_face_pts2d, target_source_edge_idx, source_edge_indices, exclude_seg_idx, eps);
+
+    for (li = [0 : 1 : len(lobes) - 1])
+        if (is_undef(lobe_indices) || _ps_list_contains(lobe_indices, li))
+            intersection() {
+                multmatrix(target_inv)
+                    ps_face_crossing_lobe_body_ctx(lobes[li][0], lobes[li][1], z0, z1, eps);
+
+                ps_clip_local_boundary_edge_by_own_interference_ctx(
+                    edge_radius,
+                    edge_length,
+                    face_bounds,
+                    eps
+                )
+                    children();
+            }
+}
+
+module _ps_proxy_emit_crossing_local_boundary_lobe_bodies_raw_in_current_edge_frame(face_bounds, source_edge_indices, lobe_indices, exclude_seg_idx, eps = 1e-8) {
+    z0 = face_bounds[0];
+    z1 = face_bounds[1];
+    target_face_pts2d = $ps_face_pts2d;
+    target_source_edge_idx = $ps_face_boundary_seg_source_edge_idx;
+    target_inv = _ps_proxy_frame_inverse_matrix(
+        $ps_edge_center_world,
+        $ps_edge_ex_world,
+        $ps_edge_ey_world,
+        $ps_edge_ez_world
+    );
+    lobes = _ps_proxy_target_edge_lobe_recs(target_face_pts2d, target_source_edge_idx, source_edge_indices, exclude_seg_idx, eps);
+
+    multmatrix(target_inv)
+        for (li = [0 : 1 : len(lobes) - 1])
+            if (is_undef(lobe_indices) || _ps_list_contains(lobe_indices, li))
+                ps_face_crossing_lobe_body_ctx(lobes[li][0], lobes[li][1], z0, z1, eps);
+}
+
+module ps_clip_local_boundary_edge_by_crossing_edges_ctx(edge_radius, edge_length, face_bounds, source_edge_indices = undef, lobe_indices = undef, eps = 1e-8) {
+    assert(!is_undef($ps_face_boundary_seg_idx), "ps_clip_local_boundary_edge_by_crossing_edges_ctx must be used inside place_on_face_filled_boundary_source_edges(...)");
+    assert(!is_undef($ps_edge_center_world), "ps_clip_local_boundary_edge_by_crossing_edges_ctx must be used inside place_on_face_filled_boundary_source_edges(...)");
+
+    difference() {
+        ps_clip_local_boundary_edge_by_own_interference_ctx(
+            edge_radius,
+            edge_length,
+            face_bounds,
+            eps
+        )
+            children();
+
+        _ps_proxy_emit_crossing_local_boundary_lobe_bodies_in_current_edge_frame(
+            face_bounds,
+            edge_radius,
+            edge_length,
+            source_edge_indices,
+            lobe_indices,
+            $ps_face_boundary_seg_source_edge_idx,
+            eps
+        )
+            children();
+    }
+}
+
+module _ps_proxy_place_local_boundary_edges_in_target_face(edge_radius, edge_length, source_edge_indices, face_bounds, eps = 1e-8) {
+    place_on_face_filled_boundary_source_edges(source_edge_indices = source_edge_indices, eps = eps)
+        ps_clip_local_boundary_edge_by_crossing_edges_ctx(
+            edge_radius,
+            edge_length,
+            face_bounds,
+            source_edge_indices,
+            undef,
+            eps
+        )
             children();
 }
 
@@ -792,6 +1055,7 @@ module ps_clip_face_local_clearance_by_feature_proxies_ctx(
                     edge_radius,
                     edge_length,
                     resolved_local_edge_indices,
+                    face_bounds,
                     eps
                 )
                     children(0);

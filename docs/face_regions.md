@@ -174,7 +174,8 @@ half-space intersection.
 Current proxy-interference status:
 
 - the face-side interference volume is now working in the dedicated
-  `test_interference.scad` probe and is wired into the proxy face branch
+  `examples/experiments/face-interference/test_interference.scad` probe and is
+  wired into the proxy face branch
 - the remaining unresolved issue is the edge-side interior-corner cleanup
   ("armpit hair")
 - that remaining problem should now be treated as an arrangement/cell-clipping
@@ -183,14 +184,25 @@ Current proxy-interference status:
 In particular, the next edge-side model should be:
 
 - start from the default dihedral-centered edge cutter `E0`
-- clip it to the owning filled face cell, or equivalently subtract the crossing
-  filled face cells inside the active slab
+- subtract the crossing face material that actually punches through that cutter
 
-So the intended first execution form is:
+The important refinement is that the subtraction unit is not "one body per
+crossing source edge". For self-intersecting/star faces it should be one
+**crossing lobe / span** on the target edge:
 
-- `E(i,b) = E0(i,b) ∩ owner_cell_prism(i,b)`
+- find the strict crossings of the target source edge
+- sort them by `t` along the target edge
+- pair consecutive crossings into occupied spans
+- build a bounded lobe polygon per span from:
+  - the target-edge segment between those crossing points
+  - the boundary path between the paired crossing edges
+  - an optional fake closing edge
+- extrude that lobe over the face slab
+- apply phase-1 interference only on the real boundary edges of that lobe
+- subtract the union of those lobe bodies from `E0`
 
-rather than inventing a special hand-tapered cutter end.
+That lobe/span model is now the preferred next step, rather than inventing a
+special hand-tapered cutter end.
 
 Important failure notes to remember if revisiting older shield ideas:
 
@@ -199,8 +211,10 @@ Important failure notes to remember if revisiting older shield ideas:
 - broadening each convex atom to use all parent-cell boundary cutters
   over-constrains the star and collapses it again
 - the remaining seam artifacts are not primarily an `eps` problem; they come
-  from how the cutter shape ignores the true filled-cell ownership at
+  from how the cutter shape ignores the true bounded crossing span at
   re-entrant corners
+- a per-crossing-edge phase-2 subtraction is too coarse a semantic unit; the
+  correct removal is organized by paired crossings / lobes along the target edge
 
 ## What Ended Up Working
 

@@ -193,20 +193,27 @@ This repo is OpenSCAD-first; there is no separate build system.
 - First landed cell-builder on that proxy baseline: `ps_partition_face_by_feature_proxies(...)` / `_ctx(...)` in `core/proxy_interaction.scad` recursively partition the target face proxy by the actual proxy cutters and emit the resulting cells as separate solids. Keep cutter counts explicit and small (`face_indices`, `edge_indices`, `vertex_indices`, `max_cutters`) because the split is exponential in the number of cutters.
 - First landed composed fabrication helper on that same baseline: `ps_carve_face_by_feature_proxies(...)` clips face occupancy and local clearance separately by the same foreign occupancy cutters, then subtracts the clipped local clearance from the clipped face occupancy. Keep lower-level `clip`/`cells` helpers as internal debugging aids only; the example path should use the composed carve.
 - The local-clearance branch in `core/proxy_interaction.scad` should now place edge clearance on `place_on_face_filled_boundary_edges(...)`, not on the original face-walk edges. That keeps star/self-crossing face seating aligned to the true filled perimeter.
-- Face-side anti-interference is now in better shape than the first shield experiments: the dedicated `test_interference.scad` probe is the reference surface, and the face branch in `core/proxy_interaction.scad` is now using that interference volume. The unresolved part is the edge-side interior-corner cleanup ("armpit hair"), not the face-side bevel direction.
+- Face-side and edge-side interference probes now live under `src/polysymmetrica/examples/experiments/face-interference/`, not `examples/printing/`. The dedicated `test_interference.scad` probe there is still the reference surface for face-side interference, and the face branch in `core/proxy_interaction.scad` is now using that interference volume. The unresolved part is the edge-side interior-corner cleanup ("armpit hair"), not the face-side bevel direction.
 - Current edge-interference principle: the correct edge cutter is **not** an ad hoc tapered block. It should come from the same face-cell logic as later cell-removal work. In compact form:
   - `E(i,b) = E0(i,b) - X(i,b)`
   - where `E0` is the simple default cutter for boundary segment `b`
-  - and `X` is the union of the other filled face cells crossing that cutter
-  For execution, the simpler first form is:
-  - `E(i,b) = E0(i,b) ∩ owner_cell_prism(i,b)`
-  - where `owner_cell_prism` is the slab extrusion of the filled cell that owns boundary segment `b`
+  - and `X` is the union of the bounded crossing **lobes/spans** that punch through that cutter
+  The current intended execution form is no longer "one body per crossing source edge". Instead:
+  - find the strict crossings of the target source edge
+  - sort them by `t` along the target edge
+  - pair consecutive crossings into occupied spans
+  - build a bounded lobe body for each span from the target-edge segment plus the boundary path between the paired crossing edges (with a fake closing edge if needed)
+  - extrude that lobe over the face slab
+  - apply phase-1 interference only to the real boundary edges of that lobe
+  - subtract the union of those lobe bodies from `E0`
   This is the next intended fix for the remaining interior-corner artifacts.
 - Important failure notes from the interference passes:
   - a single global boundary-half-space shield on a star/heptagram collapses it to its convex kernel
   - giving every atom all parent-cell boundary cutters also over-constrains the star and collapses it again
   - atom-local cutters preserve the arms and the correct bevel direction, but still leave the interior-corner seam artifacts
+  - treating one phase-1 body per crossing source edge as the phase-2 subtraction unit is also wrong; it is too broad in some cases and too narrow in others
   - the hard problem was not `eps`; it was assigning the right nonconvex boundary constraints without reintroducing kernel collapse
+  - keep source-edge / face-walk numbering explicit when debugging star polygons; it is easy to compare the right geometry under the wrong numbering scheme
 - Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
 - Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
 

@@ -1,13 +1,17 @@
-use <../../core/funcs.scad>
-use <../../core/placement.scad>
-use <../../core/duals.scad>
-use <../../core/truncation.scad>
-use <../../core/render.scad>
-use <../../core/classify.scad>
-use <../../core/prisms.scad>
-use <../../core/construction.scad>
-use <../../core/segments.scad>
-use <../../core/face_regions.scad>
+// Ad hoc sandbox for broad face-interference and segmentation experiments.
+// This is not the primary probe surface; use it for one-off manual experiments when the
+// focused probes are too narrow.
+
+use <../../../core/funcs.scad>
+use <../../../core/placement.scad>
+use <../../../core/duals.scad>
+use <../../../core/truncation.scad>
+use <../../../core/render.scad>
+use <../../../core/classify.scad>
+use <../../../core/prisms.scad>
+use <../../../core/construction.scad>
+use <../../../core/segments.scad>
+use <../../../core/face_regions.scad>
 
 use <../../models/platonics_all.scad>
 use <../../models/archimedians_all.scad>

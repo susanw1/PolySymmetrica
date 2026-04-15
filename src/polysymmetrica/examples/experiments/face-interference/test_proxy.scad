@@ -1,34 +1,30 @@
-use <../../core/prisms.scad>
-use <../../core/funcs.scad>
-use <../../core/proxy_interaction.scad>
-use <../../core/segments.scad>
+// Live integration probe for the proxy carve path.
+// Use this to check the composed result from face occupancy, foreign face cutters, and local
+// edge-clearance once the lower-level interference probes look correct.
+
+use <../../../core/prisms.scad>
+use <../../../core/funcs.scad>
+use <../../../core/proxy_interaction.scad>
+use <../../../core/segments.scad>
 
 SC = 1;
 IR = 20 * SC;
 
 p = poly_antiprism(n = 7, p = 3, angle = 15);
 
-// Keep the default view to one ordinary face. Add face 0 back when testing
-// star-face punch-throughs, but do not make that the default baseline.
-SHOW_FACES = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+// Probe one or more target faces.
+SHOW_FACES = [0]; //[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 
-// Default to one known intersecting face so the carved result is visually
-// obvious. `undef` means "all other faces".
+// Foreign face cutters. `undef` means "all other faces".
 CUTTER_FACE_INDICES = [];
 faces = poly_faces(p);
 edges = _ps_edges_from_faces(faces);
-CUTTER_VERTEX_INDICES = [];
 
-// There are two distinct concepts here:
-// - local edge-seat clearance, aligned to the target face boundary
-// - foreign penetrating occupancy from other faces/edges/vertices
-//
-// This example shows the composed proxy carve path:
-// face occupancy clipped by foreign occupancy, minus local clearance.
-SHOW_CUTTER_FACES = false;
-SHOW_LOCAL_EDGE_CLEARANCE = true;
-SHOW_CUTTER_VERTICES = false;
-SHOW_CARVED_RESULT = true;
+// Main toggles:
+// - SHOW_FOREIGN_FACE_CUTTERS: include foreign face occupancy cutters
+// - SHOW_EDGE_CLEARANCE: include the local edge-seat clearance path
+SHOW_FOREIGN_FACE_CUTTERS = false;
+SHOW_EDGE_CLEARANCE = true;
 
 function target_boundary_edge_indices(face_idx) =
     let(target_face = faces[face_idx])
@@ -39,7 +35,7 @@ function target_boundary_edge_indices(face_idx) =
 
 EDGE_T = 3.5 * SC;
 FACE_T = 1.6 * SC;
-BASE_Z = -FACE_T / 4;
+BASE_Z = -FACE_T / 4 - 1;
 PILLOW_THK = 0.4 * SC;
 VERTEX_PROXY_R = 2.2 * SC;
 EDGE_STRIP_W = 1.2 * SC;
@@ -62,7 +58,10 @@ module face_proxy() {
 }
 
 module edge_proxy_strip() {
-    #cube([$ps_edge_len, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
+    y_shift = $ps_face_boundary_seg_inward_is_positive_ey ? EDGE_STRIP_W / 2 : -EDGE_STRIP_W / 2;
+
+    translate([0, y_shift, 0])
+        #cube([$ps_edge_len, EDGE_STRIP_W, EDGE_STRIP_H], center = true);
 }
 
 module vertex_proxy() {
@@ -81,14 +80,14 @@ for (i = [0 : 1 : len(SHOW_FACES) - 1]) {
             edge_radius = EDGE_T / 2,
             edge_length = EDGE_INFLUENCE_LEN,
             vertex_radius = VERTEX_PROXY_R,
-            include_local_edges = SHOW_LOCAL_EDGE_CLEARANCE,
+            include_local_edges = SHOW_EDGE_CLEARANCE,
             include_local_vertices = false,
-            include_cutter_faces = SHOW_CUTTER_FACES,
+            include_cutter_faces = SHOW_FOREIGN_FACE_CUTTERS,
             include_cutter_edges = false,
-            include_cutter_vertices = SHOW_CUTTER_VERTICES,
+            include_cutter_vertices = false,
             cutter_face_indices = CUTTER_FACE_INDICES,
             cutter_edge_indices = [],
-            cutter_vertex_indices = CUTTER_VERTEX_INDICES,
+            cutter_vertex_indices = [],
             local_edge_indices = target_boundary_edge_indices(fi),
             local_vertex_indices = []
         ) {
