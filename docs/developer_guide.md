@@ -105,6 +105,7 @@ Related deep-dive notes:
 - [Params overrides](params_overrides.md)
 - [Face attachment](attach.md)
 - [Construction helpers](construction.md)
+- [Iterator APIs](iterators.md)
 - [Face segmentation](segments.md)
 - [Face region volumes](face_regions.md)
 

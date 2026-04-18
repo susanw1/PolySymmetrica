@@ -31,12 +31,16 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Files: lower snake case (e.g., `placement.scad`, `test_duals.scad`).
 - Poly descriptor shape is `[verts, faces, e_over_ir]`; use the accessor helpers in `core/funcs.scad`.
 - Preserve `$ps_*` variable naming conventions for placement metadata (see `docs/developer_guide.md`).
+- For new local helpers, add short API-style comments with `Function:`/`Module:`, `Params:`, `Returns:`, and an optional `Limitations/Gotchas:` section when there is a real sharp edge or non-obvious constraint worth calling out.
+- Prefer named colors in examples/probes/debug surfaces unless an exact numeric palette is genuinely needed; named colors are easier to read and discuss.
+- Prefer small modules and push reusable logic into pure functions where possible; keep modules as thin rendering/placement/CSG wrappers rather than the primary home of business logic.
 
 ## Testing Guidelines
 - Tests are plain OpenSCAD modules that call `assert(...)` in `src/tests/core/`.
 - Add new test modules with a `test_*` prefix and register them in `src/tests/run_all.scad`.
 - Keep numeric tolerances explicit (see `EPS` in `TestFuncs.scad`).
 - Do not rely on `poly_valid(...)` alone for transform correctness; add operation-specific tests (counts, adjacency, family behavior) for new geometry operators.
+- When choosing where logic should live, bias toward functions over modules if that makes the result directly unit-testable; use modules mainly for side-effectful geometry emission and placement contexts.
 
 ## Scaling & Dual Alignment Notes
 - Dual overlays are sensitive to which geometric feature you choose to align (edge midpoints vs face families).
@@ -116,121 +120,28 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
   - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
-## Session Notes (Face Region Volumes)
-- `src/polysymmetrica/core/face_regions.scad` is the new home for local face-region and segmentation volume helpers.
-- These helpers are intentionally face-local: they depend on face geometry, cut geometry, and dihedral/2 rules, not on any global polyhedral centre convention.
-- Keep `examples/printing/face_plate.scad` thin. If segmented-face or printable join geometry needs more machinery, move that machinery into `core/face_regions.scad`, not back into the example.
-- Helper tests now live in `src/tests/core/TestFaceRegions.scad`, not under `src/tests/examples/`.
-- Generic child-clipping wrappers now live there too:
-  - `ps_clip_to_face_region(_ctx)`
-  - `ps_clip_to_visible_face_cell_ctx(...)`
-  - `ps_clip_to_visible_face_segments_ctx(...)`
-- `core/face_regions.scad` now owns the real segmented-face geometry story. `segments.scad` finds visible cells and cut provenance; `face_regions.scad` turns that into admissible 3D regions.
-- The supported contract is: derive keep regions from the underlying polyhedron alone, then clip arbitrary child geometry to them. Do not try to infer a perfect result recursively from already-decorated neighboring faces.
-- `examples/printing/face_plate.scad` should stay a thin consumer of those core regions. Avoid reintroducing segmentation or join solving into the example layer.
-- For segmented visible cells, the important model is direct region construction from **all** side constraints together, not "keep prism minus a union of independent cut bands". This matters when multiple cut edges meet at one corner, for example where a true edge punches through another face.
-- Parent edges use the ordinary face dihedral/2 rule. Cut edges use cutter-derived join geometry from the matched cut entries and cutter face normals.
-- `face_plate_visible(..., seg_apply_cut_bands=true)` now selects the direct visible-cell region path. `seg_along_pad` and the old subtraction-band tuning were removed as dead baggage.
-- Consumer rule: pass the full intended segmentation join clearance into the core region path. Do not halve `edge_inset` before passing it in.
-- The exact 2D clipped loop helper (`ps_face_visible_cell_loop_at_z_clipped(...)`) is now trusted as cross-section truth for bad punch-through cases such as `poly_antiprism(7,3, angle=15)` `f2/c0`.
-- Important lesson: a visible cell may still be nonconvex. In that case the clipped half-plane loop is the convex kernel of the cell, not the whole visible region. Do not replace a nonconvex live cell loop with the clipped loop directly.
-- The current live fix is: decompose nonconvex visible cells into convex atoms in `face_regions.scad`, build one atom region per convex atom, then union them.
-- Important refinement: a convex atom created by triangulating a nonconvex cell is not automatically a valid half-plane-bounded region for clipped-loop lofting. If an atom contains any triangulation `"inner"` edge, the clipped-loop path can blow up far beyond the true atom footprint. For now, only atoms bounded entirely by real cell edges may use clipped-loop lofting; inner-edge atoms must stay on the adjacent-line path.
-- Do not switch live geometry over just because the clipped top loop looks right. The acceptance rule for future exact-region work is stricter: an exact convex-atom region model must reproduce the accepted local cross-sections across the actual occupied `z` span before the live region builder is replaced.
-- The raw exact 3D CSG probe/debug path was removed as a dead end. Keep the useful diagnostics only:
-  - face/cell/cut labels
-  - orange-vs-cyan loop comparison
-  - plane-derived 2D cross-section checks
-- For the canonical troublesome `poly_antiprism(7,3, angle=15)` join, the matched cut pair `f2/c0/e1/c1/f5` and `f5/c1/e1/c0/f2` already agree numerically:
-  - `cut_dihed ~= 94.2341`
-  - `join_dihed ~= 265.7659`
-  - identical profile over the face slab span `[[0.55, -0.4], [2.03592, 1.2]]`
-  So if that join still looks wrong, the bug is in whole-cell region construction, not in the per-edge dihedral math.
+## Session Notes (Face Regions, Segmentation, and Interference)
+- `segments.scad` is the analysis layer: crossings, arrangement cells, visible segments, provenance ids.
+- `face_regions.scad` is the region/interference layer: admissible 3D regions and face-local interference bodies built from that analysis.
+- Keep example surfaces thin. `face_plate.scad` should stay a consumer of the core region model; face-interference probes now live under `src/polysymmetrica/examples/experiments/face-interference/`.
+- Treat these helpers as **face-local**. They depend on face geometry, cutter geometry, and dihedral rules, not on any global poly-centre convention.
+- For self-intersecting/star faces, work from the **filled arrangement** and the **true filled boundary**, not from the raw self-crossing walk.
+- Nonconvex visible cells/filled regions may need convex atoms; clipped-loop or half-plane constructions are only safe when the atom/cell assumptions actually hold.
+- The intended default fill rule for self-intersecting face work is `"nonzero"`. Thread the same fill mode consistently through segmentation and cutter logic.
+- Merge same-face cut fragments only by connected collinear intervals. Do not bridge disjoint spans across empty gaps.
+- Keep examples/docs pointing at the right layer:
+  - `docs/segments.md` for split-cell / cut-line analysis
+  - `docs/face_regions.md` for 3D clipping/region semantics
+  - `docs/segment_plan.md` for current interference/segmentation plan detail
 
-## Session Notes (Printing Segmentation Metadata)
-- `face_plate_visible(...)` uses `ps_clip_to_visible_face_segments_ctx(...)` as its segmented path and should remain a thin consumer of the core region model.
-- `ps_face_visible_segments(...)` now returns `cell_cut_entry_ids` as a fifth parallel vector alongside `cell_edge_kinds`. Values are `undef` for parent edges and stable indices into `ps_face_geom_cut_entries(...)` for cut edges.
-- `place_on_face_visible_segments(...)` exposes the same data as `$ps_vis_seg_cut_entry_ids`; `place_on_face_segments(...)` exposes `$ps_seg_cut_entry_ids`.
-- `cut_entry_id` is face-local; use it to index back into `ps_face_geom_cut_entries(...)`.
-- `cut_pair_id` is the world-stable join id for the same geometric cut seen from two faces. It is derived from the two face ids plus a quantized world-space line signature (anchor point + direction), and is exposed as `$ps_vis_seg_cut_pair_ids` when `place_on_faces(...)` world-frame context is available.
-- `cut_run_id` is local to one visible-cell boundary and groups one continuous cutter contribution. Use it to distinguish split cut spans when the same cutter re-enters the same visible cell in multiple disjoint runs.
-- Core region semantics: `z0`/`z1` are only admissible-region bounds. Parent/cut side faces should be full-depth planes across that span. If a cut span is finite, the principled fix is full-depth run-end planes, not top-only notches or cap-specific heuristics.
-- Related rule: the target model is that the live cut-edge path should use the full active `z0..z1` span for side-plane construction. Treat any internal `band_z0` / `band_z1` as suspect legacy/debug plumbing rather than a real top/bottom distinction in core geometry. A direct swap to full-span live construction was attempted and backed out because it caused broader region-builder regressions.
-- `ps_face_visible_cell_cut_run_end_entries(...)` is the first principled helper for finite split cut spans. Keep it as analysis/debug metadata until a full-depth run-end-plane live path is ready; do not reintroduce heuristic top-only endpoint notches.
-- Keep `_ps_fr_atom_is_enabled(...)` minimal and justified: all-inner atoms stay off, explicit debug skip lists are honored, but avoid heuristic atom-role suppressions in the live path unless they have a general geometric proof.
-- The key rule for future cut-edge relief work is: use these propagated cut-entry ids, not fuzzy segment-equality matching, when tying visible-cell edges back to cutter geometry.
-- A plausible future fabrication path is **proxy interaction**: keep the analytic layer for visibility/provenance, but let user-supplied raw face/edge/vertex proxy solids drive interference subtraction with ordinary CSG. If pursued, proxies must be raw proposals only, bounded by explicit local influence extents, and must not recurse on already-clipped neighbors.
-- For face-face interference in that proxy path, a useful early mode is `face_proxy_mode="sweep_to_bounds"`: project the neighboring face proxy to its local XY footprint and extrude it through `face_bounds` to form a bounded subtractor volume.
-- Signature sketches for that proxy path live in `src/polysymmetrica/core/proxy_interaction.scad`; keep that file at the API-contract level until there is a clear first implementation.
-- Proxy interaction needs a hard semantic split:
-  - **occupancy proxies** describe material that really exists and should cut foreign intersecting polys
-  - **clearance proxies** describe intentional fit/seat/tolerance gaps and should stay separate by default
-- Do not reuse local face/edge seating clearance as the foreign inter-poly cutter. Inter-poly subtraction should be driven by foreign occupancy, with any desired extra fit gap represented explicitly as a separate clearance/dilation step.
-- Proxy fabrication should now be framed as:
-  - `face_shielded(i) = F_raw(i) ∩ Z(i) ∩ ⋂ B(i,e)` using one adjacent-edge bisector half-space per edge
-  - `V(i) = ⋃ Occ(x)` over non-adjacent intersecting features only
-  - `face_final(i) = face_shielded(i) - V(i) - C_local(i)`
-- Adjacent faces should not be treated as foreign cutters once those bisector shields are active; their anti-interference role is already handled by the shield planes.
-- Local edge-clearance strips still belong on the simple indexed `place_on_edges(...)` path in dihedral-centered frames. Do not reshape them with extra corridor/span clipping unless a concrete need survives review.
-- For self-intersecting/star faces, do not apply those shields to the original self-crossing walk directly. First split at self-intersections, create pseudo-vertices, classify the filled arrangement, keep only the true filled-boundary subsegments, then apply shielding/clearance from those boundary subsegments.
-- In other words: the next principled proxy step is face-local arrangement/boundary extraction for nonconvex/self-crossing faces, not more cutter/clearance tuning.
-- First landed Phase-1 helper surface in `segments.scad`:
-  - `ps_face_filled_cells(...)` for the non-zero filled arrangement cells
-  - `ps_face_filled_boundary_segments(...)` for the true filled-boundary subsegments with inherited source-edge ids/params
-  - `place_on_face_filled_boundary_segments(...)` for stable local placement on those true filled-boundary subsegments, with source-edge metadata and dihedral exposed as `$ps_*` vars
-  - `place_on_face_filled_boundary_edges(...)` for dihedral-centered edge-style placement on those same true filled-boundary subsegments
-- First landed Phase-2 helper surface in `segments.scad`:
-  - `ps_face_filled_atoms(...)` for conservative convex atomization of the filled arrangement, with atom edges marked as `"boundary"` or `"inner"`
-- Preferred proxy execution order is now:
-  1. face-local arrangement extraction
-  2. convex atomization of the filled face region
-  3. shielded-face construction from true boundary subsegments
-  4. non-adjacent `ps_intersections(...)` hit-list generation
-  5. foreign occupied-volume builder
-  6. final `face_shielded - foreign_occ - local_clearance` carve
-  7. only then frame integration and later analytic run-end relief
-- One concrete trap already found: do not pass a short `edge_length` influence clip (for example `IR`) into edge proxy subtraction unless you really intend to truncate the strip along its own `x` axis. That was the cause of the “middle part of the edge works, ends missing” regression.
-- First landed cell-builder on that proxy baseline: `ps_partition_face_by_feature_proxies(...)` / `_ctx(...)` in `core/proxy_interaction.scad` recursively partition the target face proxy by the actual proxy cutters and emit the resulting cells as separate solids. Keep cutter counts explicit and small (`face_indices`, `edge_indices`, `vertex_indices`, `max_cutters`) because the split is exponential in the number of cutters.
-- First landed composed fabrication helper on that same baseline: `ps_carve_face_by_feature_proxies(...)` clips face occupancy and local clearance separately by the same foreign occupancy cutters, then subtracts the clipped local clearance from the clipped face occupancy. Keep lower-level `clip`/`cells` helpers as internal debugging aids only; the example path should use the composed carve.
-- The local-clearance branch in `core/proxy_interaction.scad` should now place edge clearance on `place_on_face_filled_boundary_edges(...)`, not on the original face-walk edges. That keeps star/self-crossing face seating aligned to the true filled perimeter.
-- Face-side and edge-side interference probes now live under `src/polysymmetrica/examples/experiments/face-interference/`, not `examples/printing/`. The dedicated `test_interference.scad` probe there is still the reference surface for face-side interference, and the face branch in `core/proxy_interaction.scad` is now using that interference volume. The unresolved part is the edge-side interior-corner cleanup ("armpit hair"), not the face-side bevel direction.
-- Current edge-interference principle: the correct edge cutter is **not** an ad hoc tapered block. It should come from the same face-cell logic as later cell-removal work. In compact form:
-  - `E(i,b) = E0(i,b) - X(i,b)`
-  - where `E0` is the simple default cutter for boundary segment `b`
-  - and `X` is the union of the bounded crossing **lobes/spans** that punch through that cutter
-  The current intended execution form is no longer "one body per crossing source edge". Instead:
-  - find the strict crossings of the target source edge
-  - sort them by `t` along the target edge
-  - pair consecutive crossings into occupied spans
-  - build a bounded lobe body for each span from the target-edge segment plus the boundary path between the paired crossing edges (with a fake closing edge if needed)
-  - extrude that lobe over the face slab
-  - apply phase-1 interference only to the real boundary edges of that lobe
-  - subtract the union of those lobe bodies from `E0`
-  This is the next intended fix for the remaining interior-corner artifacts.
-- Important failure notes from the interference passes:
-  - a single global boundary-half-space shield on a star/heptagram collapses it to its convex kernel
-  - giving every atom all parent-cell boundary cutters also over-constrains the star and collapses it again
-  - atom-local cutters preserve the arms and the correct bevel direction, but still leave the interior-corner seam artifacts
-  - treating one phase-1 body per crossing source edge as the phase-2 subtraction unit is also wrong; it is too broad in some cases and too narrow in others
-  - the hard problem was not `eps`; it was assigning the right nonconvex boundary constraints without reintroducing kernel collapse
-  - keep source-edge / face-walk numbering explicit when debugging star polygons; it is easy to compare the right geometry under the wrong numbering scheme
-- Pure cut-edge cross-section helpers for printing live in `examples/printing/face_plate.scad` for now (`ps_face_cut_join_dihed`, `ps_face_cut_relief_u_at_z`, `ps_face_cut_relief_profile2d`); their tests live under `src/tests/examples/`, not `src/tests/core/`.
-- Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in `face_plate.scad`.
-
-## Session Notes (Printing Segmentation)
-- The generic segmented path now builds visible-cell regions directly from all edge side lines together. This is the right abstraction for punch-through cases and future stellation-style intersections.
-
-## Session Notes (Printing Face Segmentation)
-- `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
-- `examples/printing/face_plate.scad`: keep segmentation join clearance separate from ordinary outer-edge inset. `face_plate_visible(..., seg_cut_clearance=...)` controls the cut-edge gap; it defaults to `edge_inset` only for backward-compatible behavior.
-- `core/face_regions.scad`: avoid reintroducing alternate cut-band/subtraction APIs unless they have a real consumer. The main segmented path should stay the direct visible-cell region build.
-- `core/segments.scad`: `nonzero` is now the intended default for `ps_face_segments(...)` / `place_on_face_segments(...)`; keep `evenodd` as an explicit/debug option rather than the normal user path.
-- Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
-- Same-face cut fragments must merge by connected collinear intervals only. Do not collapse all fragments from one cutter face to the farthest pair, or disjoint spans get bridged across empty gaps.
-- Docs split: `docs/segments.md` explains split-cell / cut-line analysis and iteration; `docs/face_regions.md` explains the 3D clipping/volume layer that consumes that data. Keep examples and docs pointing users at the right layer instead of re-explaining segmentation inside `face_plate`-style consumers.
-- `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
-- `ps_face_visible_segments(...)` should only collapse back to the unsplit parent polygon when **all** split cells are visible. If a cut leaves multiple visible survivors, keep them all as separate cells.
-- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata from the region model. Avoid solving segmented joins in the example layer.
+## Session Notes (Proxy Interaction)
+- `core/proxy_interaction.scad` should keep a hard split between **occupancy** and **clearance**. Do not reuse local seating clearance as the foreign cutter.
+- Adjacent faces belong in the anti-interference/shield model, not in the foreign-cutter set.
+- Local edge-clearance strips belong on indexed edge placement in dihedral-centered frames unless a stronger geometric reason survives review.
+- For self-intersecting faces, any proxy/interference path should build on face-local arrangement/boundary extraction first, not on the original self-crossing face walk.
+- Do not pass a short `edge_length` influence clip (for example `IR`) into edge subtraction unless you really intend to truncate the strip along its own `x` axis.
+- The current high-level edge-interference idea is durable: the edge cutter should be trimmed by the filled face material that punches through it, not by ad hoc tapered end geometry. Detailed lobe/span execution belongs in `docs/segment_plan.md`.
+- Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in the example layer.
 
 ## Session Notes (Construction Toolkit)
 - Johnson-style construction should build on explicit topology tools first: delete faces, recover boundary loops, then cap them. Keep “repair” semantics visible instead of burying them in magical element-deletion helpers.
@@ -264,6 +175,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Remove clearly unused locals/helpers/wrappers only when references are zero.
 - Prefer shared helpers in `funcs.scad` over duplicate per-file utilities.
 - Keep comments/docs aligned with actual behavior and parameter semantics.
+- Keep `AGENTS.md` focused on guiding principles and durable top-level concepts; move detailed plans, execution history, and low-level next-step notes into `docs/*.md`.
 - Run full tests and verify PASS:
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - Ensure scratch/probe files are in `/tmp`, not in repo tree.

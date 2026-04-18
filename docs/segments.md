@@ -75,6 +75,69 @@ Where:
 
 For ordinary unsplit faces, this usually returns one cell.
 
+### `ps_face_filled_cells(face_pts3d_local, eps=1e-8)`
+
+Semantic wrapper for the normal filled face arrangement under the `nonzero`
+fill rule.
+
+This is the usual starting point for true filled-boundary and atom analysis.
+
+### `ps_face_filled_boundary_segments(face_pts3d_local, eps=1e-8)`
+
+Extracts the true filled-boundary subsegments of a possibly self-intersecting
+face.
+
+Returns:
+
+```scad
+[
+    [seg2d, source_edge_idx, source_t0, source_t1, filled_cell_idx],
+    ...
+]
+```
+
+Where:
+
+- `seg2d`
+  one true boundary subsegment in face-local 2D
+- `source_edge_idx`
+  the original face-walk edge this subsegment came from
+- `source_t0`, `source_t1`
+  parameters along that original source edge
+- `filled_cell_idx`
+  the filled cell that contributed this boundary edge
+
+Shared edges between two filled cells are internal and are filtered out here.
+
+### `ps_face_filled_boundary_source_edges(face_pts3d_local, eps=1e-8)`
+
+Groups the true filled-boundary subsegments back onto their original face-walk
+source edges.
+
+Returns:
+
+```scad
+[
+    [seg2d, source_edge_idx, spans, inward_sign],
+    ...
+]
+```
+
+Where:
+
+- `seg2d`
+  the full original source edge in face-local 2D
+- `source_edge_idx`
+  the original face-walk edge index
+- `spans`
+  `[[source_t0, source_t1, filled_cell_idx], ...]` for the true filled spans
+  that survive on that source edge
+- `inward_sign`
+  the agreed filled-side sign for that source edge in its local 2D frame
+
+This is the canonical data API behind
+`place_on_face_filled_boundary_source_edges(...)`.
+
 ### `place_on_face_segments(mode="nonzero", eps=1e-8)`
 
 Iterator wrapper over `ps_face_segments(...)` for use inside `place_on_faces(...)`.
@@ -89,6 +152,28 @@ Provides:
 - `$ps_seg_edge_ids`
 - `$ps_seg_edge_kinds`
 - `$ps_seg_cut_entry_ids`
+
+### `place_on_face_filled_boundary_segments(eps=1e-8)`
+
+Iterator wrapper over `ps_face_filled_boundary_segments(...)`.
+
+This is the true filled-boundary traversal surface for star/self-crossing faces.
+Use it when you want one record per actual surviving boundary subsegment.
+
+### `place_on_face_filled_boundary_source_edges(source_edge_indices=undef, eps=1e-8)`
+
+Iterator wrapper over `ps_face_filled_boundary_source_edges(...)`.
+
+This is the preferred iterator when you want:
+
+- one record per original source edge
+- access to the surviving filled boundary spans on that source edge
+- a dihedral-centered edge-style frame without artificial subsegment end caps
+
+Provides the usual boundary-edge context plus:
+
+- `$ps_face_boundary_source_spans`
+- `$ps_face_boundary_source_span_count`
 
 ### `ps_polygon(points, mode="nonzero", eps=1e-8)`
 
