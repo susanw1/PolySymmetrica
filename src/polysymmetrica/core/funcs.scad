@@ -4,20 +4,55 @@
 // Copyright 2025 Susan Witts
 // SPDX-License-Identifier: MIT
 
+// Shared-helper quick index. Prefer reusing these before adding new local copies:
+// - Poly descriptors: poly_verts, poly_faces, poly_e_over_ir, poly_edges, make_poly
+// - Basic validation: ps_faces_valid, ps_indices_in_range
+// - Vector math: v_*, ps_rot_axis
+// - Face/edge topology: ps_find_edge_index, ps_edge_faces_table, ps_face_has_edge, faces_around_vertex
+// - Face geometry/frames: ps_face_centroid, ps_face_normal, ps_face_frame_normal, poly_face_center/ex/ey/ez
+// - Orientation: poly_fix_winding, ps_orient_face_outward, ps_orient_all_faces_outward
 
 ///////////////////////////////////////
 // ---- Poly descriptor API ----
+/**
+ * Function: Return the vertex list from a poly descriptor.
+ * Params: poly ([verts, faces, e_over_ir] descriptor).
+ * Returns: `poly[0]`.
+ */
 function poly_verts(poly)      = poly[0];
+/**
+ * Function: Return the face list from a poly descriptor.
+ * Params: poly ([verts, faces, e_over_ir] descriptor).
+ * Returns: `poly[1]`.
+ */
 function poly_faces(poly)      = poly[1];
+/**
+ * Function: Return the stored edge-to-inter-radius scale from a poly descriptor.
+ * Params: poly ([verts, faces, e_over_ir] descriptor).
+ * Returns: `poly[2]`.
+ */
 function poly_e_over_ir(poly)  = poly[2];
-// Derive edge list from a poly's faces.
-// Derived, O(F); prefer _ps_edges_from_faces(faces) when faces already available.
+/**
+ * Function: Derive the unique undirected edge list for a poly descriptor.
+ * Params: poly ([verts, faces, e_over_ir] descriptor).
+ * Returns: Canonical undirected edges `[[a, b] ...]`.
+ * Limitations: Derived from faces each time; prefer `_ps_edges_from_faces(faces)` when faces are already available.
+ */
 function poly_edges(poly)      = _ps_edges_from_faces(poly_faces(poly));
 
-// Clamp scalar to [lo, hi].
+/**
+ * Function: Clamp a scalar to an inclusive range.
+ * Params: x (value), lo (lower bound), hi (upper bound).
+ * Returns: `x` clamped to `[lo, hi]`.
+ */
 function ps_clamp(x, lo, hi) = min(max(x, lo), hi);
 
-// Constructor with full validation and optional auto-computation
+/**
+ * Function: Construct a poly descriptor and auto-compute `e_over_ir` when omitted.
+ * Params: verts (`[[x,y,z] ...]`), faces (`[[i0,i1,...] ...]`), e_over_ir (optional override).
+ * Returns: Normalized poly descriptor `[verts_centered, faces, e_over_ir]`.
+ * Limitations: Structural validation only; does not itself guarantee manifoldness or closure.
+ */
 function make_poly(verts, faces, e_over_ir=undef) =
     let(
         // Validation
@@ -51,7 +86,12 @@ function make_poly(verts, faces, e_over_ir=undef) =
     )
     [verts_centered, faces, computed_e_over_ir];
 
-// Fix face winding so each undirected edge appears in opposite directions.
+/**
+ * Function: Reorient faces so shared undirected edges appear with opposite directions.
+ * Params: poly (poly descriptor to repair).
+ * Returns: Poly descriptor with corrected face winding.
+ * Limitations: Topological winding repair only; does not decide outwardness from geometry.
+ */
 function poly_fix_winding(poly) =
     let(
         verts = poly_verts(poly),
@@ -62,6 +102,11 @@ function poly_fix_winding(poly) =
 
 ///////////////////////////////////////
 // ---- Basic validation helpers ----
+/**
+ * Function: Check that every face has arity >= 3 and all indices are in range.
+ * Params: verts (vertex list), faces (face index loops).
+ * Returns: `true` when every face satisfies the basic structural checks.
+ */
 function ps_faces_valid(verts, faces) =
     len([
         for (f = faces)
@@ -69,6 +114,11 @@ function ps_faces_valid(verts, faces) =
                 1
     ]) == len(faces);
 
+/**
+ * Function: Check that all indices in one face lie within `[0, max_idx)`.
+ * Params: face (face index loop), max_idx (exclusive upper bound).
+ * Returns: `true` when all indices are valid.
+ */
 function ps_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
 
@@ -189,12 +239,48 @@ function _ps_index_of(list, v) =
 
 ///////////////////////////////////////
 // ---- Vector math ----
+/**
+ * Function: Add two vectors component-wise.
+ * Params: a, b (same-dimension vectors).
+ * Returns: `a + b`.
+ */
 function v_add(a, b)   = a + b;
+/**
+ * Function: Subtract one vector from another component-wise.
+ * Params: a, b (same-dimension vectors).
+ * Returns: `a - b`.
+ */
 function v_sub(a, b)   = a - b;
+/**
+ * Function: Scale a vector by a scalar.
+ * Params: a (vector), k (scalar multiplier).
+ * Returns: `a * k`.
+ */
 function v_scale(a, k) = a * k;             // scalar multiplication
+/**
+ * Function: Compute the dot product of two vectors.
+ * Params: a, b (same-dimension vectors).
+ * Returns: Scalar dot product.
+ */
 function v_dot(a, b)   = a * b;             // dot product
+/**
+ * Function: Compute the 3D cross product of two vectors.
+ * Params: a, b (3D vectors).
+ * Returns: `cross(a, b)`.
+ */
 function v_cross(a, b) = cross(a, b);       // OpenSCAD built-in
+/**
+ * Function: Compute the Euclidean norm of a vector.
+ * Params: a (vector).
+ * Returns: `norm(a)`.
+ */
 function v_len(a)      = norm(a);           // built-in length
+/**
+ * Function: Normalize a vector safely.
+ * Params: a (vector).
+ * Returns: Unit vector, or `[0,0,0]` when `a` is zero.
+ * Limitations: Zero-vector fallback is silent; assert first if that is not acceptable.
+ */
 function v_norm(a)     = let(L = norm(a)) (L == 0 ? [0,0,0] : a / L);
 
 function _ps_ordered_pair(a, b) = (a < b) ? [a,b] : [b,a];
@@ -202,19 +288,39 @@ function _ps_ordered_pair(a, b) = (a < b) ? [a,b] : [b,a];
 
 ///////////////////////////////////////
 // ---- Edge/list primitives ----
+/**
+ * Function: Compare two canonical undirected edge pairs for exact equality.
+ * Params: e1, e2 (edge pairs `[a, b]`).
+ * Returns: `true` when the pairs match exactly.
+ * Limitations: Does not normalize orientation; callers should canonicalize first when needed.
+ */
 function edge_equal(e1, e2) = (e1[0] == e2[0] && e1[1] == e2[1]);
 
-/** Sum of vector */
+/**
+ * Function: Sum a list of scalars recursively.
+ * Params: a (scalar list), i (internal recursion index).
+ * Returns: Sum of all entries in `a`.
+ */
 function sum(a, i = 0) =
     i >= len(a) ? 0 : a[i] + sum(a, i + 1);
 
-/** Sum of vector list (2D/3D/ND) */
+/**
+ * Function: Sum a list of vectors component-wise.
+ * Params: list (vector list).
+ * Returns: One vector with the component-wise sum.
+ * Limitations: Assumes all vectors in the list have the same dimension.
+ */
 function v_sum(list) =
     (len(list) == 0) ? [] :
     let(n = len(list[0]))
     [ for (i = [0:1:n-1]) sum([for (v = list) v[i]]) ];
 
-// Rotate vector v around axis by ang (degrees).
+/**
+ * Function: Rotate a 3D vector about an axis by an angle in degrees.
+ * Params: v (vector), axis (rotation axis), ang (degrees).
+ * Returns: Rotated vector.
+ * Limitations: Zero axis collapses to the `v_norm(...)` zero-vector behavior.
+ */
 function ps_rot_axis(v, axis, ang) =
     let(
         a = v_norm(axis),
@@ -226,7 +332,12 @@ function ps_rot_axis(v, axis, ang) =
     )
     v_add(v_add(term1, term2), term3);
 
-
+/**
+ * Function: Find the index of an undirected edge in a canonical edge list.
+ * Params: edges (canonical undirected edge list), a,b (edge endpoints).
+ * Returns: Index of `{a, b}` within `edges`.
+ * Limitations: Assumes the edge exists; intentionally does not return `undef` on miss.
+ */
 function ps_find_edge_index(edges, a, b) =
     let(
         e = _ps_ordered_pair(a, b),
@@ -234,7 +345,11 @@ function ps_find_edge_index(edges, a, b) =
     )
     idxs[0];   // assume the edge exists
 
-// point equality within eps
+/**
+ * Function: Compare two points within an absolute epsilon.
+ * Params: p,q (points/vectors), eps (equality tolerance).
+ * Returns: `true` when `norm(p - q) <= eps`.
+ */
 function ps_point_eq(p,q,eps) = norm(p-q) <= eps;
 
 function _ps_list_min(list, i=0, cur=undef) =
@@ -353,20 +468,68 @@ function _ps_face_edge_offsets(faces) =
 
 ///////////////////////////////////////
 // ---- Polygon helpers ----
+/**
+ * Function: Compute the edge length of a regular `n`-gon from its circumradius.
+ * Params: n_vertex (vertex count), rad (circumradius).
+ * Returns: Edge length.
+ */
 function ps_calc_edge(n_vertex, rad) = 2 * rad * sin(180 / n_vertex);
 
-/** Calculate polygon radius, given N and edge length */
+/**
+ * Function: Compute the circumradius of a regular `n`-gon from its edge length.
+ * Params: n_vertex (vertex count), edge_len (edge length).
+ * Returns: Circumradius.
+ */
 function ps_calc_radius(n_vertex, edge_len) = edge_len / (2 * sin(180 / n_vertex));
+
+function _ps_orient2(a, b, c) =
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+// Intersection of two 2D lines given as dot(n, p) = d.
+function _ps_line_intersect_2d(n1, d1, n2, d2, eps=1e-9) =
+    let(det = n1[0] * n2[1] - n1[1] * n2[0])
+    (abs(det) < eps)
+        ? [0, 0]
+        : [
+            (d1 * n2[1] - n1[1] * d2) / det,
+            (n1[0] * d2 - d1 * n2[0]) / det
+        ];
+
+function _ps_poly_turns2(poly) =
+    let(n = len(poly))
+    [
+        for (i = [0:1:n-1])
+            _ps_orient2(poly[(i - 1 + n) % n], poly[i], poly[(i + 1) % n])
+    ];
+
+function _ps_poly_is_convex2(poly, eps=1e-9) =
+    let(
+        turns = [for (t = _ps_poly_turns2(poly)) if (abs(t) > eps) t]
+    )
+    (len(turns) <= 1) ||
+    (min(turns) >= -eps) ||
+    (max(turns) <= eps);
 
 
 ///////////////////////////////////////
 // ---- Geometry helpers ----
+/**
+ * Function: Compute the simple centroid of one face from its vertices.
+ * Params: verts (vertex list), f (face index loop).
+ * Returns: Arithmetic mean of the face vertices.
+ * Limitations: Vertex-average centroid, not an area-weighted polygon centroid.
+ */
 function ps_face_centroid(verts, f) =
     len(f) == 0
         ? [0,0,0]
         : v_scale(v_sum([for (vid = f) verts[vid]]), 1 / len(f));
 
-// Face normal (not scaled, just direction)
+/**
+ * Function: Compute the topological outward normal implied by one face's winding.
+ * Params: verts (vertex list), f (face index loop).
+ * Returns: Unit normal direction.
+ * Limitations: Uses OpenSCAD's left-hand-rule winding convention (clockwise from outside).
+ */
 function ps_face_normal(verts, f) =
     // OpenSCAD expects LHR (clockwise from outside), so flip cross product.
     v_norm(v_cross(
@@ -374,9 +537,12 @@ function ps_face_normal(verts, f) =
         verts[f[1]] - verts[f[0]]
     ));
 
-// Frame normal for face-local placement.
-// For non-planar faces this uses a Newell-style best-fit normal and then
-// aligns it with the topological face orientation from ps_face_normal(...).
+/**
+ * Function: Compute the placement normal used for face-local frames.
+ * Params: verts (vertex list), f (face index loop), eps (degeneracy tolerance).
+ * Returns: Unit face-frame normal.
+ * Limitations: Non-planar faces use a Newell-style best-fit normal aligned to `ps_face_normal(...)`.
+ */
 function ps_face_frame_normal(verts, f, eps=1e-12) =
     let(
         n = len(f),
@@ -436,9 +602,12 @@ function _ps_face_planarity_err(verts, f, eps=1e-12) =
 
 function _ps_faces_max_planarity_err(verts, faces, eps=1e-12) =
     (len(faces) == 0) ? 0 : max([for (f = faces) _ps_face_planarity_err(verts, f, eps)]);
-
-
-// Return index of some neighbour vertex of vi (from the face list)
+/**
+ * Function: Return one adjacent vertex of the requested vertex.
+ * Params: poly (poly descriptor), vi (vertex index).
+ * Returns: Index of one neighboring vertex.
+ * Limitations: Returns the first available neighbor only; not a full adjacency query.
+ */
 function poly_vertex_neighbor(poly, vi) =
     let(
         faces = poly_faces(poly),
@@ -478,7 +647,12 @@ function _ps_edges_from_faces(faces) =
     uniq_edges;
 
 
-// For each edge, list the indices of the faces incident to it (should be 2)
+/**
+ * Function: Build the incident-face table for a known edge list.
+ * Params: faces (face index loops), edges (canonical undirected edge list).
+ * Returns: One face-index list per edge.
+ * Limitations: Closed manifolds usually yield two faces per edge; open shells may yield fewer.
+ */
 function ps_edge_faces_table(faces, edges) =
     [
         for (ei = [0 : len(edges)-1])
@@ -489,9 +663,11 @@ function ps_edge_faces_table(faces, edges) =
             ]
     ];
 
-
-
-// Does face f contain undirected edge {a,b}?
+/**
+ * Function: Test whether a face contains an undirected edge.
+ * Params: f (face index loop), a,b (edge endpoints).
+ * Returns: `true` when `{a, b}` appears along the face boundary.
+ */
 function ps_face_has_edge(f, a, b) =
     sum([
         for (k = [0 : len(f)-1])
@@ -502,7 +678,11 @@ function ps_face_has_edge(f, a, b) =
             ((x==a && y==b) || (x==b && y==a)) ? 1 : 0
     ]) > 0;
 
-// Faces incident to vertex vi (unordered).
+/**
+ * Function: Return the set of faces incident to one vertex.
+ * Params: poly (poly descriptor), vi (vertex index).
+ * Returns: Unordered incident face indices.
+ */
 function vertex_incident_faces(poly, vi) =
     let(faces = poly_faces(poly))
     [
@@ -539,7 +719,12 @@ function faces_around_vertex_rec(v, f_cur, f_prev, f_start, faces, edges, edge_f
         ? concat(acc, [f_cur])
         : faces_around_vertex_rec(v, next, f_cur, f_start, faces, edges, edge_faces, concat(acc, [f_cur]));
 
-// Incident faces around a vertex in cyclic order (for manifold neighborhoods).
+/**
+ * Function: Walk the incident faces around one vertex in cyclic order.
+ * Params: poly (poly descriptor), v (vertex index), edges (edge list), edge_faces (incident-face table).
+ * Returns: Incident face indices ordered around the vertex.
+ * Limitations: Assumes a manifold neighborhood around the vertex.
+ */
 function faces_around_vertex(poly, v, edges, edge_faces) =
     let(
         faces = poly_faces(poly),
@@ -551,6 +736,12 @@ function faces_around_vertex(poly, v, edges, edge_faces) =
 
 ///////////////////////////////////////
 // ---- Frame/placement helpers ----
+/**
+ * Function: Compute the world-space center used for one face placement frame.
+ * Params: poly (poly descriptor), fi (face index), scale (global vertex scale).
+ * Returns: Face center in world coordinates.
+ * Limitations: Vertex-average face center, matching the placement path.
+ */
 function poly_face_center(poly, fi, scale) =
     let(
         f   = poly_faces(poly)[fi],
@@ -565,7 +756,12 @@ function poly_face_center(poly, fi, scale) =
         sum(zs) / len(f)
     ];
 
-
+/**
+ * Function: Compute the face-local +X axis used by `place_on_faces(...)`.
+ * Params: poly (poly descriptor), fi (face index), scale (global vertex scale).
+ * Returns: Unit +X direction in world coordinates.
+ * Limitations: Projects into the face plane and falls back to the next face edge direction if needed.
+ */
 function poly_face_ex(poly, fi, scale) =
     let(f      = poly_faces(poly)[fi],
         vs     = poly_verts(poly),
@@ -582,14 +778,23 @@ function poly_face_ex(poly, fi, scale) =
         ? v_norm(ex_proj)
         : v_norm(ex_fallback);   // local +X points towards face vertex order
 
-
+/**
+ * Function: Compute the face-local +Y axis used by `place_on_faces(...)`.
+ * Params: poly (poly descriptor), fi (face index), scale (global vertex scale).
+ * Returns: Unit +Y direction in world coordinates.
+ */
 function poly_face_ey(poly, fi, scale) =
     v_cross(
         poly_face_ez(poly, fi, scale),
         poly_face_ex(poly, fi, scale)
     );
 
-
+/**
+ * Function: Compute the face-local +Z axis used by `place_on_faces(...)`.
+ * Params: poly (poly descriptor), fi (face index), scale (global vertex scale).
+ * Returns: Unit +Z direction in world coordinates.
+ * Limitations: Placement/frame normal, not necessarily the first-triangle normal for non-planar faces.
+ */
 function poly_face_ez(poly, fi, scale) =
     let(f  = poly_faces(poly)[fi],
         vs = poly_verts(poly),
@@ -597,16 +802,23 @@ function poly_face_ez(poly, fi, scale) =
     // Frame +Z for placement; best-fit for non-planar faces, aligned to LHR.
     ps_face_frame_normal(vs_scaled, f);
 
-
+/**
+ * Function: Build a homogeneous transform matrix from an orthonormal frame.
+ * Params: center (frame origin), ex/ey/ez (frame basis vectors).
+ * Returns: A 4x4 matrix suitable for `multmatrix(...)`.
+ */
 function ps_frame_matrix(center, ex, ey, ez) = [
     [ex[0], ey[0], ez[0], center[0]],
     [ex[1], ey[1], ez[1], center[1]],
     [ex[2], ey[2], ez[2], center[2]],
     [0,      0,     0,     1]
 ];
-
-
-// Ensure face orientation so normal points outward (centroid·normal > 0)
+/**
+ * Function: Orient one face so its winding points outward relative to its centroid.
+ * Params: verts (vertex list), f (face index loop).
+ * Returns: Either `f` or its reversal, whichever gives outward orientation.
+ * Limitations: Uses the centroid-dot-normal heuristic; not a substitute for full validation.
+ */
 function ps_orient_face_outward(verts, f) =
     let(
         c = ps_face_centroid(verts, f),
@@ -616,5 +828,10 @@ function ps_orient_face_outward(verts, f) =
         ? f
         : _ps_reverse(f);  // reversed
 
+/**
+ * Function: Orient every face in a mesh outward using `ps_orient_face_outward(...)`.
+ * Params: verts (vertex list), faces (face index loops).
+ * Returns: Face list with outward-oriented winding.
+ */
 function ps_orient_all_faces_outward(verts, faces) =
     [ for (f = faces) ps_orient_face_outward(verts, f) ];

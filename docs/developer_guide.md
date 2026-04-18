@@ -62,7 +62,7 @@ PolySymmetrica/
 │   │   │   ├─ validate.scad        # poly validity checks
 │   │   │   ├─ cleanup.scad         # structural cleanup/normalization
 │   │   │   ├─ construction.scad    # delete/cap/slice construction helpers
-│   │   │   ├─ construction.scad    # slice/cap/attach construction helpers
+│   │   │   ├─ face_regions.scad    # local face region and segmentation clip volumes
 │   │   │   ├─ prisms.scad          # prism/antiprism generators
 │   │   │   ├─ render.scad          # poly_describe, render helpers
 │   │   │   └─ duals.scad           # poly_dual and helpers
@@ -90,6 +90,7 @@ PolySymmetrica/
     ├─ cantellation.md
     ├─ snubs.md
     ├─ attach.md
+    ├─ face_regions.md
     └─ images/
 ```
 
@@ -104,6 +105,9 @@ Related deep-dive notes:
 - [Params overrides](params_overrides.md)
 - [Face attachment](attach.md)
 - [Construction helpers](construction.md)
+- [Iterator APIs](iterators.md)
+- [Face segmentation](segments.md)
+- [Face region volumes](face_regions.md)
 
 ---
 
@@ -174,9 +178,14 @@ This has multiple advantages:
 
 These operators attach arbitrary geometry to each face/edge/vertex of a polyhedron:
 
-* `place_on_faces(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
-* `place_on_edges(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
-* `place_on_vertices(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
+* `place_on_faces(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+* `place_on_edges(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+* `place_on_vertices(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+
+`place_on_edges(...)` now uses the adjacent-face normal bisector as its local `+Z`
+direction when an edge has a usable face pair. That makes edge-local space
+dihedral-centered rather than radial-centered. Boundary/degenerate edges fall
+back to the older radial frame.
 
 Or calculate it based on edge length:
 
@@ -189,6 +198,29 @@ Classification controls:
 * `classify`: optional precomputed value from `poly_classify(...)`; preferred for consistency and speed.
 * `classify_opts`: optional `[detail, eps, radius, include_geom]`; used only when `classify` is not passed.
 * if both are omitted, placement remains geometry-only (no classification is performed and family vars are `undef`).
+* `indices`: optional exact index list for the placement site family (`face_idx`, `edge_idx`, or `vertex_idx`). `undef` means iterate all sites.
+
+This is also the intended low-level selector for the proxy-interaction path in
+`core/proxy_interaction.scad`: analytic code can identify the exact neighboring
+faces, edges, and vertices that can reach a target feature, then instantiate
+only those raw proxies in the correct placement frames.
+
+For self-intersecting faces, `segments.scad` also exposes nested placement on
+the true filled perimeter rather than the original self-crossing walk:
+
+- `place_on_face_filled_boundary_segments(...)`
+- `place_on_face_filled_boundary_edges(...)`
+
+The latter is the preferred basis for local edge-clearance on star/self-crossing
+faces because it keeps the familiar dihedral-centered edge frame while following
+the actual filled boundary subsegments.
+
+The face proxy path also supports a simple face-interferer realization mode:
+
+- `face_proxy_mode = "raw"`: use the neighboring face proxy geometry as-is,
+  bounded only by `face_bounds`
+- `face_proxy_mode = "sweep_to_bounds"`: project the neighboring face proxy to
+  its local XY footprint and extrude it through `face_bounds`
 
 
 Each operator:
@@ -222,7 +254,12 @@ PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 | `$ps_vertex_family_id`          |   ☐   |   ✅   |   ☐   | Family id of the current vertex from `poly_classify(...)`                                                                                                         |
 | `$ps_edge_idx`                  |   ☐   |   ☐   |   ✅  | Index of the edge being placed (0..M-1)                                                                                                                        |
 | `$ps_edge_midradius`            |   ☐   |   ☐   |   ✅  | Distance from poly centre to edge midpoint (world units; scale-derived)                                                                                        |
+| `$ps_dihedral`                  |   ☐   |   ☐   |   ✅  | Internal dihedral angle for this edge, degrees (`undef` for boundary/non-manifold edges)                                                                       |
 | `$ps_edge_pts_local`            |   ☐   |   ☐   |   ✅  | Edge endpoints in **edge-local coords**, typically `[[ -L/2,0,0 ], [ +L/2,0,0 ]]`                                                                              |
+| `$ps_edge_center_world`         |   ☐   |   ☐   |   ✅  | Edge midpoint in world coords                                                                                                                                    |
+| `$ps_edge_ex_world`             |   ☐   |   ☐   |   ✅  | Edge-local `+X` axis in world coords (along the edge)                                                                                                            |
+| `$ps_edge_ey_world`             |   ☐   |   ☐   |   ✅  | Edge-local `+Y` axis in world coords                                                                                                                             |
+| `$ps_edge_ez_world`             |   ☐   |   ☐   |   ✅  | Edge-local `+Z` axis in world coords (adjacent-face normal bisector when available)                                                                              |
 | `$ps_edge_verts_idx`            |   ☐   |   ☐   |   ✅  | Vertex indices of this edge `[v0, v1]`                                                                                                                         |
 | `$ps_edge_adj_faces_idx`        |   ☐   |   ☐   |   ✅  | Face indices adjacent to this edge (usually 2 for closed manifold polys)                                                                                       |
 | `$ps_edge_family_id`            |   ☐   |   ☐   |   ✅  | Family id of the current edge from `poly_classify(...)`                                                                                                           |

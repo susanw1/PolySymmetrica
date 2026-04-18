@@ -19,6 +19,8 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Run all negative tests (expects each file in `src/tests/negative/` to fail):
   `src/tests/run_negative_all.sh`
 - Scratch/probe `.scad` files should be created in `/tmp` (for example `/tmp/tmp_probe.scad`), not in the repo root.
+- `openscad-nightly` is installed via snap on this machine, so it is sandboxed more tightly than the apt `openscad`. When feeding `openscad-nightly` a scratch `.scad`, prefer a repo-local `.tmp/` path over `/tmp`, otherwise snap confinement may block reading the input file.
+- This environment has `python3` available but not `python`. For quick probe-file generation or text rewriting, use `python3`.
 - Generated outputs (`.stl`, logs, screenshots) should also go to `/tmp` unless they are intentional docs/examples assets.
 - Process safety: never kill `openscad-nightly` broadly (`pkill openscad*` etc.). The user keeps an interactive `openscad-nightly` session running.
   Only target exact non-interactive command lines started for this task.
@@ -29,12 +31,16 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Files: lower snake case (e.g., `placement.scad`, `test_duals.scad`).
 - Poly descriptor shape is `[verts, faces, e_over_ir]`; use the accessor helpers in `core/funcs.scad`.
 - Preserve `$ps_*` variable naming conventions for placement metadata (see `docs/developer_guide.md`).
+- For new local helpers, add short API-style comments with `Function:`/`Module:`, `Params:`, `Returns:`, and an optional `Limitations/Gotchas:` section when there is a real sharp edge or non-obvious constraint worth calling out.
+- Prefer named colors in examples/probes/debug surfaces unless an exact numeric palette is genuinely needed; named colors are easier to read and discuss.
+- Prefer small modules and push reusable logic into pure functions where possible; keep modules as thin rendering/placement/CSG wrappers rather than the primary home of business logic.
 
 ## Testing Guidelines
 - Tests are plain OpenSCAD modules that call `assert(...)` in `src/tests/core/`.
 - Add new test modules with a `test_*` prefix and register them in `src/tests/run_all.scad`.
 - Keep numeric tolerances explicit (see `EPS` in `TestFuncs.scad`).
 - Do not rely on `poly_valid(...)` alone for transform correctness; add operation-specific tests (counts, adjacency, family behavior) for new geometry operators.
+- When choosing where logic should live, bias toward functions over modules if that makes the result directly unit-testable; use modules mainly for side-effectful geometry emission and placement contexts.
 
 ## Scaling & Dual Alignment Notes
 - Dual overlays are sensitive to which geometric feature you choose to align (edge midpoints vs face families).
@@ -64,12 +70,15 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Shared mesh build helper: `_ps_poly_from_face_points(...)` dedups points, orients faces, and rescales to unit edge.
 - Placement modules now accept optional classification context:
   - `place_on_faces/edges/vertices(..., classify=cls, classify_opts=[detail,eps,radius,include_geom])`
+  - `place_on_faces/edges/vertices(..., indices=[...])` filters to an exact site list while reusing the same placement frames and `$ps_*` metadata.
+  - `core/proxy_interaction.scad` should build on those exact index lists rather than recreating feature transforms by hand.
   - New `$ps_*` family vars are exposed per element (`*_family_id`) plus global family counts.
   - To avoid family-id drift between placement and overrides/solvers, classify once and reuse the same `cls`.
 - Dependency hygiene: `faces_around_vertex` helpers now live in `core/funcs.scad` (shared primitive). Avoid pulling them from `duals.scad` to prevent `placement -> classify -> duals -> placement` style use-cycles.
 
 ## Session Notes (Recent Cleanup Insights)
 - Prefer shared scalar helpers in `funcs.scad` when used across core files (for example `ps_clamp(...)`), rather than duplicating private variants per file.
+- Promote only genuinely generic geometry primitives into `funcs.scad` (for example 2D orientation, convexity, or line intersection); keep face-region-specific half-plane clipping and offset machinery local until it has a second real consumer.
 - Remove thin pass-through wrappers when they add no semantic value; call the canonical helper directly.
 - For inert cleanup passes, include comment-only/doc-only normalization together with dead-local/dead-helper removal, then always run:
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
@@ -103,6 +112,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - `place_on_faces(...)` now uses a frame normal intended for placement (`ps_face_frame_normal(...)`) rather than relying only on the first triangle normal.
 - `ps_face_frame_normal(...)` uses a Newell-style best-fit normal for non-planar faces, then aligns sign to `ps_face_normal(...)` so winding/orientation semantics remain consistent.
 - `ps_face_normal(...)` is still the topological/orientation normal and should remain unchanged for validation/duals logic.
+- `place_on_edges(...)` now uses the adjacent-face normal bisector as edge-local `+Z` when a usable face pair exists; this is the preferred dihedral-centered frame for edge structure/proxy work. Boundary/degenerate edges fall back to the older radial frame.
 - For non-planar faces, `$ps_poly_center_local` may legitimately have significant local X/Y components; this is expected and indicates the face center is not radially aligned to poly center.
 - `poly_face_ex(...)` must be projected onto the local face plane (perpendicular to face EZ) before normalization; otherwise local-dot projections drift and `$ps_poly_center_local` placement can be wrong.
 - Coverage added in `src/tests/core/TestFuncs.scad`:
@@ -110,11 +120,28 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `test_face_frame_normal__nonplanar_is_unit_and_oriented`
   - `test_poly_face_ez__uses_frame_normal_for_nonplanar_face`
 
-## Session Notes (Printing Face Segmentation)
-- `face_plate_visible(...)` should only use the segmented visible-cell path when `ps_face_geom_cut_entries(...)` returns actual geometry cuts; otherwise it must fall back to plain `face_plate(...)` so regular/star faces keep their known-good bevel and pillow behavior.
-- Cutter/cut-entry logic must thread the same fill mode (`"nonzero"` vs `"evenodd"`) that the face geometry uses; otherwise star/self-intersecting cutters silently segment against the wrong filled region.
-- `ps_face_visible_segments(...)` must reorient kept cells to match the parent face winding before handing them to bevel code; otherwise parent edges bevel outward.
-- For segmented printable pieces, keep original parent edges beveled and let cut edges use cut-derived metadata; do not clip finished 3D plates with `intersection()`, because the normalized CSG tree explodes badly for printing demos.
+## Session Notes (Face Regions, Segmentation, and Interference)
+- `segments.scad` is the analysis layer: crossings, arrangement cells, visible segments, provenance ids.
+- `face_regions.scad` is the region/interference layer: admissible 3D regions and face-local interference bodies built from that analysis.
+- Keep example surfaces thin. `face_plate.scad` should stay a consumer of the core region model; face-interference probes now live under `src/polysymmetrica/examples/experiments/face-interference/`.
+- Treat these helpers as **face-local**. They depend on face geometry, cutter geometry, and dihedral rules, not on any global poly-centre convention.
+- For self-intersecting/star faces, work from the **filled arrangement** and the **true filled boundary**, not from the raw self-crossing walk.
+- Nonconvex visible cells/filled regions may need convex atoms; clipped-loop or half-plane constructions are only safe when the atom/cell assumptions actually hold.
+- The intended default fill rule for self-intersecting face work is `"nonzero"`. Thread the same fill mode consistently through segmentation and cutter logic.
+- Merge same-face cut fragments only by connected collinear intervals. Do not bridge disjoint spans across empty gaps.
+- Keep examples/docs pointing at the right layer:
+  - `docs/segments.md` for split-cell / cut-line analysis
+  - `docs/face_regions.md` for 3D clipping/region semantics
+  - `docs/segment_plan.md` for current interference/segmentation plan detail
+
+## Session Notes (Proxy Interaction)
+- `core/proxy_interaction.scad` should keep a hard split between **occupancy** and **clearance**. Do not reuse local seating clearance as the foreign cutter.
+- Adjacent faces belong in the anti-interference/shield model, not in the foreign-cutter set.
+- Local edge-clearance strips belong on indexed edge placement in dihedral-centered frames unless a stronger geometric reason survives review.
+- For self-intersecting faces, any proxy/interference path should build on face-local arrangement/boundary extraction first, not on the original self-crossing face walk.
+- Do not pass a short `edge_length` influence clip (for example `IR`) into edge subtraction unless you really intend to truncate the strip along its own `x` axis.
+- The current high-level edge-interference idea is durable: the edge cutter should be trimmed by the filled face material that punches through it, not by ad hoc tapered end geometry. Detailed lobe/span execution belongs in `docs/segment_plan.md`.
+- Failed geometry experiments should be deleted rather than left around dead. Keep the abstraction boundary clean: segmentation metadata in `segments.scad`, admissible regions in `face_regions.scad`, example styling in the example layer.
 
 ## Session Notes (Construction Toolkit)
 - Johnson-style construction should build on explicit topology tools first: delete faces, recover boundary loops, then cap them. Keep “repair” semantics visible instead of burying them in magical element-deletion helpers.
@@ -138,6 +165,8 @@ This repo is OpenSCAD-first; there is no separate build system.
   - `place_on_face_visible_segments(...)`
   - `face_visible_mask(...)`
 - This path works by splitting a face by geometry-derived cut segments, then discarding cells occluded by other local triangles. It is preferable to `hull() face_cut_stencil(...)` for printing because it avoids magic-number cutters and over-subtraction.
+- If cut lines split a face but every child cell remains visible, keep the original unsplit face cell.
+- Star-prism side faces should resolve to the two visible side panels after spike occlusion; do not collapse that case to a single octagon or center strip.
 - When splitting a simple face by cut segments, do not require child cell winding to match the outer boundary. The traversal can yield mixed orientation for valid cells.
 - Endpoint-on-boundary intersections matter for cut segmentation. A strict interior/interior-only segment intersection test will miss essential split nodes.
 
@@ -146,6 +175,7 @@ This repo is OpenSCAD-first; there is no separate build system.
 - Remove clearly unused locals/helpers/wrappers only when references are zero.
 - Prefer shared helpers in `funcs.scad` over duplicate per-file utilities.
 - Keep comments/docs aligned with actual behavior and parameter semantics.
+- Keep `AGENTS.md` focused on guiding principles and durable top-level concepts; move detailed plans, execution history, and low-level next-step notes into `docs/*.md`.
 - Run full tests and verify PASS:
   `openscad -o /tmp/ps-tests.stl src/tests/run_all.scad`
 - Ensure scratch/probe files are in `/tmp`, not in repo tree.
