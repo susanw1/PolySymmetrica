@@ -544,6 +544,55 @@ function _ps_seg_unique_source_edge_indices(segs, i=0, acc=[]) =
         )
         _ps_seg_unique_source_edge_indices(segs, i + 1, acc2);
 
+function _ps_seg_filled_boundary_source_edge_records(face_pts2d, filled_cells, segs, eps=1e-8) =
+    let(
+        source_ids = _ps_seg_unique_source_edge_indices(segs),
+        nface = len(face_pts2d)
+    )
+    [
+        for (source_edge_idx = source_ids)
+            let(
+                matches = [for (s = segs) if (s[1] == source_edge_idx) s],
+                match_spans = [for (rec = matches) [rec[2], rec[3], rec[4]]],
+                match_signs = [
+                    for (rec = matches)
+                        let(
+                            cell_idx = rec[4],
+                            cell = filled_cells[cell_idx]
+                        )
+                            _ps_seg_boundary_inward_sign(rec[0], cell, eps)
+                ],
+                _agree = assert(
+                    len(match_signs) > 0 && min(match_signs) == max(match_signs),
+                    str("ps_face_filled_boundary_source_edges: inconsistent inward signs for source edge ", source_edge_idx)
+                ),
+                p0 = face_pts2d[source_edge_idx],
+                p1 = face_pts2d[(source_edge_idx + 1) % nface]
+            )
+            [[p0, p1], source_edge_idx, match_spans, match_signs[0]]
+    ];
+
+// Unique original face-walk edges that still contribute one or more true
+// filled-boundary spans.
+//
+// Return entries:
+//   [seg2d, source_edge_idx, spans, inward_sign]
+//
+// where:
+// - seg2d is the full original source edge in face-local 2D
+// - source_edge_idx is its face-walk index
+// - spans is [[source_t0, source_t1, filled_cell_idx], ...] for the true
+//   filled boundary spans that survive on that source edge
+// - inward_sign is the agreed filled-side sign for the source edge in the
+//   source-edge local 2D frame
+function ps_face_filled_boundary_source_edges(face_pts3d_local, eps=1e-8) =
+    let(
+        face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]],
+        filled_cells = ps_face_filled_cells(face_pts3d_local, eps),
+        segs = ps_face_filled_boundary_segments(face_pts3d_local, eps)
+    )
+    _ps_seg_filled_boundary_source_edge_records(face_pts2d, filled_cells, segs, eps);
+
 // Nested true filled-boundary segment iterator. Call inside place_on_faces(...).
 //
 // Unlike `place_on_face_segments(...)`, this iterates the actual filled
@@ -691,41 +740,26 @@ module place_on_face_filled_boundary_source_edges(source_edge_indices=undef, eps
     assert(!is_undef($ps_face_pts2d), "place_on_face_filled_boundary_source_edges: requires place_on_faces context");
     assert(!is_undef($ps_face_pts3d_local), "place_on_face_filled_boundary_source_edges: requires place_on_faces context");
 
-    face_pts2d = $ps_face_pts2d;
-    filled_cells = ps_face_filled_cells($ps_face_pts3d_local, eps);
     segs = ps_face_filled_boundary_segments($ps_face_pts3d_local, eps);
-    source_ids = _ps_seg_unique_source_edge_indices(segs);
-    nface = len(face_pts2d);
+    source_recs = ps_face_filled_boundary_source_edges($ps_face_pts3d_local, eps);
 
-    for (si = [0:1:len(source_ids)-1]) {
-        source_edge_idx = source_ids[si];
+    for (si = [0:1:len(source_recs)-1]) {
+        rec = source_recs[si];
+        seg2d = rec[0];
+        source_edge_idx = rec[1];
+        match_spans = rec[2];
+        inward_sign = rec[3];
         use_seg =
             is_undef(source_edge_indices) ||
             _ps_list_contains(source_edge_indices, source_edge_idx);
-        matches = [for (s = segs) if (s[1] == source_edge_idx) s];
-        match_spans = [for (rec = matches) [rec[2], rec[3], rec[4]]];
-        match_signs = [
-            for (rec = matches)
-                let(
-                    cell_idx = rec[4],
-                    cell = filled_cells[cell_idx]
-                )
-                    _ps_seg_boundary_inward_sign(rec[0], cell, eps)
-        ];
 
-        if (use_seg && len(matches) > 0) {
-            p0 = face_pts2d[source_edge_idx];
-            p1 = face_pts2d[(source_edge_idx + 1) % nface];
-            seg2d = [p0, p1];
+        if (use_seg) {
+            p0 = seg2d[0];
+            p1 = seg2d[1];
             mid = _ps_seg_boundary_midpoint(seg2d);
             seg_len = _ps_seg_boundary_seg_len(seg2d);
             ex2 = (seg_len <= eps) ? [1, 0] : (p1 - p0) / seg_len;
             ey2 = _ps_seg_boundary_left_normal(seg2d, eps);
-            assert(
-                min(match_signs) == max(match_signs),
-                str("place_on_face_filled_boundary_source_edges: inconsistent inward signs for source edge ", source_edge_idx)
-            );
-            inward_sign = match_signs[0];
             inward2 = ey2 * inward_sign;
             source_dihedral = is_undef($ps_face_dihedrals) ? undef : _ps_seg_safe_at($ps_face_dihedrals, source_edge_idx, undef);
             source_neighbor_face_idx = is_undef($ps_face_neighbors_idx) ? undef : _ps_seg_safe_at($ps_face_neighbors_idx, source_edge_idx, undef);
@@ -734,7 +768,7 @@ module place_on_face_filled_boundary_source_edges(source_edge_indices=undef, eps
             ey3 = v_norm(v_cross(ez3, ex3));
 
             $ps_face_boundary_seg_idx = si;
-            $ps_face_boundary_seg_count = len(source_ids);
+            $ps_face_boundary_seg_count = len(source_recs);
             $ps_face_boundary_seg2d = seg2d;
             $ps_face_boundary_seg_pts3d_local = [[p0[0], p0[1], 0], [p1[0], p1[1], 0]];
             $ps_face_boundary_seg_len = seg_len;
