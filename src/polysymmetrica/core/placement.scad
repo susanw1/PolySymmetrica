@@ -65,6 +65,17 @@ function _ps_face_site_dihedrals(face, fi, faces0, edges, edge_faces, face_n) =
     ];
 
 /**
+ * Function: Build adjacent-face indices for one edge site.
+ * Params: faces (poly face index cycles), e (undirected edge vertex pair)
+ * Returns: list of adjacent face indices in scan order
+ */
+function _ps_edge_site_adj_faces_idx(faces, e) =
+    [
+        for (fi = [0:1:len(faces)-1])
+            if (ps_face_has_edge(faces[fi], e[0], e[1])) fi
+    ];
+
+/**
  * Function: Build face placement site records for `place_on_faces(...)`.
  * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context)
  * Returns: list of face site records `[face_idx, center, ex, ey, ez, edge_len, vertex_count, face_midradius, face_radius, poly_center_local, face_pts2d, face_pts3d_local, poly_verts_local, poly_faces_idx, face_planarity_err, face_is_planar, face_family_id, face_family_count, edge_family_count, vertex_family_count, face_neighbors_idx, face_dihedrals]`
@@ -184,6 +195,66 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
     }
 }
 
+/**
+ * Function: Build edge placement site records for `place_on_edges(...)`.
+ * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context)
+ * Returns: list of edge site records `[edge_idx, center, ex, ey, ez, edge_len, edge_midradius, poly_center_local, edge_pts_local, edge_verts_idx, edge_adj_faces_idx, edge_family_id, face_family_count, edge_family_count, vertex_family_count]`
+ * Limitations: preserves the current radial fallback edge frame; dihedral-bisector geometry belongs in a later dedicated change
+ */
+function ps_edge_sites(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) =
+    let(
+        exp_edge_len = is_undef(edge_len) ? inter_radius * poly_e_over_ir(poly) : edge_len,
+        scale = exp_edge_len,
+        verts = poly_verts(poly),
+        faces = poly_faces(poly),
+        edges = _ps_edges_from_faces(faces),
+        cls = _ps_resolve_classify(poly, classify, classify_opts),
+        family_counts = is_undef(cls) ? undef : ps_classify_counts(cls),
+        edge_family_ids = is_undef(cls) ? [] : ps_classify_edge_ids(cls, len(edges)),
+        face_family_count = is_undef(family_counts) ? undef : family_counts[0],
+        edge_family_count = is_undef(family_counts) ? undef : family_counts[1],
+        vert_family_count = is_undef(family_counts) ? undef : family_counts[2]
+    )
+    [
+        for (ei = [0:1:len(edges)-1])
+            let(
+                e = edges[ei],
+                v0 = verts[e[0]] * scale,
+                v1 = verts[e[1]] * scale,
+                center = (v0 + v1) / 2,
+                ex = v_norm(v1 - v0),
+                ez0 = v_norm(center),
+                ey = v_norm(v_cross(ez0, ex)),
+                ez = v_norm(v_cross(ex, ey)),
+                edge_midradius = norm(center),
+                edge_len_actual = norm(v1 - v0),
+                poly_center_local = [
+                    v_dot(-center, ex),
+                    v_dot(-center, ey),
+                    v_dot(-center, ez)
+                ],
+                edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]],
+                adj_faces_idx = _ps_edge_site_adj_faces_idx(faces, e)
+            )
+            [
+                ei,
+                center,
+                ex,
+                ey,
+                ez,
+                edge_len_actual,
+                edge_midradius,
+                poly_center_local,
+                edge_pts_local,
+                e,
+                adj_faces_idx,
+                is_undef(cls) ? undef : edge_family_ids[ei],
+                face_family_count,
+                edge_family_count,
+                vert_family_count
+            ]
+    ];
+
 // ---- Place children on all vertices of a polyhedron ----
 module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
     target_edge_len = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
@@ -254,61 +325,24 @@ module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = un
 
 // ---- Place children on all edges of a polyhedron ----
 module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
-    scale = is_undef(edge_len)? inter_radius * poly_e_over_ir(poly) : edge_len;
-    verts = poly_verts(poly);
-    faces = poly_faces(poly);
-    edges = _ps_edges_from_faces(faces);
-    cls = _ps_resolve_classify(poly, classify, classify_opts);
-    family_counts = is_undef(cls) ? undef : ps_classify_counts(cls);
-    edge_family_ids = is_undef(cls) ? [] : ps_classify_edge_ids(cls, len(edges));
-    face_family_count = is_undef(family_counts) ? undef : family_counts[0];
-    vert_family_count = is_undef(family_counts) ? undef : family_counts[2];
+    sites = ps_edge_sites(poly, inter_radius, edge_len, classify, classify_opts);
 
-    for (ei = [0 :  1 : len(edges)-1]) {
-
-        e  = edges[ei];
-        v0 = verts[e[0]] * scale;
-        v1 = verts[e[1]] * scale;
-
-        center = (v0 + v1) / 2;          // edge midpoint (world)
-        ex     = v_norm(v1 - v0);        // along edge
-        ez0    = v_norm(center);         // radial reference
-        ey     = v_norm(v_cross(ez0, ex)); // orthonormal
-        ez     = v_norm(v_cross(ex, ey));  // orthonormal
-
-        edge_midradius   = norm(center);
-        edge_len_actual  = norm(v1 - v0);
-
-        // vector from edge centre to poly centre in local coords
-        poly_center_local = [
-            v_dot(-center, ex),
-            v_dot(-center, ey),
-            v_dot(-center, ez)
-        ];
-        // Edge endpoints in LOCAL coords
-        edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]];
-
-        // Adjacent faces (indices)
-        adj_faces_idx = [
-            for (fi = [0 :  1 : len(faces)-1])
-                if (ps_face_has_edge(faces[fi], e[0], e[1])) fi
-        ];
-
+    for (site = sites) {
         // Metadata for children (edge-local)
-        $ps_edge_idx            = ei;
-        $ps_edge_len            = edge_len_actual;      // actual length of this edge (vs supplied edge_len = scaling factor arg)
-        $ps_edge_midradius      = edge_midradius;
-        $ps_poly_center_local   = poly_center_local;
+        $ps_edge_idx            = site[0];
+        $ps_edge_len            = site[5];      // actual length of this edge (vs supplied edge_len = scaling factor arg)
+        $ps_edge_midradius      = site[6];
+        $ps_poly_center_local   = site[7];
 
-        $ps_edge_pts_local      = edge_pts_local;
-        $ps_edge_verts_idx      = e;
-        $ps_edge_adj_faces_idx  = adj_faces_idx;
-        $ps_edge_family_id      = is_undef(cls) ? undef : edge_family_ids[ei];
-        $ps_face_family_count   = face_family_count;
-        $ps_edge_family_count   = is_undef(family_counts) ? undef : family_counts[1];
-        $ps_vertex_family_count = vert_family_count;
+        $ps_edge_pts_local      = site[8];
+        $ps_edge_verts_idx      = site[9];
+        $ps_edge_adj_faces_idx  = site[10];
+        $ps_edge_family_id      = site[11];
+        $ps_face_family_count   = site[12];
+        $ps_edge_family_count   = site[13];
+        $ps_vertex_family_count = site[14];
 
-        multmatrix(ps_frame_matrix(center, ex, ey, ez))
+        multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
             children();
     }
 }

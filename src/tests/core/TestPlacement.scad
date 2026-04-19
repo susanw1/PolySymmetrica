@@ -99,6 +99,32 @@ module test_ps_face_sites__cube_records_match_face_structure() {
     }
 }
 
+module test_ps_edge_sites__cube_records_match_edge_structure() {
+    p = hexahedron();
+    faces = poly_faces(p);
+    edges = _ps_edges_from_faces(faces);
+    cls = poly_classify(p, 1, 1e-6, 1, false);
+    ids = ps_classify_edge_ids(cls, len(edges));
+    counts = ps_classify_counts(cls);
+    sites = ps_edge_sites(p, classify = cls);
+
+    assert_int_eq(len(sites), len(edges), "edge site count should match edge count");
+
+    for (site = sites) {
+        ei = site[0];
+
+        assert_vec3_near(site[8][0], [-site[5] / 2, 0, 0], 1e-9, "edge local start point");
+        assert_vec3_near(site[8][1], [site[5] / 2, 0, 0], 1e-9, "edge local end point");
+        assert_int_eq(len(site[9]), 2, "edge vertex pair should have arity 2");
+        assert_int_eq(len(site[10]), 2, "cube edges should have two adjacent faces");
+        assert(abs(norm(site[1]) - site[6]) < 1e-9, str("edge center/midradius mismatch ei=", ei));
+        assert_int_eq(site[11], ids[ei], "site edge family id");
+        assert_int_eq(site[12], counts[0], "site face family count");
+        assert_int_eq(site[13], counts[1], "site edge family count");
+        assert_int_eq(site[14], counts[2], "site vertex family count");
+    }
+}
+
 module test_place_on_all__cube_single_family() {
     p = hexahedron();
     cls = poly_classify(p, 1, 1e-6, 1, false);
@@ -308,6 +334,7 @@ module run_TestPlacement() {
     test_place_on_vertices__family_ids_and_counts_from_classify();
     test_place_on_faces__auto_classify_matches_precomputed();
     test_ps_face_sites__cube_records_match_face_structure();
+    test_ps_edge_sites__cube_records_match_edge_structure();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_face_segments__star_face_split();
