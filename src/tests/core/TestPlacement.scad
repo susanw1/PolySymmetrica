@@ -125,6 +125,49 @@ module test_ps_edge_sites__cube_records_match_edge_structure() {
     }
 }
 
+module test_ps_edge_sites__cube_uses_adjacent_face_normal_bisector() {
+    p = hexahedron();
+    verts = poly_verts(p);
+    faces = poly_faces(p);
+    faces0 = ps_orient_all_faces_outward(verts, faces);
+    edges = _ps_edges_from_faces(faces0);
+    edge_faces = ps_edge_faces_table(faces0, edges);
+    face_n = [for (f = faces0) ps_face_normal(verts, f)];
+    sites = ps_edge_sites(p);
+
+    for (site = sites) {
+        ei = site[0];
+        adj = edge_faces[ei];
+        nsum = face_n[adj[0]] + face_n[adj[1]];
+        expected = v_norm(nsum);
+        assert(
+            v_dot(site[4], expected) > 1 - 1e-9,
+            str("edge site ez should follow adjacent-face bisector ei=", ei, " got=", site[4], " expected=", expected)
+        );
+    }
+}
+
+module test_ps_edge_sites__preserves_raw_edge_order_for_classify_ids() {
+    p = hexahedron();
+    verts = poly_verts(p);
+    faces_rev = [for (f = poly_faces(p)) [for (i = [len(f)-1:-1:0]) f[i]]];
+    p_rev = [verts, faces_rev, poly_e_over_ir(p)];
+    raw_edges = _ps_edges_from_faces(faces_rev);
+    oriented_edges = _ps_edges_from_faces(ps_orient_all_faces_outward(verts, faces_rev));
+    cls = poly_classify(p_rev, 1, 1e-6, 1, false);
+    ids = ps_classify_edge_ids(cls, len(raw_edges));
+    sites = ps_edge_sites(p_rev, classify = cls);
+
+    assert(raw_edges != oriented_edges, "reversed input should change raw edge ordering for this regression test");
+    assert_int_eq(len(sites), len(raw_edges), "reversed poly edge site count");
+
+    for (site = sites) {
+        ei = site[0];
+        assert(site[9] == raw_edges[ei], str("edge site should preserve raw edge order ei=", ei, " got=", site[9], " expected=", raw_edges[ei]));
+        assert_int_eq(site[11], ids[ei], "edge family id should match raw-order classify ids");
+    }
+}
+
 module test_ps_vertex_sites__cube_records_match_vertex_structure() {
     p = hexahedron();
     verts = poly_verts(p);
@@ -362,6 +405,8 @@ module run_TestPlacement() {
     test_place_on_faces__auto_classify_matches_precomputed();
     test_ps_face_sites__cube_records_match_face_structure();
     test_ps_edge_sites__cube_records_match_edge_structure();
+    test_ps_edge_sites__cube_uses_adjacent_face_normal_bisector();
+    test_ps_edge_sites__preserves_raw_edge_order_for_classify_ids();
     test_ps_vertex_sites__cube_records_match_vertex_structure();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();

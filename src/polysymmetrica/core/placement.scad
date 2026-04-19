@@ -65,17 +65,6 @@ function _ps_face_site_dihedrals(face, fi, faces0, edges, edge_faces, face_n) =
     ];
 
 /**
- * Function: Build adjacent-face indices for one edge site.
- * Params: faces (poly face index cycles), e (undirected edge vertex pair)
- * Returns: list of adjacent face indices in scan order
- */
-function _ps_edge_site_adj_faces_idx(faces, e) =
-    [
-        for (fi = [0:1:len(faces)-1])
-            if (ps_face_has_edge(faces[fi], e[0], e[1])) fi
-    ];
-
-/**
  * Function: Build full neighbor indices for one vertex site from the edge list.
  * Params: edges (undirected edge list), vi (vertex index)
  * Returns: list of neighboring vertex indices in edge scan order
@@ -211,7 +200,7 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
  * Function: Build edge placement site records for `place_on_edges(...)`.
  * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context)
  * Returns: list of edge site records `[edge_idx, center, ex, ey, ez, edge_len, edge_midradius, poly_center_local, edge_pts_local, edge_verts_idx, edge_adj_faces_idx, edge_family_id, face_family_count, edge_family_count, vertex_family_count]`
- * Limitations: preserves the current radial fallback edge frame; dihedral-bisector geometry belongs in a later dedicated change
+ * Limitations: uses an adjacent-face normal bisector for `+Z` when a usable face pair exists, with radial fallback on boundary or degenerate edges
  */
 function ps_edge_sites(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) =
     let(
@@ -219,7 +208,10 @@ function ps_edge_sites(poly, inter_radius = 1, edge_len = undef, classify = unde
         scale = exp_edge_len,
         verts = poly_verts(poly),
         faces = poly_faces(poly),
+        faces0 = ps_orient_all_faces_outward(verts, faces),
         edges = _ps_edges_from_faces(faces),
+        edge_faces = ps_edge_faces_table(faces0, edges),
+        face_n = [for (f = faces0) ps_face_normal(verts, f)],
         cls = _ps_resolve_classify(poly, classify, classify_opts),
         family_counts = is_undef(cls) ? undef : ps_classify_counts(cls),
         edge_family_ids = is_undef(cls) ? [] : ps_classify_edge_ids(cls, len(edges)),
@@ -235,9 +227,24 @@ function ps_edge_sites(poly, inter_radius = 1, edge_len = undef, classify = unde
                 v1 = verts[e[1]] * scale,
                 center = (v0 + v1) / 2,
                 ex = v_norm(v1 - v0),
-                ez0 = v_norm(center),
-                ey = v_norm(v_cross(ez0, ex)),
-                ez = v_norm(v_cross(ex, ey)),
+                adj_faces_idx = edge_faces[ei],
+                radial_ref = v_norm(center),
+                bisector_raw =
+                    (len(adj_faces_idx) < 2)
+                        ? radial_ref
+                        : face_n[adj_faces_idx[0]] + face_n[adj_faces_idx[1]],
+                bisector_signed =
+                    (norm(bisector_raw) <= 1e-12)
+                        ? radial_ref
+                        : ((v_dot(bisector_raw, radial_ref) < 0) ? -bisector_raw : bisector_raw),
+                ez_proj = bisector_signed - ex * v_dot(bisector_signed, ex),
+                radial_proj = radial_ref - ex * v_dot(radial_ref, ex),
+                ez_dir =
+                    (norm(ez_proj) <= 1e-12)
+                        ? radial_proj
+                        : ez_proj,
+                ez = v_norm(ez_dir),
+                ey = v_norm(v_cross(ez, ex)),
                 edge_midradius = norm(center),
                 edge_len_actual = norm(v1 - v0),
                 poly_center_local = [
@@ -245,8 +252,7 @@ function ps_edge_sites(poly, inter_radius = 1, edge_len = undef, classify = unde
                     v_dot(-center, ey),
                     v_dot(-center, ez)
                 ],
-                edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]],
-                adj_faces_idx = _ps_edge_site_adj_faces_idx(faces, e)
+                edge_pts_local = [[-edge_len_actual/2, 0, 0], [edge_len_actual/2, 0, 0]]
             )
             [
                 ei,

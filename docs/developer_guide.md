@@ -277,6 +277,11 @@ public:
 When inside `place_on_edges(...)`, the following edge-specific metadata is
 public:
 
+The edge frame itself is currently dihedral-centered when a usable adjacent
+face pair exists: local `+X` runs along the edge and local `+Z` follows the
+projected bisector of the two adjacent outward face normals. Boundary or
+degenerate edges fall back to the older radial frame.
+
 | Variable | Meaning |
 | --- | --- |
 | `$ps_edge_idx` | Index of the current edge in the poly descriptor. |
