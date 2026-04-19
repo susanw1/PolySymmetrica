@@ -153,7 +153,7 @@ Helper for printing: `show_poly(poly, detail, eps, radius, include_geom)`.
 
 ---
 
-### **3.2 Inter-Radius Scaling**
+### **3.3 Inter-Radius Scaling**
 
 PolySymmetrica uses **inter-radius** = radius to the midpoint of an edge as its main input scale.
 
@@ -170,7 +170,7 @@ This has multiple advantages:
 
 ---
 
-### **3.3 Generic Placement Operators**
+### **3.4 Generic Placement Operators**
 
 These operators attach arbitrary geometry to each face/edge/vertex of a polyhedron:
 
@@ -199,56 +199,114 @@ Each operator:
 
 PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 
-(Conventions: ✅ = available, ☐ = not set)
+### **3.5 Stable public placement context metadata**
 
-| Variable                        | Faces | Verts  | Edges | Meaning                                                                                                                                                        |
-| ------------------------------- | :---: | :---:  | :---: | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `$ps_face_idx`                 |   ✅  |   ☐   |   ☐   | Index of the face being placed (0..N-1)                                                                                                                        |
-| `$ps_vertex_count`              |   ✅  |   ☐   |   ☐   | Number of vertices of this face (length of `$ps_face_pts2d`)                                                                                                   |
-| `$ps_face_midradius`            |   ✅  |   ☐   |   ☐   | Distance from poly centre to face centre (world units; scale-derived)                                                                                          |
-| `$ps_face_radius`              |   ✅  |   ☐   |   ☐   | Mean distance from face centre to its vertices (useful even for irregular faces; scale-derived)                                                                |
-| `$ps_face_pts2d`                |   ✅  |   ☐   |   ☐   | Face polygon vertices in **face-local 2D coords** `[[x,y]...]` suitable for `polygon(points=...)`                                                              |
-| `$ps_face_pts3d_local`          |   ✅  |   ☐   |   ☐   | Face vertices in **face-local 3D coords** `[[x,y,z]...]`, mean-centered in local z (planar faces are near `z=0`)                                               |
-| `$ps_face_planarity_err`        |   ✅  |   ☐   |   ☐   | Max local-z deviation across face vertices (0 for perfectly planar in local frame)                                                                               |
-| `$ps_face_is_planar`            |   ✅  |   ☐   |   ☐   | Boolean planarity flag (`$ps_face_planarity_err <= 1e-8`)                                                                                                         |
-| `$ps_face_family_id`            |   ✅  |   ☐   |   ☐   | Family id of the current face from `poly_classify(...)`                                                                                                           |
-| `$ps_face_neighbors_idx`       |   ✅  |   ☐   |   ☐   | Adjacent face indices per face edge (aligned with `$ps_face_pts2d` order; `undef` for boundary edges)                                                         |
-| `$ps_face_dihedrals`            |   ✅  |   ☐   |   ☐   | Dihedral angles per face edge, degrees (aligned with `$ps_face_pts2d` order; internal dihedral for closed manifolds)                                           |
-| `$ps_vertex_valence`            |   ☐   |   ✅   |   ☐   | Number of incident edges at this vertex                                                                                                                       |
-| `$ps_vertex_neighbors_idx`      |   ☐   |   ✅   |   ☐   | Neighbor vertex indices incident to this vertex (order currently unspecified)                                                                                 |
-| `$ps_vertex_neighbor_pts_local` |   ☐   |   ✅   |   ☐   | Vectors from vertex to each neighbor in **vertex-local coords** `[[x,y,z]...]`                                                                                |
-| `$ps_vert_radius`               |   ☐   |   ✅   |   ☐   | Distance from poly centre to this vertex (world units; scale-derived)                                                                                         |
-| `$ps_vertex_idx`                |   ☐   |   ✅   |   ☐   | Index of the vertex being placed (0..K-1)                                                                                                                     |
-| `$ps_vertex_family_id`          |   ☐   |   ✅   |   ☐   | Family id of the current vertex from `poly_classify(...)`                                                                                                         |
-| `$ps_edge_idx`                  |   ☐   |   ☐   |   ✅  | Index of the edge being placed (0..M-1)                                                                                                                        |
-| `$ps_edge_midradius`            |   ☐   |   ☐   |   ✅  | Distance from poly centre to edge midpoint (world units; scale-derived)                                                                                        |
-| `$ps_edge_pts_local`            |   ☐   |   ☐   |   ✅  | Edge endpoints in **edge-local coords**, typically `[[ -L/2,0,0 ], [ +L/2,0,0 ]]`                                                                              |
-| `$ps_edge_verts_idx`            |   ☐   |   ☐   |   ✅  | Vertex indices of this edge `[v0, v1]`                                                                                                                         |
-| `$ps_edge_adj_faces_idx`        |   ☐   |   ☐   |   ✅  | Face indices adjacent to this edge (usually 2 for closed manifold polys)                                                                                       |
-| `$ps_edge_family_id`            |   ☐   |   ☐   |   ✅  | Family id of the current edge from `poly_classify(...)`                                                                                                           |
-| `$ps_edge_len`                  |   ✅  |   ✅   |   ✅  | **Faces:** mean edge length for the face (scale-derived); **Edges:** *actual* length of this edge; **Verts:** target edge length parameter passed to placement |
-| `$ps_face_family_count`         |   ✅  |   ✅   |   ✅  | Total number of face families from the active classification                                                                                                       |
-| `$ps_edge_family_count`         |   ✅  |   ✅   |   ✅  | Total number of edge families from the active classification                                                                                                       |
-| `$ps_vertex_family_count`       |   ✅  |   ✅   |   ✅  | Total number of vertex families from the active classification                                                                                                     |
-| `$ps_poly_center_local`         |   ✅  |   ✅   |   ✅  | Polyhedral centre vector expressed in the current local coord frame (Faces/Edges/Verts). For vertices: `[0,0,-$ps_vert_radius]` by construction                |
+The variables documented in this section are the **stable public placement
+context metadata** for the core placement operators:
 
-Family ids are only meaningful relative to one classification context. If you need stable matching between placement and transform/override logic, pass the same precomputed `classify` object to all consumers.
+- `place_on_faces(...)`
+- `place_on_edges(...)`
+- `place_on_vertices(...)`
+
+If a `$ps_*` variable is **not** documented here, it should currently be
+treated as internal or experimental rather than part of the public contract.
+
+Likewise, nested iterator modules in other files, such as `segments.scad` or
+`face_regions.scad`, may expose additional `$ps_*` variables of their own; they
+are governed by their own docs and are not automatically part of this core
+placement context metadata surface.
+
+The contract is about **semantics**, not implementation details. Future helper
+functions such as site-record builders should preserve these meanings.
+
+#### Common guarantees
+
+All three core placement operators guarantee that children are evaluated in a
+local orthonormal frame centered on the current placement site.
+
+The exact axis-construction details are part of each placement operator's
+geometry and may evolve. Consumers should rely on the documented `$ps_*`
+metadata contract rather than inferring hidden frame semantics from the current
+implementation.
+
+Every placement site also exposes the following common metadata:
+
+| Variable | Faces | Verts | Edges | Meaning |
+| --- | :---: | :---: | :---: | --- |
+| `$ps_edge_len` | ✅ | ✅ | ✅ | Scale-driving edge length for this placement context. On faces this is the scale-derived face edge length; on edges it is the actual length of the current edge; on vertices it is the target edge length used to scale the poly. |
+| `$ps_poly_center_local` | ✅ | ✅ | ✅ | Vector from the placement-site origin to the polyhedral center, expressed in the current local frame. |
+| `$ps_face_family_count` | ✅ | ✅ | ✅ | Total number of face families in the active classification, or `undef` when no classification context is active. |
+| `$ps_edge_family_count` | ✅ | ✅ | ✅ | Total number of edge families in the active classification, or `undef` when no classification context is active. |
+| `$ps_vertex_family_count` | ✅ | ✅ | ✅ | Total number of vertex families in the active classification, or `undef` when no classification context is active. |
+
+#### Face placement contract
+
+When inside `place_on_faces(...)`, the following face-specific metadata is
+public:
+
+| Variable | Meaning |
+| --- | --- |
+| `$ps_face_idx` | Index of the current face in the poly descriptor. |
+| `$ps_vertex_count` | Number of vertices in the current face. |
+| `$ps_face_midradius` | Distance from poly center to face center, in world units after scaling. |
+| `$ps_face_radius` | Mean distance from the face center to its vertices, in world units after scaling. |
+| `$ps_face_pts2d` | Face vertices in face-local 2D coordinates, suitable for `polygon(points=...)`. |
+| `$ps_face_pts3d_local` | Face vertices in face-local 3D coordinates, with local `z` mean-centered. |
+| `$ps_face_planarity_err` | Maximum local-z deviation across the current face vertices. |
+| `$ps_face_is_planar` | Boolean planarity flag derived from `$ps_face_planarity_err`. |
+| `$ps_face_family_id` | Family id of the current face from `poly_classify(...)`, or `undef` if no classification is active. |
+| `$ps_face_neighbors_idx` | Adjacent face indices per face edge, aligned with `$ps_face_pts2d` order. Boundary edges are `undef`. |
+| `$ps_face_dihedrals` | Dihedral angles per face edge, aligned with `$ps_face_pts2d` order. Boundary edges use a fallback self-normal value and should not be treated as meaningful two-face dihedrals. |
+
+#### Vertex placement contract
+
+When inside `place_on_vertices(...)`, the following vertex-specific metadata is
+public:
+
+| Variable | Meaning |
+| --- | --- |
+| `$ps_vertex_idx` | Index of the current vertex in the poly descriptor. |
+| `$ps_vertex_valence` | Number of incident edges at the current vertex. |
+| `$ps_vertex_neighbors_idx` | Neighbor vertex indices incident to the current vertex. Their order is available but not currently guaranteed as a public ordering contract. |
+| `$ps_vertex_neighbor_pts_local` | Vectors from the current vertex to each neighbor, expressed in vertex-local coordinates. |
+| `$ps_vert_radius` | Distance from the poly center to the current vertex, in world units after scaling. |
+| `$ps_vertex_family_id` | Family id of the current vertex from `poly_classify(...)`, or `undef` if no classification is active. |
+
+#### Edge placement contract
+
+When inside `place_on_edges(...)`, the following edge-specific metadata is
+public:
+
+| Variable | Meaning |
+| --- | --- |
+| `$ps_edge_idx` | Index of the current edge in the poly descriptor. |
+| `$ps_edge_midradius` | Distance from the poly center to the current edge midpoint, in world units after scaling. |
+| `$ps_edge_pts_local` | Edge endpoints in edge-local coordinates, typically `[[ -L/2, 0, 0 ], [ +L/2, 0, 0 ]]`. |
+| `$ps_edge_verts_idx` | Vertex indices of the current edge `[v0, v1]`. |
+| `$ps_edge_adj_faces_idx` | Face indices adjacent to the current edge. Closed manifold edges usually have two. |
+| `$ps_edge_family_id` | Family id of the current edge from `poly_classify(...)`, or `undef` if no classification is active. |
+
+#### Classification note
+
+Family ids are only meaningful relative to one classification context. If you
+need stable matching between placement and transform/override logic, pass the
+same precomputed `classify` object to all consumers.
 
 These make the system extremely expressive.
 
-### **3.4 Cantitruncation Notes**
+### **3.6 Cantitruncation Notes**
 
 See [cantitruncation.md](cantitruncation.md) for current parameterization, trig solver, and dominant‑family notes.
 
-### **3.5 Cantellation Notes**
+### **3.7 Cantellation Notes**
 
 See [cantellation.md](cantellation.md) for current parameterization, helpers, and planarity notes.
 
-### **3.6 Snub Notes**
+### **3.8 Snub Notes**
 
 See [snubs.md](snubs.md) for snub usage, default solving, helper notes, and current caveats.
 
-### **3.7 Shared Params Overrides**
+### **3.9 Shared Params Overrides**
 
 PolySymmetrica supports operator-agnostic structured overrides using shared row formats:
 
@@ -276,7 +334,7 @@ For schema details, compile-spec format, and examples, see:
 
 When using family-targeted overrides (`"family"` rows), keep classification context consistent (`detail`, `radius`, `include_geom`) across all stages; best practice is to classify once and reuse that object.
 
-### **3.8 Face Attachment**
+### **3.10 Face Attachment**
 
 `poly_attach(...)` composes two closed polys by welding selected faces:
 
@@ -305,7 +363,7 @@ See:
 - [attach.md](attach.md)
 - [`src/polysymmetrica/examples/basics/main_attach.scad`](../src/polysymmetrica/examples/basics/main_attach.scad)
 
-### **3.9 Validation Modes**
+### **3.11 Validation Modes**
 
 `poly_valid(poly, mode, eps)` supports progressively stricter checks:
 
@@ -380,7 +438,7 @@ These conventions aim to:
 
 ---
 
-### **3.8 Dual Operator**
+### **3.12 Dual Operator**
 
 PolySymmetrica implements a **fully correct convex dual construction**:
 
