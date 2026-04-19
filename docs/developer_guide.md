@@ -199,10 +199,10 @@ Each operator:
 
 PolySymmetrica exposes per-placement metadata via `$ps_*` variables.
 
-### **3.5 Stable public placement metadata contract**
+### **3.5 Stable public placement context metadata**
 
 The variables documented in this section are the **stable public placement
-contract** for the core placement operators:
+context metadata** for the core placement operators:
 
 - `place_on_faces(...)`
 - `place_on_edges(...)`
@@ -214,7 +214,7 @@ treated as internal or experimental rather than part of the public contract.
 Likewise, nested iterator modules in other files, such as `segments.scad` or
 `face_regions.scad`, may expose additional `$ps_*` variables of their own; they
 are governed by their own docs and are not automatically part of this core
-placement contract.
+placement context metadata surface.
 
 The contract is about **semantics**, not implementation details. Future helper
 functions such as site-record builders should preserve these meanings.
