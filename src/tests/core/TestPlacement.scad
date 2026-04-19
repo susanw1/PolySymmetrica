@@ -71,6 +71,87 @@ module test_place_on_faces__auto_classify_matches_precomputed() {
     }
 }
 
+module test_ps_face_sites__cube_records_match_face_structure() {
+    p = hexahedron();
+    faces = poly_faces(p);
+    cls = poly_classify(p, 1, 1e-6, 1, false);
+    ids = ps_classify_face_ids(cls, len(faces));
+    counts = ps_classify_counts(cls);
+    sites = ps_face_sites(p, classify = cls);
+
+    assert_int_eq(len(sites), len(faces), "face site count should match face count");
+
+    for (site = sites) {
+        fi = site[0];
+        face = faces[fi];
+
+        assert_int_eq(site[6], len(face), "site vertex count should match face arity");
+        assert_int_eq(len(site[10]), len(face), "site 2d point count should match face arity");
+        assert_int_eq(len(site[11]), len(face), "site 3d local point count should match face arity");
+        assert_int_eq(len(site[20]), len(face), "site neighbor count should match face arity");
+        assert_int_eq(len(site[21]), len(face), "site dihedral count should match face arity");
+        assert(site[15], str("cube face site should be planar fi=", fi));
+        assert(abs(site[14]) < 1e-9, str("cube face planarity err should be ~0 fi=", fi, " err=", site[14]));
+        assert_int_eq(site[16], ids[fi], "site face family id");
+        assert_int_eq(site[17], counts[0], "site face family count");
+        assert_int_eq(site[18], counts[1], "site edge family count");
+        assert_int_eq(site[19], counts[2], "site vertex family count");
+    }
+}
+
+module test_ps_edge_sites__cube_records_match_edge_structure() {
+    p = hexahedron();
+    faces = poly_faces(p);
+    edges = _ps_edges_from_faces(faces);
+    cls = poly_classify(p, 1, 1e-6, 1, false);
+    ids = ps_classify_edge_ids(cls, len(edges));
+    counts = ps_classify_counts(cls);
+    sites = ps_edge_sites(p, classify = cls);
+
+    assert_int_eq(len(sites), len(edges), "edge site count should match edge count");
+
+    for (site = sites) {
+        ei = site[0];
+
+        assert_vec3_near(site[8][0], [-site[5] / 2, 0, 0], 1e-9, "edge local start point");
+        assert_vec3_near(site[8][1], [site[5] / 2, 0, 0], 1e-9, "edge local end point");
+        assert_int_eq(len(site[9]), 2, "edge vertex pair should have arity 2");
+        assert_int_eq(len(site[10]), 2, "cube edges should have two adjacent faces");
+        assert(abs(norm(site[1]) - site[6]) < 1e-9, str("edge center/midradius mismatch ei=", ei));
+        assert_int_eq(site[11], ids[ei], "site edge family id");
+        assert_int_eq(site[12], counts[0], "site face family count");
+        assert_int_eq(site[13], counts[1], "site edge family count");
+        assert_int_eq(site[14], counts[2], "site vertex family count");
+    }
+}
+
+module test_ps_vertex_sites__cube_records_match_vertex_structure() {
+    p = hexahedron();
+    verts = poly_verts(p);
+    cls = poly_classify(p, 1, 1e-6, 1, false);
+    ids = ps_classify_vert_ids(cls, len(verts));
+    counts = ps_classify_counts(cls);
+    sites = ps_vertex_sites(p, classify = cls);
+
+    assert_int_eq(len(sites), len(verts), "vertex site count should match vertex count");
+
+    for (site = sites) {
+        vi = site[0];
+
+        assert_int_eq(site[8], 3, "cube vertex valence should be 3");
+        assert_int_eq(len(site[9]), site[8], "neighbor index count should match valence");
+        assert_int_eq(len(site[10]), site[8], "neighbor point count should match valence");
+        assert(abs(norm(site[1]) - site[6]) < 1e-9, str("vertex center/radius mismatch vi=", vi));
+        assert_vec3_near(site[7], [0, 0, -site[6]], 1e-9, "vertex poly-center local");
+        for (p_local = site[10])
+            assert(abs(norm(p_local) - site[5]) < 1e-9, str("vertex neighbor edge length mismatch vi=", vi, " p=", p_local));
+        assert_int_eq(site[11], ids[vi], "site vertex family id");
+        assert_int_eq(site[12], counts[0], "site face family count");
+        assert_int_eq(site[13], counts[1], "site edge family count");
+        assert_int_eq(site[14], counts[2], "site vertex family count");
+    }
+}
+
 module test_place_on_all__cube_single_family() {
     p = hexahedron();
     cls = poly_classify(p, 1, 1e-6, 1, false);
@@ -279,6 +360,9 @@ module run_TestPlacement() {
     test_place_on_edges__family_ids_and_counts_from_classify();
     test_place_on_vertices__family_ids_and_counts_from_classify();
     test_place_on_faces__auto_classify_matches_precomputed();
+    test_ps_face_sites__cube_records_match_face_structure();
+    test_ps_edge_sites__cube_records_match_edge_structure();
+    test_ps_vertex_sites__cube_records_match_vertex_structure();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_face_segments__star_face_split();
