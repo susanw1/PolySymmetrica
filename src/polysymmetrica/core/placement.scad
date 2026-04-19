@@ -209,7 +209,7 @@ function ps_edge_sites(poly, inter_radius = 1, edge_len = undef, classify = unde
         verts = poly_verts(poly),
         faces = poly_faces(poly),
         faces0 = ps_orient_all_faces_outward(verts, faces),
-        edges = _ps_edges_from_faces(faces0),
+        edges = _ps_edges_from_faces(faces),
         edge_faces = ps_edge_faces_table(faces0, edges),
         face_n = [for (f = faces0) ps_face_normal(verts, f)],
         cls = _ps_resolve_classify(poly, classify, classify_opts),
