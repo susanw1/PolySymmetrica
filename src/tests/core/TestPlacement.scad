@@ -71,6 +71,34 @@ module test_place_on_faces__auto_classify_matches_precomputed() {
     }
 }
 
+module test_ps_face_sites__cube_records_match_face_structure() {
+    p = hexahedron();
+    faces = poly_faces(p);
+    cls = poly_classify(p, 1, 1e-6, 1, false);
+    ids = ps_classify_face_ids(cls, len(faces));
+    counts = ps_classify_counts(cls);
+    sites = ps_face_sites(p, classify = cls);
+
+    assert_int_eq(len(sites), len(faces), "face site count should match face count");
+
+    for (site = sites) {
+        fi = site[0];
+        face = faces[fi];
+
+        assert_int_eq(site[6], len(face), "site vertex count should match face arity");
+        assert_int_eq(len(site[10]), len(face), "site 2d point count should match face arity");
+        assert_int_eq(len(site[11]), len(face), "site 3d local point count should match face arity");
+        assert_int_eq(len(site[20]), len(face), "site neighbor count should match face arity");
+        assert_int_eq(len(site[21]), len(face), "site dihedral count should match face arity");
+        assert(site[15], str("cube face site should be planar fi=", fi));
+        assert(abs(site[14]) < 1e-9, str("cube face planarity err should be ~0 fi=", fi, " err=", site[14]));
+        assert_int_eq(site[16], ids[fi], "site face family id");
+        assert_int_eq(site[17], counts[0], "site face family count");
+        assert_int_eq(site[18], counts[1], "site edge family count");
+        assert_int_eq(site[19], counts[2], "site vertex family count");
+    }
+}
+
 module test_place_on_all__cube_single_family() {
     p = hexahedron();
     cls = poly_classify(p, 1, 1e-6, 1, false);
@@ -279,6 +307,7 @@ module run_TestPlacement() {
     test_place_on_edges__family_ids_and_counts_from_classify();
     test_place_on_vertices__family_ids_and_counts_from_classify();
     test_place_on_faces__auto_classify_matches_precomputed();
+    test_ps_face_sites__cube_records_match_face_structure();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
     test_place_on_face_segments__star_face_split();
