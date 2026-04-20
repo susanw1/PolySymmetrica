@@ -151,6 +151,29 @@ module test_v_sum__vec3_list() {
     assert_vec3_near(v_sum([[1,2,3],[4,5,6]]), [5,7,9], EPS, "v_sum");
 }
 
+module test_ps_centroid2d__basic() {
+    c0 = ps_centroid2d([]);
+    assert_near(c0[0], 0, EPS, "centroid2d empty x");
+    assert_near(c0[1], 0, EPS, "centroid2d empty y");
+
+    c1 = ps_centroid2d([[0,0],[2,0],[2,2],[0,2]]);
+    assert_near(c1[0], 1, EPS, "centroid2d square x");
+    assert_near(c1[1], 1, EPS, "centroid2d square y");
+
+    c2 = ps_centroid2d([[1,1],[4,1],[1,7]]);
+    assert_near(c2[0], 2, EPS, "centroid2d tri x");
+    assert_near(c2[1], 3, EPS, "centroid2d tri y");
+}
+
+module test_ps_cyclic_pairs__basic() {
+    assert(ps_cyclic_pairs([]) == [], "cyclic pairs empty");
+    assert(ps_cyclic_pairs([5]) == [], "cyclic pairs singleton");
+    assert(
+        ps_cyclic_pairs([0,1,2,3]) == [[0,1],[1,2],[2,3],[3,0]],
+        "cyclic pairs quad"
+    );
+}
+
 // --- _ps_ordered_pair ---
 module test_ps_ordered_pair__basic() {
     assert(_ps_ordered_pair(1,2) == [1,2], "ordered 1,2");
@@ -633,6 +656,8 @@ module run_TestFuncs() {
     test_edge_equal__ordered();
     test_sum__numbers();
     test_v_sum__vec3_list();
+    test_ps_centroid2d__basic();
+    test_ps_cyclic_pairs__basic();
     test_ps_ordered_pair__basic();
     test_ps_reverse__edge_cases();
     test_ps_identity_map__basic();

@@ -72,11 +72,20 @@ function ps_faces_valid(verts, faces) =
 function ps_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
 
+/**
+ * Function: Build successive pairs from a circular list.
+ * Params: list (item list)
+ * Returns: `[[list[i], list[i+1]], ... , [last, first]]`, or `[]` for lists shorter than 2
+ */
+function ps_cyclic_pairs(list) =
+    let(n = len(list))
+    (n < 2) ? [] :
+    [ for (i = [0:1:n-1]) [list[i], list[(i+1)%n]] ];
+
 ///////////////////////////////////////
 // ---- Winding/orientation helpers (private) ----
 function _ps_face_edges_dir(f) =
-    let(n = len(f))
-    [ for (i = [0:1:n-1]) [f[i], f[(i+1)%n]] ];
+    ps_cyclic_pairs(f);
 
 function _ps_face_edge_dir(f, a, b) =
     let(
@@ -213,6 +222,15 @@ function v_sum(list) =
     (len(list) == 0) ? [] :
     let(n = len(list[0]))
     [ for (i = [0:1:n-1]) sum([for (v = list) v[i]]) ];
+
+/**
+ * Function: Compute the simple centroid of a 2D point list.
+ * Params: points (2D point list)
+ * Returns: centroid `[x, y]`, or `[0, 0]` for an empty list
+ */
+function ps_centroid2d(points) =
+    (len(points) == 0) ? [0, 0] :
+    v_scale(v_sum(points), 1 / len(points));
 
 // Rotate vector v around axis by ang (degrees).
 function ps_rot_axis(v, axis, ang) =
