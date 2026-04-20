@@ -214,6 +214,15 @@ function v_sum(list) =
     let(n = len(list[0]))
     [ for (i = [0:1:n-1]) sum([for (v = list) v[i]]) ];
 
+/**
+ * Function: Compute the simple centroid of a 2D point list.
+ * Params: points (2D point list)
+ * Returns: centroid `[x, y]`, or `[0, 0]` for an empty list
+ */
+function ps_centroid2d(points) =
+    (len(points) == 0) ? [0, 0] :
+    v_scale(v_sum(points), 1 / len(points));
+
 // Rotate vector v around axis by ang (degrees).
 function ps_rot_axis(v, axis, ang) =
     let(
