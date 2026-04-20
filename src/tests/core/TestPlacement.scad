@@ -329,6 +329,25 @@ module test_ps_face_segments__default_matches_nonzero() {
     assert(segs_default == segs_nonzero, "ps_face_segments default should match nonzero fill");
 }
 
+module test_ps_face_arrangement__pentagram_counts() {
+    p = poly_antiprism(5, 2);
+    pts3 = [for (i = poly_faces(p)[1]) poly_verts(p)[i]];
+    arr = ps_face_arrangement(pts3, 1e-9);
+    crossings = arr[1];
+    nodes = arr[2];
+    spans = arr[3];
+    cells = arr[4];
+
+    assert_int_eq(len(crossings), 5, "pentagram crossings");
+    assert_int_eq(len(nodes), 10, "pentagram arrangement nodes");
+    assert_int_eq(len(spans), 15, "pentagram arrangement spans");
+    assert_int_eq(len(cells), 7, "pentagram arrangement cells");
+
+    assert_int_eq(len([for (n = nodes) if (n[1] == "source_vertex") 1]), 5, "pentagram source-vertex count");
+    assert_int_eq(len([for (n = nodes) if (n[1] == "crossing") 1]), 5, "pentagram crossing-node count");
+    assert_int_eq(len([for (s = spans) if (s[6] == "source") 1]), len(spans), "pentagram span kinds");
+}
+
 module test_ps_face_visible_segments__cube_face_unchanged() {
     p = hexahedron();
     place_on_faces(p) {
@@ -423,6 +442,7 @@ module run_TestPlacement() {
     test_seg_face_tris3__concave_area_preserved();
     test_seg_face_tris3__star_area_matches_segments();
     test_ps_face_segments__default_matches_nonzero();
+    test_ps_face_arrangement__pentagram_counts();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__cells_preserve_parent_winding();

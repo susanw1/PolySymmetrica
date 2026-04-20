@@ -17,6 +17,7 @@ faces.
 
 Use `segments.scad` when you want answers to questions like:
 
+- "What is the raw arrangement induced by this self-crossing face?"
 - "How does this self-crossing face split under `nonzero` fill?"
 - "What cut segments cross this face?"
 - "Which cells of this face are still visible?"
@@ -99,6 +100,25 @@ Where:
   `"parent"` or `"cut"`
 
 For ordinary unsplit faces, this usually returns one cell.
+
+### `ps_face_arrangement(face_pts3d_local, eps=1e-8)`
+
+Builds the raw planar arrangement induced by the face loop.
+
+Returns:
+
+```scad
+[
+    face_pts2d,
+    crossings,
+    nodes,
+    spans,
+    cells
+]
+```
+
+This is the unfiltered arrangement-level product.
+It does not apply a fill rule and does not imply convex decomposition.
 
 ### `place_on_face_segments(mode="nonzero", eps=1e-8)`
 

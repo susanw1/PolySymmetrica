@@ -120,7 +120,7 @@ Suggested sub-records:
 crossing = [source_edge_a, source_t_a, source_edge_b, source_t_b, pt2d, node_idx]
 node     = [pt2d, kind]
 span     = [seg2d, node_a, node_b, source_edge_idx, source_t0, source_t1, kind]
-cell     = [pts2d, node_ids, span_ids, signed_area]
+cell     = [pts2d, pts3d_local, node_ids, span_ids, signed_area]
 ```
 
 Where `kind` is intentionally explicit and small, for example:
@@ -179,7 +179,7 @@ Proposed record:
 
 ```scad
 [
-    [pts2d, span_ids, source_edge_ids],
+    [pts2d, pts3d_local, span_ids, source_edge_ids],
     ...
 ]
 ```

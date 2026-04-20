@@ -303,6 +303,7 @@ These make the system extremely expressive.
 
 See [segments.md](segments.md) for the face-local analysis layer:
 
+- `ps_face_arrangement(...)`
 - `ps_face_segments(...)`
 - `ps_face_geom_cut_entries(...)`
 - `ps_face_geom_cut_segments(...)`

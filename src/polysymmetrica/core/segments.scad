@@ -186,7 +186,8 @@ function _ps_seg_extract_cycles(nodes, hedges, input_area_sign, hi=0, visited=un
         keep = (len(hs) >= 3) && (len(ns) >= 3) && (abs(area) > eps),
         edge_ids = [for (hidx = hs) hedges[hidx][3]],
         kinds = [for (hidx = hs) (len(hedges[hidx]) > 4 ? hedges[hidx][4] : "parent")],
-        cyc = [pts2d, pts3d, edge_ids, kinds, ns],
+        span_ids = [for (hidx = hs) hedges[hidx][2]],
+        cyc = [pts2d, pts3d, edge_ids, kinds, ns, span_ids],
         vis2 = (len(hs) == 0) ? _ps_list_set(vis, hi, true) : _ps_seg_set_true_many(vis, hs),
         cycles2 = keep ? concat(cycles, [cyc]) : cycles
     )
@@ -332,15 +333,24 @@ function _ps_seg_cycle_probe_point(poly, eps=1e-9) =
     )
     (len(idxs) > 0) ? cands[idxs[0]] : centroid;
 
+function _ps_seg_node_kind(node3d, face_pts3d_local, eps=1e-9) =
+    max([
+        for (p = face_pts3d_local)
+            (norm(node3d - p) <= eps) ? 1 : 0
+    ]) == 1 ? "source_vertex" : "crossing";
+
 /**
- * Function: Split a face loop into simple face-local cells.
- * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
- * Returns: `[[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]`
- * Limitations/Gotchas: `mode="nonzero"` is the intended default for solid self-crossing faces; use `"evenodd"` only when parity fill is genuinely wanted
+ * Function: Build the planar arrangement induced by one face loop.
+ * Params: face_pts3d_local (loop in face-local 3D), eps (geometric tolerance)
+ * Returns: `[face_pts2d, crossings, nodes, spans, cells]`
+ * Limitations/Gotchas: cells are all traced simple arrangement cells before any fill-rule filtering; they are not guaranteed convex
  */
-function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
-    let(n = len(face_pts3d_local))
-    (n < 3) ? [] :
+function ps_face_arrangement(face_pts3d_local, eps=1e-8) =
+    let(
+        n = len(face_pts3d_local),
+        face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]]
+    )
+    (n < 3) ? [face_pts2d, [], [], [], []] :
     let(
         hits = _ps_seg_hits(face_pts3d_local, eps),
         ts = _ps_seg_edge_ts(face_pts3d_local, hits, eps),
@@ -354,8 +364,8 @@ function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
                 for (t = ts_e)
                     _ps_seg_interp3(a, b, t)
         ],
-        nodes = _ps_seg_unique_nodes(raw_nodes, eps),
-        segs = _ps_seg_segments_from_ts(face_pts3d_local, ts, nodes, eps),
+        nodes3d = _ps_seg_unique_nodes(raw_nodes, eps),
+        segs = _ps_seg_segments_from_ts(face_pts3d_local, ts, nodes3d, eps),
         hedges = concat(
             [
                 for (si = [0:1:len(segs)-1])
@@ -368,26 +378,72 @@ function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
                     [s[1], s[0], si, s[2], "parent", s[4], s[3]]
             ]
         ),
-        outer2d = [for (p = face_pts3d_local) [p[0], p[1]]],
+        input_area = _ps_seg_poly_area2(face_pts2d),
+        input_sign = (input_area >= 0) ? 1 : -1,
+        cycles = _ps_seg_extract_cycles(nodes3d, hedges, input_sign, 0, undef, [], eps),
+        cycles_u = _ps_seg_dedupe_cycles(cycles),
+        crossings = [
+            for (h = hits)
+                let(node_idx = _ps_seg_node_index(nodes3d, h[4], eps))
+                [h[0], h[1], h[2], h[3], [h[4][0], h[4][1]], node_idx]
+        ],
+        nodes = [
+            for (p = nodes3d)
+                [[p[0], p[1]], _ps_seg_node_kind(p, face_pts3d_local, eps)]
+        ],
+        spans = [
+            for (s = segs)
+                [
+                    [[nodes3d[s[0]][0], nodes3d[s[0]][1]], [nodes3d[s[1]][0], nodes3d[s[1]][1]]],
+                    s[0],
+                    s[1],
+                    s[2],
+                    s[3],
+                    s[4],
+                    "source"
+                ]
+        ],
+        cells = [
+            for (c = cycles_u)
+                [c[0], c[1], c[4], c[5], _ps_seg_poly_area2(c[0])]
+        ]
+    )
+    [face_pts2d, crossings, nodes, spans, cells];
+
+/**
+ * Function: Split a face loop into simple face-local cells.
+ * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: `[[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]`
+ * Limitations/Gotchas: `mode="nonzero"` is the intended default for solid self-crossing faces; use `"evenodd"` only when parity fill is genuinely wanted
+ */
+function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
+    let(
+        n = len(face_pts3d_local),
+        arr = ps_face_arrangement(face_pts3d_local, eps),
+        outer2d = arr[0],
+        spans = arr[3],
+        cells = arr[4]
+    )
+    (n < 3) ? [] :
+    let(
         input_area = _ps_seg_poly_area2(outer2d),
         input_sign = (input_area >= 0) ? 1 : -1,
-        cycles = _ps_seg_extract_cycles(nodes, hedges, input_sign, 0, undef, [], eps),
-        cycles_u = _ps_seg_dedupe_cycles(cycles),
         filtered = [
-            for (c = cycles_u)
+            for (c = cells)
                 let(
                     pts2d = c[0],
                     pts3d = c[1],
-                    edge_ids = c[2],
-                    kinds = c[3],
+                    span_ids = c[3],
                     probe = _ps_seg_cycle_probe_point(pts2d, eps),
-                    area_c = _ps_seg_poly_area2(pts2d),
+                    area_c = c[4],
                     cycle_sign_ok = (abs(input_area) <= eps) ? true : (area_c * input_sign > eps),
                     in_evenodd = _ps_seg_point_in_poly_evenodd(probe, outer2d, eps),
                     in_nonzero = _ps_seg_point_in_poly_nonzero(probe, outer2d, eps),
                     keep = (mode == "all") ? true :
                            (mode == "nonzero") ? in_nonzero :
-                           in_evenodd
+                           in_evenodd,
+                    edge_ids = [for (si = span_ids) spans[si][3]],
+                    kinds = [for (si = span_ids) spans[si][6]]
                 )
                 if (keep && ((mode == "nonzero") ? cycle_sign_ok : true)) [pts2d, pts3d, edge_ids, kinds]
         ]
