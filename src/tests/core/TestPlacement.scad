@@ -231,7 +231,7 @@ module test_place_on_face_segments__star_face_split() {
     p = poly_antiprism(5, 2);
     place_on_faces(p) {
         if ($ps_face_idx == 0) {
-            place_on_face_segments() {
+            place_on_face_segments(mode="evenodd") {
                 assert(!is_undef($ps_seg_idx), "segment idx should be defined");
                 assert(!is_undef($ps_seg_count), "segment count should be defined");
                 assert($ps_seg_count > 1, "star face should split into multiple segments");
@@ -320,6 +320,13 @@ module test_seg_face_tris3__star_area_matches_segments() {
     assert(len(segs) > 1, "star face should split into multiple even-odd regions");
     assert(len(tris) >= 3, "triangulation should produce at least a few triangles");
     assert(abs(area_tris - area_segs) < 1e-6, str("star triangulation area mismatch tris=", area_tris, " segs=", area_segs));
+}
+
+module test_ps_face_segments__default_matches_nonzero() {
+    pts3 = [[0,9,0], [-5,-5,0], [8,3,0], [-8,3,0], [5,-5,0]];
+    segs_default = ps_face_segments(pts3, eps=1e-9);
+    segs_nonzero = ps_face_segments(pts3, "nonzero", 1e-9);
+    assert(segs_default == segs_nonzero, "ps_face_segments default should match nonzero fill");
 }
 
 module test_ps_face_visible_segments__cube_face_unchanged() {
@@ -415,6 +422,7 @@ module run_TestPlacement() {
     test_seg_cycle_probe_point__concave_inside();
     test_seg_face_tris3__concave_area_preserved();
     test_seg_face_tris3__star_area_matches_segments();
+    test_ps_face_segments__default_matches_nonzero();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__cells_preserve_parent_winding();

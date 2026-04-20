@@ -1,6 +1,14 @@
 // ---------------------------------------------------------------------------
 // PolySymmetrica - Face segmentation helpers
 // Extracts simple face segments from possibly self-intersecting face loops.
+//
+// Scope of this file:
+// - analyze a face loop into simple cells
+// - derive geometry cut entries/segments
+// - determine visible cells from face-local +Z
+//
+// It intentionally stops at data/iteration. 3D keep/cut volumes that consume
+// this analysis live elsewhere.
 
 use <funcs.scad>
 
@@ -324,16 +332,13 @@ function _ps_seg_cycle_probe_point(poly, eps=1e-9) =
     )
     (len(idxs) > 0) ? cands[idxs[0]] : centroid;
 
-// Segment a face loop in face-local coordinates.
-//
-// mode controls how self-intersecting loops are filled:
-// - "evenodd": inside if ray-crossing parity is odd (star centers can be holes)
-// - "nonzero": inside if winding number is non-zero (star centers stay filled)
-// - "all": keep every extracted cycle (debug/inspection)
-//
-// Input:  face_pts3d_local = [[x,y,z], ...] in loop order.
-// Return: [[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]
-function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
+/**
+ * Function: Split a face loop into simple face-local cells.
+ * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: `[[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]`
+ * Limitations/Gotchas: `mode="nonzero"` is the intended default for solid self-crossing faces; use `"evenodd"` only when parity fill is genuinely wanted
+ */
+function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
     let(n = len(face_pts3d_local))
     (n < 3) ? [] :
     let(
@@ -391,10 +396,12 @@ function ps_face_segments(face_pts3d_local, mode="evenodd", eps=1e-8) =
         ? [[[for (p = face_pts3d_local) [p[0], p[1]]], face_pts3d_local, [for (i = [0:1:n-1]) i], [for (_i = [0:1:n-1]) "parent"]]]
         : filtered;
 
-// Nested face-segment iterator. Call inside place_on_faces(...).
-// Uses the same mode semantics as ps_face_segments(...):
-// "evenodd" | "nonzero" | "all".
-module place_on_face_segments(mode="evenodd", eps=1e-8) {
+/**
+ * Module: Iterate simple face-local cells for the current placed face.
+ * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: none; exposes `$ps_seg_*` metadata and calls children once per cell
+ */
+module place_on_face_segments(mode="nonzero", eps=1e-8) {
     face_pts3d_local = is_undef($ps_face_pts3d_local)
         ? [for (p = $ps_face_pts2d) [p[0], p[1], 0]]
         : $ps_face_pts3d_local;
@@ -413,17 +420,12 @@ module place_on_face_segments(mode="evenodd", eps=1e-8) {
     }
 }
 
-// Safe 2D polygon fill for possibly concave/self-intersecting loops.
-// Intended as a drop-in substitute for polygon(points=...) in cases where
-// OpenSCAD's native handling can be backend-dependent for crossing loops.
-//
-// Example:
-//   ps_polygon($ps_face_pts2d, mode="nonzero");
-//
-// mode:
-// - "evenodd": parity fill (can leave star centers hollow)
-// - "nonzero": winding fill (fills star centers)
-// - "all": render all extracted cycles (debug)
+/**
+ * Module: Render a safe 2D polygon fill for concave or self-intersecting loops.
+ * Params: points (2D loop), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: none; emits 2D filled geometry via the segmented cells
+ * Limitations/Gotchas: intended as a drop-in replacement for raw `polygon(points=...)` when backend behavior on crossing loops is unreliable
+ */
 module ps_polygon(points, mode="nonzero", eps=1e-8) {
     assert(!is_undef(points), "ps_polygon: points must be defined");
     assert(len(points) >= 3, "ps_polygon: need at least 3 points");
@@ -543,7 +545,7 @@ function _ps_seg_triangulate_simple_poly_idx(pts2d, eps=1e-9) =
 
 // Triangulate a face in face-local coordinates.
 // Unlike a simple fan, this path handles concave/self-intersecting loops by:
-// 1) splitting into simple segments via ps_face_segments(..., "evenodd"),
+// 1) splitting into simple segments via ps_face_segments(..., mode),
 // 2) ear-clipping each simple segment.
 function _ps_seg_face_tris3(face_idx_loop, poly_verts_local, eps=1e-8, mode="evenodd") =
     let(
@@ -788,6 +790,11 @@ function _ps_seg_cut_entries_dedupe(entries, eps=1e-8, i=0, acc=[]) =
     )
     _ps_seg_cut_entries_dedupe(entries, eps, i + 1, acc2);
 
+/**
+ * Function: Derive geometry cut entries where other faces cross the current face plane.
+ * Params: face_pts2d (current face loop), face_idx (current face index), poly_faces_idx/poly_verts_local (full poly in current face-local coordinates), eps (tolerance), mode (cutter triangulation fill rule), filter_parent (drop cuts that coincide with parent edges)
+ * Returns: `[[seg2d, cutter_face_idx, cut_dihed], ...]`
+ */
 function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     (is_undef(face_pts2d) || is_undef(poly_faces_idx) || is_undef(poly_verts_local)) ? [] :
     let(
@@ -815,21 +822,19 @@ function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_ver
     )
     out;
 
-// Compute local 2D cut segments formed by intersections of other faces with this face plane.
-// Inputs are expected from place_on_faces(...):
-// - face_pts2d: current face loop in local 2D
-// - face_idx: current face index
-// - poly_faces_idx: full poly faces as index loops
-// - poly_verts_local: full poly vertices in current face-local coordinates
-// - mode: face fill rule to use when triangulating cutter faces ("evenodd" | "nonzero")
+/**
+ * Function: Return only the 2D cut segments from `ps_face_geom_cut_entries(...)`.
+ * Params: face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent
+ * Returns: `[seg2d, ...]`
+ */
 function ps_face_geom_cut_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     [for (e = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent)) e[0]];
 
-// Split the current face by geometry-derived cut segments and keep only the
-// cells that are actually visible from the face-local +Z side.
-//
-// Returns:
-//   [[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds], ...]
+/**
+ * Function: Split the current face by geometry cuts and keep only the cells visible from local `+Z`.
+ * Params: face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent
+ * Returns: `[[cell_pts2d, cell_pts3d_local, cell_edge_ids, cell_edge_kinds], ...]`
+ */
 function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
     let(
         base_segs = ps_face_segments([for (p = face_pts2d) [p[0], p[1], 0]], mode, eps),
@@ -849,7 +854,11 @@ function ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_ver
                 if (!hidden) _ps_seg_orient_cell(cell, target_sign, eps)
     ];
 
-// Iterate geometry-derived cut segments for current face.
+/**
+ * Module: Iterate geometry-derived cut segments for the current placed face.
+ * Params: mode (cutter triangulation fill rule), eps (tolerance), filter_parent (drop cuts that coincide with parent edges)
+ * Returns: none; exposes `$ps_face_cut_*` metadata and calls children once per cut segment
+ */
 module place_on_face_geom_cut_segments(mode="nonzero", eps=1e-8, filter_parent=true) {
     assert(!is_undef($ps_face_pts2d), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_face_pts2d)");
     assert(!is_undef($ps_face_idx), "place_on_face_geom_cut_segments: requires place_on_faces context ($ps_face_idx)");
@@ -865,7 +874,11 @@ module place_on_face_geom_cut_segments(mode="nonzero", eps=1e-8, filter_parent=t
     }
 }
 
-// Iterate the retained visible face cells for the current face.
+/**
+ * Module: Iterate the retained visible cells for the current placed face.
+ * Params: mode (cell/cutter fill rule), eps (tolerance), filter_parent (drop cuts that coincide with parent edges)
+ * Returns: none; exposes `$ps_vis_seg_*` metadata and calls children once per visible cell
+ */
 module place_on_face_visible_segments(mode="nonzero", eps=1e-8, filter_parent=true) {
     assert(!is_undef($ps_face_pts2d), "place_on_face_visible_segments: requires place_on_faces context ($ps_face_pts2d)");
     assert(!is_undef($ps_face_idx), "place_on_face_visible_segments: requires place_on_faces context ($ps_face_idx)");

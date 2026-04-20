@@ -299,19 +299,31 @@ same precomputed `classify` object to all consumers.
 
 These make the system extremely expressive.
 
-### **3.6 Cantitruncation Notes**
+### **3.6 Face Segment Notes**
+
+See [segments.md](segments.md) for the face-local analysis layer:
+
+- `ps_face_segments(...)`
+- `ps_face_geom_cut_entries(...)`
+- `ps_face_geom_cut_segments(...)`
+- `ps_face_visible_segments(...)`
+
+Use this layer when you want analyzable face-local cells, cuts, and visibility,
+not arbitrary 3D clipping.
+
+### **3.7 Cantitruncation Notes**
 
 See [cantitruncation.md](cantitruncation.md) for current parameterization, trig solver, and dominant‑family notes.
 
-### **3.7 Cantellation Notes**
+### **3.8 Cantellation Notes**
 
 See [cantellation.md](cantellation.md) for current parameterization, helpers, and planarity notes.
 
-### **3.8 Snub Notes**
+### **3.9 Snub Notes**
 
 See [snubs.md](snubs.md) for snub usage, default solving, helper notes, and current caveats.
 
-### **3.9 Shared Params Overrides**
+### **3.10 Shared Params Overrides**
 
 PolySymmetrica supports operator-agnostic structured overrides using shared row formats:
 
@@ -339,7 +351,7 @@ For schema details, compile-spec format, and examples, see:
 
 When using family-targeted overrides (`"family"` rows), keep classification context consistent (`detail`, `radius`, `include_geom`) across all stages; best practice is to classify once and reuse that object.
 
-### **3.10 Face Attachment**
+### **3.11 Face Attachment**
 
 `poly_attach(...)` composes two closed polys by welding selected faces:
 
@@ -368,7 +380,7 @@ See:
 - [attach.md](attach.md)
 - [`src/polysymmetrica/examples/basics/main_attach.scad`](../src/polysymmetrica/examples/basics/main_attach.scad)
 
-### **3.11 Validation Modes**
+### **3.12 Validation Modes**
 
 `poly_valid(poly, mode, eps)` supports progressively stricter checks:
 
@@ -443,7 +455,7 @@ These conventions aim to:
 
 ---
 
-### **3.12 Dual Operator**
+### **3.13 Dual Operator**
 
 PolySymmetrica implements a **fully correct convex dual construction**:
 
