@@ -83,8 +83,7 @@ function _ps_drop_face_by_idx(faces, fi_drop) =
 function _ps_faces_directed_edges(faces) =
     [
         for (f = faces)
-            for (i = [0:1:len(f)-1])
-                [f[i], f[(i+1)%len(f)]]
+            each ps_cyclic_pairs(f)
     ];
 
 // Directed boundary edges: edges that are not matched by an opposite-directed

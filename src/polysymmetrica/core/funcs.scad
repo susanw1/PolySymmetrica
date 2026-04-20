@@ -72,11 +72,20 @@ function ps_faces_valid(verts, faces) =
 function ps_indices_in_range(face, max_idx) =
     len([for (vi = face) if (vi >= 0 && vi < max_idx) 1]) == len(face);
 
+/**
+ * Function: Build successive pairs from a circular list.
+ * Params: list (item list)
+ * Returns: `[[list[i], list[i+1]], ... , [last, first]]`, or `[]` for lists shorter than 2
+ */
+function ps_cyclic_pairs(list) =
+    let(n = len(list))
+    (n < 2) ? [] :
+    [ for (i = [0:1:n-1]) [list[i], list[(i+1)%n]] ];
+
 ///////////////////////////////////////
 // ---- Winding/orientation helpers (private) ----
 function _ps_face_edges_dir(f) =
-    let(n = len(f))
-    [ for (i = [0:1:n-1]) [f[i], f[(i+1)%n]] ];
+    ps_cyclic_pairs(f);
 
 function _ps_face_edge_dir(f, a, b) =
     let(

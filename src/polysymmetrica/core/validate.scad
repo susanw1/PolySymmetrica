@@ -14,8 +14,7 @@ function _ps_faces_min_arity(faces, min_k=3) =
     min([ for (f=faces) len(f) ]) >= min_k;
 
 function _ps_face_edges(f) =
-    let(n = len(f))
-    [ for (i=[0:1:n-1]) [f[i], f[(i+1)%n]] ];
+    ps_cyclic_pairs(f);
 
 function _ps_face_has_edge(f, a, b) =
     let(n = len(f))
