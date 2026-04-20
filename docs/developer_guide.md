@@ -311,6 +311,13 @@ See [segments.md](segments.md) for the face-local analysis layer:
 Use this layer when you want analyzable face-local cells, cuts, and visibility,
 not arbitrary 3D clipping.
 
+See [face_arrangement.md](face_arrangement.md) for the planned next layer:
+
+- `ps_face_arrangement(...)`
+- `ps_face_boundary_model(...)`
+- `ps_face_cells(...)`
+- `ps_face_atoms(...)`
+
 ### **3.7 Cantitruncation Notes**
 
 See [cantitruncation.md](cantitruncation.md) for current parameterization, trig solver, and dominant‑family notes.

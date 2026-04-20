@@ -9,6 +9,10 @@
 
 This file is about data and iteration, not arbitrary 3D clipping.
 
+See also [face_arrangement.md](face_arrangement.md) for the next planned layer:
+explicit arrangement, boundary-model, cell, and atom APIs for self-crossing
+faces.
+
 ## Mental Model
 
 Use `segments.scad` when you want answers to questions like:
