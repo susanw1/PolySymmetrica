@@ -24,6 +24,7 @@ IR = 20 * SC;
 //sol = solve_cantitruncate_trig(base);
 //s = poly_cantellate_norm(base, 0.5);
 //p = poly_dual(great_rhombicuboctahedron());
+//p = poly_truncate(poly_dual(poly_truncate(hexahedron())), t=0, params_overrides=[["vert", "id", [0,1,2,3,4,55], ["t",0.5001]]]);
 //p = poly_attach(octahedron(), icosahedron(), f1=[0,7]);
 //p = poly_attach(octahedron(), icosahedron(), f1=[0,1,2,3,4,5,6,7]);
 //p = poly_attach(p1, icosahedron(), f1=0);
@@ -92,12 +93,12 @@ module model(show_faces = undef, clear_airspace = true) {
         place_on_faces(p, IR) {
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
-                face_plate_visible($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
+                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
                     edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6);
             }
         }
     }
 }
 
-model();
-//poly_render(p, 20);
+//model();
+poly_render(p, 20);

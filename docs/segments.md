@@ -2,15 +2,15 @@
 
 `src/polysymmetrica/core/segments.scad` is the face-local analysis layer for:
 
-- splitting concave or self-intersecting face loops into simple cells
-- triangulating those cells consistently
+- splitting concave or self-intersecting face loops into simple arrangement cells
+- triangulating those arrangement cells consistently
 - deriving geometry cut segments where other faces cross the current face plane
-- determining which split cells are actually visible from the face-local `+Z` side
+- determining which split arrangement cells are actually visible from the face-local `+Z` side
 
 This file is about data and iteration, not arbitrary 3D clipping.
 
 See also [face_arrangement.md](face_arrangement.md) for the next planned layer:
-explicit arrangement, boundary-model, cell, and atom APIs for self-crossing
+explicit arrangement, boundary-model, face-cell, and atom APIs for self-crossing
 faces.
 
 ## Mental Model
@@ -18,9 +18,10 @@ faces.
 Use `segments.scad` when you want answers to questions like:
 
 - "What is the raw arrangement induced by this self-crossing face?"
+- "What is the true filled boundary of this self-crossing face?"
 - "How does this self-crossing face split under `nonzero` fill?"
 - "What cut segments cross this face?"
-- "Which cells of this face are still visible?"
+- "Which face cells of this face are still visible?"
 - "Iterate the retained pieces and label them / color them / build custom logic."
 
 In short:
@@ -36,6 +37,7 @@ In short:
   A simple polygonal region traced from that face loop after splitting at crossings.
   Here "simple" means non-self-intersecting with one closed boundary loop.
   It does not imply convex, triangular, minimal, or canonical.
+  In this document, a simple cell is a 2D face-local arrangement region.
 
 - `parent edge`
   An edge of a derived cell that lies on one of the original face-loop edges.
@@ -44,7 +46,12 @@ In short:
   An edge of a derived cell created by splitting the face with crossings or with geometry-derived cut segments.
 
 - `filled cell`
-  A simple cell that is kept by the chosen fill rule (`nonzero`, `evenodd`, or `all`).
+  A simple 2D face cell that is kept by the chosen fill rule (`nonzero`, `evenodd`, or `all`).
+
+- `atom`
+  A convex 2D sub-piece of a filled face cell, introduced when a filled cell is too complex or non-convex for robust clipping or cutter generation.
+  An atom is derived from a filled cell.
+  It is not the same thing as a 3D body/volume.
 
 - `face boundary`
   The boundary of the original face loop as drawn, before any fill-rule interpretation.
@@ -56,7 +63,7 @@ In short:
   A segment formed where another face crosses the current face plane, expressed in the current face-local 2D coordinates.
 
 - `visible cell`
-  A filled cell, or sub-cell after further splitting by geometry cuts, that is still visible from the face-local `+Z` side.
+  A filled 2D face cell, or sub-cell after further splitting by geometry cuts, that is still visible from the face-local `+Z` side.
 
 ## Fill Modes
 
@@ -77,7 +84,7 @@ Most user-facing solid-face work should use `mode="nonzero"`.
 
 ### `ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8)`
 
-Splits one face loop into simple face cells.
+Splits one face loop into simple 2D face cells.
 
 Returns:
 
@@ -99,7 +106,7 @@ Where:
 - `edge_kinds`
   `"parent"` or `"cut"`
 
-For ordinary unsplit faces, this usually returns one cell.
+For ordinary unsplit faces, this usually returns one face cell.
 
 ### `ps_face_arrangement(face_pts3d_local, eps=1e-8)`
 
@@ -119,6 +126,33 @@ Returns:
 
 This is the unfiltered arrangement-level product.
 It does not apply a fill rule and does not imply convex decomposition.
+
+### `ps_face_boundary_model(face_pts3d_local, mode="nonzero", eps=1e-8)`
+
+Derives the true filled boundary from the arrangement for the chosen fill rule.
+
+Returns:
+
+```scad
+[
+    mode,
+    filled_cell_ids,
+    boundary_loops,
+    boundary_spans
+]
+```
+
+Where:
+
+- `filled_cell_ids`
+  indices of arrangement cells kept by the fill rule
+- `boundary_loops`
+  the reconstructed filled-boundary loops as `[pts2d, span_ids]`
+- `boundary_spans`
+  oriented boundary spans carrying lineage back to source edges where applicable
+
+This is the face-like boundary product to use when you need the resulting
+perimeter rather than just the arrangement cells.
 
 ### `place_on_face_segments(mode="nonzero", eps=1e-8)`
 
@@ -181,7 +215,7 @@ Provides:
 
 ### `ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true)`
 
-Splits the current face by geometry cuts and keeps only cells visible from the
+Splits the current face by geometry cuts and keeps only 2D face cells visible from the
 face-local `+Z` side.
 
 Returns:

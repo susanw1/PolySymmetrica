@@ -348,6 +348,21 @@ module test_ps_face_arrangement__pentagram_counts() {
     assert_int_eq(len([for (s = spans) if (s[6] == "source") 1]), len(spans), "pentagram span kinds");
 }
 
+module test_ps_face_boundary_model__pentagram_counts() {
+    p = poly_antiprism(5, 2);
+    pts3 = [for (i = poly_faces(p)[1]) poly_verts(p)[i]];
+    nz = ps_face_boundary_model(pts3, "nonzero", 1e-9);
+    eo = ps_face_boundary_model(pts3, "evenodd", 1e-9);
+
+    assert_int_eq(len(nz[1]), 1, "pentagram nonzero filled cell count");
+    assert_int_eq(len(nz[2]), 1, "pentagram nonzero boundary loop count");
+    assert_int_eq(len(nz[3]), 10, "pentagram nonzero boundary span count");
+
+    assert_int_eq(len(eo[1]), 5, "pentagram evenodd filled cell count");
+    assert_int_eq(len(eo[2]), 2, "pentagram evenodd boundary loop count");
+    assert_int_eq(len(eo[3]), 15, "pentagram evenodd boundary span count");
+}
+
 module test_ps_face_visible_segments__cube_face_unchanged() {
     p = hexahedron();
     place_on_faces(p) {
@@ -443,6 +458,7 @@ module run_TestPlacement() {
     test_seg_face_tris3__star_area_matches_segments();
     test_ps_face_segments__default_matches_nonzero();
     test_ps_face_arrangement__pentagram_counts();
+    test_ps_face_boundary_model__pentagram_counts();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
