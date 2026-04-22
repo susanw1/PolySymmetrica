@@ -102,9 +102,12 @@ Where:
 - `pts3d_local`
   matching 3D points in face-local coordinates
 - `edge_ids`
-  parent edge indices for the loop edges
+  source face-loop edge indices for the loop edges
 - `edge_kinds`
-  `"parent"` or `"cut"`
+  current edge lineage tags for the loop edges
+
+Currently, arrangement-backed `ps_face_segments(...)` emits `"source"` for inherited
+spans. Later segment layers may also emit tags such as `"cut"` or `"synthetic"`.
 
 For ordinary unsplit faces, this usually returns one face cell.
 
@@ -127,6 +130,57 @@ Returns:
 This is the unfiltered arrangement-level product.
 It does not apply a fill rule and does not imply convex decomposition.
 
+Sub-records are:
+
+```scad
+crossing = [source_edge_a, source_t_a, source_edge_b, source_t_b, pt2d, node_idx]
+node     = [pt2d, kind]
+span     = [seg2d, node_a, node_b, source_edge_idx, source_t0, source_t1, kind]
+cell     = [pts2d, pts3d_local, node_ids, span_ids, signed_area]
+```
+
+Where:
+
+- `crossings`
+  one record per proper self-crossing of the original face loop.
+- `source_edge_a`, `source_edge_b`
+  indices of the original face-loop edges that cross.
+- `source_t_a`, `source_t_b`
+  parametric positions of the crossing on those source edges.
+- `pt2d`
+  crossing point in face-local 2D.
+- `node_idx`
+  index into `nodes` for that crossing point.
+
+- `nodes`
+  unique arrangement nodes, including original face vertices and inserted crossings.
+- `kind`
+  currently `source_vertex` or `crossing`.
+
+- `spans`
+  split edge spans between arrangement nodes.
+- `seg2d`
+  span endpoints in face-local 2D.
+- `node_a`, `node_b`
+  indices into `nodes` for the span endpoints.
+- `source_edge_idx`
+  original face-loop edge that this span came from.
+- `source_t0`, `source_t1`
+  parametric interval on that original source edge.
+- span `kind`
+  currently `"source"` for arrangement spans derived directly from the face loop.
+
+- `cells`
+  all traced simple arrangement cells before any fill-rule filtering.
+- `pts2d`, `pts3d_local`
+  ordered loop points for that cell in 2D and matching face-local 3D.
+- `node_ids`
+  indices into `nodes` around the cell boundary.
+- `span_ids`
+  indices into `spans` around the cell boundary.
+- `signed_area`
+  signed 2D loop area, useful for orientation and fill-rule logic.
+
 ### `ps_face_boundary_model(face_pts3d_local, mode="nonzero", eps=1e-8)`
 
 Derives the true filled boundary from the arrangement for the chosen fill rule.
@@ -145,14 +199,45 @@ Returns:
 Where:
 
 - `filled_cell_ids`
-  indices of arrangement cells kept by the fill rule
+  indices into the arrangement `cells` array for the cells kept by the fill rule
 - `boundary_loops`
-  the reconstructed filled-boundary loops as `[pts2d, span_ids]`
+  the reconstructed filled-boundary loops
 - `boundary_spans`
   oriented boundary spans carrying lineage back to source edges where applicable
 
 This is the face-like boundary product to use when you need the resulting
 perimeter rather than just the arrangement cells.
+
+Sub-records are:
+
+```scad
+boundary_loop = [pts2d, span_ids]
+boundary_span = [seg2d, loop_idx, source_edge_idx, source_t0, source_t1, kind, left_cell_idx, right_cell_idx]
+```
+
+Where:
+
+- `boundary_loops`
+  one record per traced filled-boundary loop.
+- loop `pts2d`
+  ordered 2D vertices around that filled-boundary loop.
+- loop `span_ids`
+  indices into `boundary_spans` in loop order.
+
+- `boundary_spans`
+  one record per oriented span on the filled boundary.
+- `seg2d`
+  oriented 2D segment in loop order.
+- `loop_idx`
+  which `boundary_loop` this span belongs to.
+- `source_edge_idx`
+  original face-loop edge that this span descends from, when applicable.
+- `source_t0`, `source_t1`
+  parametric interval on that source edge.
+- `kind`
+  currently `"source"` for arrangement-derived spans; later layers may add `"cut"` or `"synthetic"`.
+- `left_cell_idx`, `right_cell_idx`
+  arrangement cell indices adjacent to the span, with one side possibly `undef` on the outside.
 
 ### `place_on_face_segments(mode="nonzero", eps=1e-8)`
 
@@ -226,6 +311,17 @@ Returns:
     ...
 ]
 ```
+
+Where:
+
+- `cell_pts2d`
+  visible cell boundary in face-local 2D.
+- `cell_pts3d_local`
+  matching face-local 3D points.
+- `cell_edge_ids`
+  source-edge ids for inherited edges where applicable.
+- `cell_edge_kinds`
+  currently `"parent"` or `"cut"` depending on whether that visible-cell edge comes from the pre-cut cell boundary or from a geometry cut.
 
 ### `place_on_face_visible_segments(...)`
 
