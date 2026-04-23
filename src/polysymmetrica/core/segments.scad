@@ -186,7 +186,8 @@ function _ps_seg_extract_cycles(nodes, hedges, input_area_sign, hi=0, visited=un
         keep = (len(hs) >= 3) && (len(ns) >= 3) && (abs(area) > eps),
         edge_ids = [for (hidx = hs) hedges[hidx][3]],
         kinds = [for (hidx = hs) (len(hedges[hidx]) > 4 ? hedges[hidx][4] : "parent")],
-        cyc = [pts2d, pts3d, edge_ids, kinds, ns],
+        span_ids = [for (hidx = hs) hedges[hidx][2]],
+        cyc = [pts2d, pts3d, edge_ids, kinds, ns, span_ids],
         vis2 = (len(hs) == 0) ? _ps_list_set(vis, hi, true) : _ps_seg_set_true_many(vis, hs),
         cycles2 = keep ? concat(cycles, [cyc]) : cycles
     )
@@ -332,15 +333,153 @@ function _ps_seg_cycle_probe_point(poly, eps=1e-9) =
     )
     (len(idxs) > 0) ? cands[idxs[0]] : centroid;
 
+function _ps_seg_node_kind(node3d, face_pts3d_local, eps=1e-9) =
+    max([
+        for (p = face_pts3d_local)
+            (norm(node3d - p) <= eps) ? 1 : 0
+    ]) == 1 ? "source_vertex" : "crossing";
+
+function _ps_seg_keep_arr_cell(cell, outer2d, mode="nonzero", eps=1e-8) =
+    let(
+        input_area = _ps_seg_poly_area2(outer2d),
+        input_sign = (input_area >= 0) ? 1 : -1,
+        pts2d = cell[0],
+        area_c = cell[4],
+        probe = _ps_seg_cycle_probe_point(pts2d, eps),
+        cycle_sign_ok = (abs(input_area) <= eps) ? true : (area_c * input_sign > eps),
+        in_evenodd = _ps_seg_point_in_poly_evenodd(probe, outer2d, eps),
+        in_nonzero = _ps_seg_point_in_poly_nonzero(probe, outer2d, eps)
+    )
+    (mode == "all") ? true :
+    (mode == "nonzero") ? (in_nonzero && cycle_sign_ok) :
+    in_evenodd;
+
+function _ps_seg_orient_arr_cell(cell, target_sign, eps=1e-9) =
+    let(
+        area = cell[4],
+        same = (abs(area) <= eps) || (area * target_sign > 0)
+    )
+    same ? cell : [
+        _ps_seg_reverse_keep_first(cell[0]),
+        _ps_seg_reverse_keep_first(cell[1]),
+        _ps_seg_reverse_keep_first(cell[2]),
+        _ps_reverse(cell[3]),
+        -area
+    ];
+
+function _ps_seg_fill_cell_ids_from_arr(arr, mode="nonzero", eps=1e-8) =
+    let(
+        outer2d = arr[0],
+        cells = arr[4]
+    )
+    [
+        for (ci = [0:1:len(cells)-1])
+            if (_ps_seg_keep_arr_cell(cells[ci], outer2d, mode, eps))
+                ci
+    ];
+
+function _ps_seg_arr_occurrences(cells, cell_ids, target_sign, eps=1e-9) =
+    [
+        for (ci = cell_ids)
+            let(
+                cell = _ps_seg_orient_arr_cell(cells[ci], target_sign, eps),
+                node_ids = cell[2],
+                span_ids = cell[3],
+                m = len(node_ids)
+            )
+            for (k = [0:1:m-1])
+                [span_ids[k], ci, node_ids[k], node_ids[(k+1)%m]]
+    ];
+
+function _ps_seg_occ_count_for_span(occs, span_id) =
+    len([for (o = occs) if (o[0] == span_id) 1]);
+
+function _ps_seg_other_cell_for_span(occs, span_id, cell_idx) =
+    let(
+        hits = [for (o = occs) if (o[0] == span_id && o[1] != cell_idx) o[1]]
+    )
+    (len(hits) == 0) ? undef : hits[0];
+
+function _ps_seg_boundary_occurrences(arr, filled_cell_ids, eps=1e-9) =
+    let(
+        outer2d = arr[0],
+        cells = arr[4],
+        input_area = _ps_seg_poly_area2(outer2d),
+        input_sign = (input_area >= 0) ? 1 : -1,
+        filled_occs = _ps_seg_arr_occurrences(cells, filled_cell_ids, input_sign, eps),
+        all_occs = _ps_seg_arr_occurrences(cells, [for (i = [0:1:len(cells)-1]) i], input_sign, eps)
+    )
+    [
+        for (o = filled_occs)
+            if (_ps_seg_occ_count_for_span(filled_occs, o[0]) == 1)
+                [o[0], o[1], o[2], o[3], _ps_seg_other_cell_for_span(all_occs, o[0], o[1])]
+    ];
+
+function _ps_seg_next_boundary_occ(boundary_occs, nodes, cur_idx, used=[]) =
+    let(
+        cur = boundary_occs[cur_idx],
+        u = cur[2],
+        v = cur[3],
+        pu = nodes[u][0],
+        pv = nodes[v][0],
+        rev_ang = atan2(pu[1] - pv[1], pu[0] - pv[0]),
+        outs = [
+            for (i = [0:1:len(boundary_occs)-1])
+                if (!_ps_list_contains(used, i) && boundary_occs[i][2] == v)
+                    i
+        ],
+        pairs = [
+            for (i = outs)
+                let(
+                    q = nodes[boundary_occs[i][3]][0],
+                    ang = atan2(q[1] - pv[1], q[0] - pv[0]),
+                    delta_raw = rev_ang - ang,
+                    delta = (delta_raw < 0) ? (delta_raw + 360) : delta_raw
+                )
+                [delta, i]
+        ]
+    )
+    (len(pairs) == 0) ? undef : pairs[_ps_seg_min_pair_idx(pairs)][1];
+
+function _ps_seg_trace_boundary_loop(boundary_occs, nodes, start_idx, cur_idx, acc=[], depth=0) =
+    let(
+        max_depth = len(boundary_occs) + 2,
+        cur = boundary_occs[cur_idx],
+        acc2 = concat(acc, [cur_idx]),
+        next_idx = _ps_seg_next_boundary_occ(boundary_occs, nodes, cur_idx, acc2)
+    )
+    (depth > max_depth) ? [] :
+    ((cur[3] == boundary_occs[start_idx][2]) && (len(acc) > 0)) ? acc2 :
+    is_undef(next_idx) ? [] :
+    _ps_seg_trace_boundary_loop(boundary_occs, nodes, start_idx, next_idx, acc2, depth + 1);
+
+function _ps_seg_extract_boundary_loops(boundary_occs, nodes, idx=0, used=[], loops=[]) =
+    (idx >= len(boundary_occs)) ? loops :
+    _ps_list_contains(used, idx) ? _ps_seg_extract_boundary_loops(boundary_occs, nodes, idx + 1, used, loops) :
+    let(
+        loop = _ps_seg_trace_boundary_loop(boundary_occs, nodes, idx, idx),
+        used2 = concat(used, loop),
+        loops2 = (len(loop) == 0) ? loops : concat(loops, [loop])
+    )
+    _ps_seg_extract_boundary_loops(boundary_occs, nodes, idx + 1, used2, loops2);
+
+function _ps_seg_boundary_span_ts(span, a, b) =
+    (a == span[1] && b == span[2]) ? [span[4], span[5]] :
+    (a == span[2] && b == span[1]) ? [span[5], span[4]] :
+    [span[4], span[5]];
+
 /**
- * Function: Split a face loop into simple face-local cells.
- * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
- * Returns: `[[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]`
- * Limitations/Gotchas: `mode="nonzero"` is the intended default for solid self-crossing faces; use `"evenodd"` only when parity fill is genuinely wanted
+ * Function: Build the planar arrangement induced by one face loop.
+ * Params: face_pts3d_local (loop in face-local 3D), eps (geometric tolerance)
+ * Returns: `[face_pts2d, crossings, nodes, spans, cells]`
+ * Limitations/Gotchas: cells are all traced simple arrangement cells before any fill-rule filtering; they are not guaranteed convex
  */
-function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
-    let(n = len(face_pts3d_local))
-    (n < 3) ? [] :
+function ps_face_arrangement(face_pts3d_local, eps=1e-8) =
+    let(
+        n = len(face_pts3d_local),
+        face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]]
+    )
+    (n < 3) ? [face_pts2d, [], [], [], []] :
     let(
         hits = _ps_seg_hits(face_pts3d_local, eps),
         ts = _ps_seg_edge_ts(face_pts3d_local, hits, eps),
@@ -354,8 +493,8 @@ function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
                 for (t = ts_e)
                     _ps_seg_interp3(a, b, t)
         ],
-        nodes = _ps_seg_unique_nodes(raw_nodes, eps),
-        segs = _ps_seg_segments_from_ts(face_pts3d_local, ts, nodes, eps),
+        nodes3d = _ps_seg_unique_nodes(raw_nodes, eps),
+        segs = _ps_seg_segments_from_ts(face_pts3d_local, ts, nodes3d, eps),
         hedges = concat(
             [
                 for (si = [0:1:len(segs)-1])
@@ -368,28 +507,113 @@ function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
                     [s[1], s[0], si, s[2], "parent", s[4], s[3]]
             ]
         ),
-        outer2d = [for (p = face_pts3d_local) [p[0], p[1]]],
-        input_area = _ps_seg_poly_area2(outer2d),
+        input_area = _ps_seg_poly_area2(face_pts2d),
         input_sign = (input_area >= 0) ? 1 : -1,
-        cycles = _ps_seg_extract_cycles(nodes, hedges, input_sign, 0, undef, [], eps),
+        cycles = _ps_seg_extract_cycles(nodes3d, hedges, input_sign, 0, undef, [], eps),
         cycles_u = _ps_seg_dedupe_cycles(cycles),
-        filtered = [
+        crossings = [
+            for (h = hits)
+                let(node_idx = _ps_seg_node_index(nodes3d, h[4], eps))
+                [h[0], h[1], h[2], h[3], [h[4][0], h[4][1]], node_idx]
+        ],
+        nodes = [
+            for (p = nodes3d)
+                [[p[0], p[1]], _ps_seg_node_kind(p, face_pts3d_local, eps)]
+        ],
+        spans = [
+            for (s = segs)
+                [
+                    [[nodes3d[s[0]][0], nodes3d[s[0]][1]], [nodes3d[s[1]][0], nodes3d[s[1]][1]]],
+                    s[0],
+                    s[1],
+                    s[2],
+                    s[3],
+                    s[4],
+                    "source"
+                ]
+        ],
+        cells = [
             for (c = cycles_u)
+                [c[0], c[1], c[4], c[5], _ps_seg_poly_area2(c[0])]
+        ]
+    )
+    [face_pts2d, crossings, nodes, spans, cells];
+
+/**
+ * Function: Derive the true filled boundary from a face arrangement.
+ * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: `[mode, filled_cell_ids, boundary_loops, boundary_spans]`
+ * Limitations/Gotchas: boundary spans are currently sourced from arrangement spans only; later synthetic/cut spans can build on this record shape
+ */
+function ps_face_boundary_model(face_pts3d_local, mode="nonzero", eps=1e-8) =
+    let(
+        arr = ps_face_arrangement(face_pts3d_local, eps),
+        nodes = arr[2],
+        spans = arr[3],
+        filled_cell_ids = _ps_seg_fill_cell_ids_from_arr(arr, mode, eps),
+        boundary_occs = _ps_seg_boundary_occurrences(arr, filled_cell_ids, eps),
+        occ_loops = _ps_seg_extract_boundary_loops(boundary_occs, nodes),
+        loop_offsets = _ps_prefix_offsets([for (loop = occ_loops) len(loop)], [0]),
+        boundary_loops = [
+            for (li = [0:1:len(occ_loops)-1])
+                let(
+                    loop = occ_loops[li],
+                    start_node_idx = boundary_occs[loop[0]][2],
+                    pts2d = concat(
+                        [[nodes[start_node_idx][0][0], nodes[start_node_idx][0][1]]],
+                        [for (k = [0:1:len(loop)-2])
+                            let(end_idx = boundary_occs[loop[k]][3])
+                            [nodes[end_idx][0][0], nodes[end_idx][0][1]]
+                        ]
+                    ),
+                    span_ids = [for (k = [0:1:len(loop)-1]) loop_offsets[li] + k]
+                )
+                [pts2d, span_ids]
+        ],
+        boundary_spans = [
+            for (li = [0:1:len(occ_loops)-1])
+                let(loop = occ_loops[li])
+                for (k = [0:1:len(loop)-1])
+                    let(
+                        occ = boundary_occs[loop[k]],
+                        span = spans[occ[0]],
+                        a = occ[2],
+                        b = occ[3],
+                        seg2d = [[nodes[a][0][0], nodes[a][0][1]], [nodes[b][0][0], nodes[b][0][1]]],
+                        ts = _ps_seg_boundary_span_ts(span, a, b)
+                    )
+                    [seg2d, li, span[3], ts[0], ts[1], span[6], occ[1], occ[4]]
+        ]
+    )
+    [mode, filled_cell_ids, boundary_loops, boundary_spans];
+
+/**
+ * Function: Split a face loop into simple face-local cells.
+ * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: `[[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]`
+ * Limitations/Gotchas: `mode="nonzero"` is the intended default for solid self-crossing faces; use `"evenodd"` only when parity fill is genuinely wanted
+ */
+function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
+    let(
+        n = len(face_pts3d_local),
+        arr = ps_face_arrangement(face_pts3d_local, eps),
+        outer2d = arr[0],
+        spans = arr[3],
+        cells = arr[4]
+    )
+    (n < 3) ? [] :
+    let(
+        filtered = [
+            for (c = cells)
                 let(
                     pts2d = c[0],
                     pts3d = c[1],
-                    edge_ids = c[2],
-                    kinds = c[3],
-                    probe = _ps_seg_cycle_probe_point(pts2d, eps),
-                    area_c = _ps_seg_poly_area2(pts2d),
-                    cycle_sign_ok = (abs(input_area) <= eps) ? true : (area_c * input_sign > eps),
-                    in_evenodd = _ps_seg_point_in_poly_evenodd(probe, outer2d, eps),
-                    in_nonzero = _ps_seg_point_in_poly_nonzero(probe, outer2d, eps),
-                    keep = (mode == "all") ? true :
-                           (mode == "nonzero") ? in_nonzero :
-                           in_evenodd
+                    span_ids = c[3],
+                    edge_ids = [for (si = span_ids) spans[si][3]],
+                    kinds = [for (si = span_ids) spans[si][6]]
                 )
-                if (keep && ((mode == "nonzero") ? cycle_sign_ok : true)) [pts2d, pts3d, edge_ids, kinds]
+                if (_ps_seg_keep_arr_cell(c, outer2d, mode, eps))
+                    [pts2d, pts3d, edge_ids, kinds]
         ]
     )
     (len(filtered) == 0)

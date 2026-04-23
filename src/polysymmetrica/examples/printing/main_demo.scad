@@ -24,6 +24,7 @@ IR = 20 * SC;
 //sol = solve_cantitruncate_trig(base);
 //s = poly_cantellate_norm(base, 0.5);
 //p = poly_dual(great_rhombicuboctahedron());
+//p = poly_truncate(poly_dual(poly_truncate(hexahedron())), t=0, params_overrides=[["vert", "id", [0,1,2,3,4,55], ["t",0.5001]]]);
 //p = poly_attach(octahedron(), icosahedron(), f1=[0,7]);
 //p = poly_attach(octahedron(), icosahedron(), f1=[0,1,2,3,4,5,6,7]);
 //p = poly_attach(p1, icosahedron(), f1=0);

@@ -329,6 +329,54 @@ module test_ps_face_segments__default_matches_nonzero() {
     assert(segs_default == segs_nonzero, "ps_face_segments default should match nonzero fill");
 }
 
+module test_ps_face_arrangement__pentagram_counts() {
+    p = poly_antiprism(5, 2);
+    pts3 = [for (i = poly_faces(p)[1]) poly_verts(p)[i]];
+    arr = ps_face_arrangement(pts3, 1e-9);
+    crossings = arr[1];
+    nodes = arr[2];
+    spans = arr[3];
+    cells = arr[4];
+
+    assert_int_eq(len(crossings), 5, "pentagram crossings");
+    assert_int_eq(len(nodes), 10, "pentagram arrangement nodes");
+    assert_int_eq(len(spans), 15, "pentagram arrangement spans");
+    assert_int_eq(len(cells), 7, "pentagram arrangement cells");
+
+    assert_int_eq(len([for (n = nodes) if (n[1] == "source_vertex") 1]), 5, "pentagram source-vertex count");
+    assert_int_eq(len([for (n = nodes) if (n[1] == "crossing") 1]), 5, "pentagram crossing-node count");
+    assert_int_eq(len([for (s = spans) if (s[6] == "source") 1]), len(spans), "pentagram span kinds");
+}
+
+module test_ps_face_boundary_model__pentagram_counts() {
+    p = poly_antiprism(5, 2);
+    pts3 = [for (i = poly_faces(p)[1]) poly_verts(p)[i]];
+    pts2 = [for (pt = pts3) [pt[0], pt[1]]];
+    nz = ps_face_boundary_model(pts3, "nonzero", 1e-9);
+    eo = ps_face_boundary_model(pts3, "evenodd", 1e-9);
+
+    assert_int_eq(len(nz[1]), 1, "pentagram nonzero filled cell count");
+    assert_int_eq(len(nz[2]), 1, "pentagram nonzero boundary loop count");
+    assert_int_eq(len(nz[3]), 10, "pentagram nonzero boundary span count");
+
+    assert_int_eq(len(eo[1]), 5, "pentagram evenodd filled cell count");
+    assert_int_eq(len(eo[2]), 2, "pentagram evenodd boundary loop count");
+    assert_int_eq(len(eo[3]), 15, "pentagram evenodd boundary span count");
+
+    for (bm = [nz, eo])
+        for (span = bm[3]) {
+            edge_idx = span[2];
+            t0 = span[3];
+            t1 = span[4];
+            a = pts2[edge_idx];
+            b = pts2[(edge_idx + 1) % len(pts2)];
+            p0 = [a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0];
+            p1 = [a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1];
+            assert(norm(p0 - span[0][0]) < 1e-6, str("boundary span start should match source params edge=", edge_idx, " t0=", t0));
+            assert(norm(p1 - span[0][1]) < 1e-6, str("boundary span end should match source params edge=", edge_idx, " t1=", t1));
+        }
+}
+
 module test_ps_face_visible_segments__cube_face_unchanged() {
     p = hexahedron();
     place_on_faces(p) {
@@ -423,6 +471,8 @@ module run_TestPlacement() {
     test_seg_face_tris3__concave_area_preserved();
     test_seg_face_tris3__star_area_matches_segments();
     test_ps_face_segments__default_matches_nonzero();
+    test_ps_face_arrangement__pentagram_counts();
+    test_ps_face_boundary_model__pentagram_counts();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
