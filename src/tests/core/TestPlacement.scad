@@ -351,6 +351,7 @@ module test_ps_face_arrangement__pentagram_counts() {
 module test_ps_face_boundary_model__pentagram_counts() {
     p = poly_antiprism(5, 2);
     pts3 = [for (i = poly_faces(p)[1]) poly_verts(p)[i]];
+    pts2 = [for (pt = pts3) [pt[0], pt[1]]];
     nz = ps_face_boundary_model(pts3, "nonzero", 1e-9);
     eo = ps_face_boundary_model(pts3, "evenodd", 1e-9);
 
@@ -361,6 +362,19 @@ module test_ps_face_boundary_model__pentagram_counts() {
     assert_int_eq(len(eo[1]), 5, "pentagram evenodd filled cell count");
     assert_int_eq(len(eo[2]), 2, "pentagram evenodd boundary loop count");
     assert_int_eq(len(eo[3]), 15, "pentagram evenodd boundary span count");
+
+    for (bm = [nz, eo])
+        for (span = bm[3]) {
+            edge_idx = span[2];
+            t0 = span[3];
+            t1 = span[4];
+            a = pts2[edge_idx];
+            b = pts2[(edge_idx + 1) % len(pts2)];
+            p0 = [a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0];
+            p1 = [a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1];
+            assert(norm(p0 - span[0][0]) < 1e-6, str("boundary span start should match source params edge=", edge_idx, " t0=", t0));
+            assert(norm(p1 - span[0][1]) < 1e-6, str("boundary span end should match source params edge=", edge_idx, " t1=", t1));
+        }
 }
 
 module test_ps_face_visible_segments__cube_face_unchanged() {

@@ -463,6 +463,11 @@ function _ps_seg_extract_boundary_loops(boundary_occs, nodes, idx=0, used=[], lo
     )
     _ps_seg_extract_boundary_loops(boundary_occs, nodes, idx + 1, used2, loops2);
 
+function _ps_seg_boundary_span_ts(span, a, b) =
+    (a == span[1] && b == span[2]) ? [span[4], span[5]] :
+    (a == span[2] && b == span[1]) ? [span[5], span[4]] :
+    [span[4], span[5]];
+
 /**
  * Function: Build the planar arrangement induced by one face loop.
  * Params: face_pts3d_local (loop in face-local 3D), eps (geometric tolerance)
@@ -574,9 +579,10 @@ function ps_face_boundary_model(face_pts3d_local, mode="nonzero", eps=1e-8) =
                         span = spans[occ[0]],
                         a = occ[2],
                         b = occ[3],
-                        seg2d = [[nodes[a][0][0], nodes[a][0][1]], [nodes[b][0][0], nodes[b][0][1]]]
+                        seg2d = [[nodes[a][0][0], nodes[a][0][1]], [nodes[b][0][0], nodes[b][0][1]]],
+                        ts = _ps_seg_boundary_span_ts(span, a, b)
                     )
-                    [seg2d, li, span[3], span[4], span[5], span[6], occ[1], occ[4]]
+                    [seg2d, li, span[3], ts[0], ts[1], span[6], occ[1], occ[4]]
         ]
     )
     [mode, filled_cell_ids, boundary_loops, boundary_spans];
