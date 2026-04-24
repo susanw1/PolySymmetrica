@@ -2,8 +2,10 @@ use <../../polysymmetrica/core/placement.scad>
 use <../../polysymmetrica/core/classify.scad>
 use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/prisms.scad>
+use <../../polysymmetrica/core/truncation.scad>
 use <../../polysymmetrica/models/platonics_all.scad>
 use <../../polysymmetrica/models/archimedians_all.scad>
+use <../../polysymmetrica/models/tetrahedron.scad>
 
 module assert_int_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
@@ -377,6 +379,93 @@ module test_ps_face_boundary_model__pentagram_counts() {
         }
 }
 
+module test_ps_face_boundary_span_sites__pentagram_attach_adjacent_face_context() {
+    p = poly_antiprism(5, 2);
+    place_on_faces(p) {
+        if ($ps_face_idx == 1) {
+            sites = _ps_face_boundary_span_sites(
+                $ps_face_pts3d_local,
+                $ps_face_idx,
+                $ps_poly_faces_idx,
+                $ps_poly_verts_local,
+                $ps_face_neighbors_idx,
+                $ps_face_dihedrals,
+                "nonzero",
+                1e-9
+            );
+
+            assert_int_eq(len(sites), 10, "pentagram nonzero boundary span site count");
+
+            for (site = sites) {
+                ei = site[8];
+                assert_int_eq(site[14], $ps_face_neighbors_idx[ei], "boundary span adjacent face id");
+                assert(abs(site[15] - $ps_face_dihedrals[ei]) < 1e-6, str("boundary span dihedral mismatch edge=", ei));
+                assert(!is_undef(site[16]), str("boundary span adjacent-face normal should be defined edge=", ei));
+                assert(site[17] != 0, str("boundary span filled side should be nonzero edge=", ei));
+                assert(!is_undef(site[18]), str("boundary span adjacent-face direction should be defined edge=", ei));
+                assert(abs(site[18][0]) < 1e-6, str("boundary span adjacent-face direction should stay in local yz plane edge=", ei));
+                assert(site[18][2] > 0, str("boundary span adjacent-face direction should point to current-face +Z edge=", ei));
+            }
+        }
+    }
+}
+
+module test_ps_face_boundary_span_sites__anti_tet_hex_is_span_directional() {
+    p = poly_truncate(tetrahedron(), t = -0.5);
+    place_on_faces(p) {
+        if ($ps_face_idx == 0) {
+            sites = _ps_face_boundary_span_sites(
+                $ps_face_pts3d_local,
+                $ps_face_idx,
+                $ps_poly_faces_idx,
+                $ps_poly_verts_local,
+                $ps_face_neighbors_idx,
+                $ps_face_dihedrals,
+                "nonzero",
+                1e-9
+            );
+            source_edges = len($ps_face_pts2d);
+            repeated_edges = [
+                for (ei = [0:1:source_edges-1])
+                    if (len([for (s = sites) if (s[8] == ei) 1]) > 1)
+                        ei
+            ];
+            mixed_dir_edges = [
+                for (ei = repeated_edges)
+                    let(
+                        has_inc = len([for (s = sites) if (s[8] == ei && s[10] > s[9]) 1]) > 0,
+                        has_dec = len([for (s = sites) if (s[8] == ei && s[10] < s[9]) 1]) > 0
+                    )
+                    if (has_inc && has_dec)
+                        ei
+            ];
+
+            assert_int_eq(len(sites), 12, "anti-tet hex nonzero boundary span site count");
+            assert(len(repeated_edges) > 0, "anti-tet hex should reuse source edges across multiple boundary spans");
+            assert(len(mixed_dir_edges) > 0, "anti-tet hex should need per-span source-edge directionality");
+
+            for (site = sites) {
+                ei = site[8];
+                assert_int_eq(site[14], $ps_face_neighbors_idx[ei], "anti-tet boundary span adjacent face id");
+                assert(abs(site[15] - $ps_face_dihedrals[ei]) < 1e-6, str("anti-tet boundary span dihedral mismatch edge=", ei));
+                assert(site[17] != 0, str("anti-tet boundary span filled side should be nonzero edge=", ei));
+                assert(!is_undef(site[18]), str("anti-tet boundary span adjacent-face direction should be defined edge=", ei));
+                assert(abs(site[18][0]) < 1e-6, str("anti-tet boundary span adjacent-face direction should stay in local yz plane edge=", ei));
+                assert(site[18][2] > 0, str("anti-tet boundary span adjacent-face direction should point to current-face +Z edge=", ei));
+            }
+
+            se1_span_dirs = [
+                for (site = sites)
+                    if (site[8] == 1)
+                        site[18]
+            ];
+            se1_has_pos_y = len([for (dir = se1_span_dirs) if (dir[1] > 0) 1]) > 0;
+            se1_has_neg_y = len([for (dir = se1_span_dirs) if (dir[1] < 0) 1]) > 0;
+            assert(se1_has_pos_y && se1_has_neg_y, "anti-tet spans from one long source edge should distinguish central vs end branches");
+        }
+    }
+}
+
 module test_ps_face_visible_segments__cube_face_unchanged() {
     p = hexahedron();
     place_on_faces(p) {
@@ -473,6 +562,8 @@ module run_TestPlacement() {
     test_ps_face_segments__default_matches_nonzero();
     test_ps_face_arrangement__pentagram_counts();
     test_ps_face_boundary_model__pentagram_counts();
+    test_ps_face_boundary_span_sites__pentagram_attach_adjacent_face_context();
+    test_ps_face_boundary_span_sites__anti_tet_hex_is_span_directional();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();
     test_ps_face_visible_segments__cells_preserve_parent_winding();
