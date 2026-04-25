@@ -67,6 +67,14 @@ direction. The projected line stays parallel to the boundary span. Adjacent
 projected lines are intersected to form the projected polygon at each target Z
 plane.
 
+The anti-interference direction is the bisector between a selected current-face
+ray and the adjacent-face ray on the current face `+Z` branch. For filled atoms
+whose winding sign matches the source face loop, the current-face ray points
+outside the filled atom. For filled atoms whose winding sign is opposite to the
+source face loop, the current-face ray points into the filled side. This matters
+for anti-truncation-style faces where the central atom and corner atoms are
+valid filled regions but represent opposite local orientations.
+
 For non-planar faces this is deliberately best-effort: each boundary span uses
 its own local source-edge midpoint Z. This keeps the generated volume tied to
 the face frame without pretending that warped faces have one exact boundary

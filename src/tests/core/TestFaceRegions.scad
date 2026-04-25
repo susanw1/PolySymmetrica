@@ -72,6 +72,30 @@ module test_ps_face_anti_interference_shells__matches_boundary_loop_count() {
         assert_int_eq(len(shells[i][0]), 2 * len(bm[2][i][0]), "shell vertices should match loop arity");
 }
 
+module test_ps_face_anti_interference_shells__pentagram_zmax_expands_outward() {
+    p = poly_antiprism(5, 2);
+    site = _test_face_site(p, 1);
+    shells = ps_face_anti_interference_shells(
+        site[11],
+        site[0],
+        site[13],
+        site[12],
+        site[20],
+        site[21],
+        -0.5,
+        0.5,
+        "nonzero"
+    );
+
+    assert_int_eq(len(shells), 1, "pentagram cap should produce one shell");
+    area_zmin = abs(_ps_seg_poly_area2(shells[0][4]));
+    area_zmax = abs(_ps_seg_poly_area2(shells[0][5]));
+    assert(
+        area_zmax > area_zmin,
+        str("pentagram +Z cap should expand outward area_zmin=", area_zmin, " area_zmax=", area_zmax)
+    );
+}
+
 module test_ps_face_anti_interference_shells__anti_tet_hex_is_finite() {
     p = poly_truncate(tetrahedron(), t = -0.5);
     site = _test_face_site(p, 0);
@@ -96,6 +120,35 @@ module test_ps_face_anti_interference_shells__anti_tet_hex_is_finite() {
     }
 }
 
+module test_ps_face_anti_interference_shells__anti_tet_winding_splits_z_direction() {
+    p = poly_truncate(tetrahedron(), t = -0.5);
+    site = _test_face_site(p, 0);
+    shells = ps_face_anti_interference_shells(
+        site[11],
+        site[0],
+        site[13],
+        site[12],
+        site[20],
+        site[21],
+        -0.5,
+        0.5,
+        "nonzero",
+        20
+    );
+
+    assert_int_eq(len(shells), 4, "anti-tet hex should split into one centre and three corner shells");
+
+    area_deltas = [
+        for (shell = shells)
+            abs(_ps_seg_poly_area2(shell[5])) - abs(_ps_seg_poly_area2(shell[4]))
+    ];
+    expanded_count = sum([for (d = area_deltas) d > EPS ? 1 : 0]);
+    shrunk_count = sum([for (d = area_deltas) d < -EPS ? 1 : 0]);
+
+    assert_int_eq(expanded_count, 1, "anti-tet same-winding centre shell should expand toward +Z");
+    assert_int_eq(shrunk_count, 3, "anti-tet opposite-winding corner shells should shrink toward +Z");
+}
+
 module test_ps_face_anti_interference_projection_cap__limits_offset() {
     assert_near(_ps_fr_project_offset(10, 0.5, 3), 3, EPS, "positive projection cap");
     assert_near(_ps_fr_project_offset(-10, 0.5, 3), -3, EPS, "negative projection cap");
@@ -106,7 +159,9 @@ module test_ps_face_anti_interference_projection_cap__limits_offset() {
 module run_TestFaceRegions() {
     test_ps_face_anti_interference_shells__cube_face_single_quad_shell();
     test_ps_face_anti_interference_shells__matches_boundary_loop_count();
+    test_ps_face_anti_interference_shells__pentagram_zmax_expands_outward();
     test_ps_face_anti_interference_shells__anti_tet_hex_is_finite();
+    test_ps_face_anti_interference_shells__anti_tet_winding_splits_z_direction();
     test_ps_face_anti_interference_projection_cap__limits_offset();
 }
 

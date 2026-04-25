@@ -13,7 +13,7 @@ use <../../models/tetrahedron.scad>
 
 IR = 30;
 FACE_THK = 0.25;
-VOL_Z_MIN = -1;
+VOL_Z_MIN = -2;
 VOL_Z_MAX = 2;
 MAX_PROJECT = 40;
 LINE_R = 0.55;
@@ -22,7 +22,7 @@ TXT_S = 3.2;
 PANEL_X = 130;
 
 STAR_POLY = poly_antiprism(5, 2);
-STAR_FACE_IDX = 1;
+STAR_FACE_IDX = 0;
 
 ANTI_POLY = poly_truncate(tetrahedron(), t = -0.5);
 ANTI_FACE_IDX = 0;
