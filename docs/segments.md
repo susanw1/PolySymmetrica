@@ -303,7 +303,10 @@ Where:
   perpendicular to the shared span and oriented toward the current face's local
   `+Z` side. This is often more useful for visualization and anti-interference
   work than the adjacent-face normal alone, especially when a single source edge
-  contributes multiple surviving boundary spans.
+  contributes multiple surviving boundary spans. The underlying source-edge
+  direction is projected into the current face plane before this direction is
+  derived, so warped/non-planar faces still preserve the span-frame `Y/Z`
+  contract.
 
 ### `ps_polygon(points, mode="nonzero", eps=1e-8)`
 

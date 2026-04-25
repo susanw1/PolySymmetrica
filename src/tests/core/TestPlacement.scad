@@ -410,6 +410,20 @@ module test_ps_face_boundary_span_sites__pentagram_attach_adjacent_face_context(
     }
 }
 
+module test_ps_face_boundary_span_direction__projects_source_edge_into_face_plane() {
+    ex = [1, 0, 0];
+    ey = [0, 1, 0];
+    ez = [0, 0, 1];
+    source_ex_raw = v_norm([1, 0, 1]);
+    source_ex_proj = v_norm(_ps_seg_project_to_plane(source_ex_raw, ez));
+    adj_face_normal_local = v_norm([0, 1, 1]);
+    dir_span_local = _ps_seg_boundary_span_adj_face_dir_span_local(source_ex_proj, ex, ey, ez, adj_face_normal_local);
+
+    assert(abs(source_ex_proj[2]) < 1e-9, "projected source edge should lie in the current face plane");
+    assert(abs(dir_span_local[0]) < 1e-9, "adjacent-face direction should stay in local yz plane after source-edge projection");
+    assert(dir_span_local[2] > 0, "adjacent-face direction should keep the +Z branch");
+}
+
 module test_ps_face_boundary_span_sites__anti_tet_hex_is_span_directional() {
     p = poly_truncate(tetrahedron(), t = -0.5);
     place_on_faces(p) {
@@ -563,6 +577,7 @@ module run_TestPlacement() {
     test_ps_face_arrangement__pentagram_counts();
     test_ps_face_boundary_model__pentagram_counts();
     test_ps_face_boundary_span_sites__pentagram_attach_adjacent_face_context();
+    test_ps_face_boundary_span_direction__projects_source_edge_into_face_plane();
     test_ps_face_boundary_span_sites__anti_tet_hex_is_span_directional();
     test_ps_face_visible_segments__cube_face_unchanged();
     test_ps_face_visible_segments__star_antiprism_side_reduced();

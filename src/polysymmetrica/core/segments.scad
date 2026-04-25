@@ -472,6 +472,9 @@ function _ps_seg_boundary_span_adj_face_normal_local(adj_face_idx, poly_faces_id
     is_undef(adj_face_idx) ? undef :
     ps_face_frame_normal(poly_verts_local, poly_faces_idx[adj_face_idx]);
 
+function _ps_seg_project_to_plane(v, n) =
+    v - n * v_dot(v, n);
+
 function _ps_seg_boundary_span_adj_face_dir_span_local(source_ex, ex, ey, ez, adj_face_normal_local, eps=1e-9) =
     is_undef(adj_face_normal_local) ? undef :
     let(
@@ -521,9 +524,11 @@ function _ps_face_boundary_span_sites(face_pts3d_local, face_idx, poly_faces_idx
                 source_edge_idx = span[2],
                 source_a = is_undef(source_edge_idx) ? undef : face_pts3d_local[source_edge_idx],
                 source_b = is_undef(source_edge_idx) ? undef : face_pts3d_local[(source_edge_idx + 1) % len(face_pts3d_local)],
-                source_ex = (is_undef(source_a) || is_undef(source_b) || norm(source_b - source_a) <= eps)
+                source_ex_raw = (is_undef(source_a) || is_undef(source_b)) ? undef : (source_b - source_a),
+                source_ex_proj = is_undef(source_ex_raw) ? undef : _ps_seg_project_to_plane(source_ex_raw, ez),
+                source_ex = (is_undef(source_ex_proj) || norm(source_ex_proj) <= eps)
                     ? ex
-                    : v_norm(source_b - source_a),
+                    : v_norm(source_ex_proj),
                 filled_cell_idx = span[6],
                 other_cell_idx = span[7],
                 adj_face_idx =

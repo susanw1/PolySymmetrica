@@ -251,6 +251,10 @@ module draw_panel_boundary_spans(poly, face_idx, mode, label_s) {
                 draw_span_side_marker($ps_boundary_span_filled_side);
 
                 translate([0, 0, SPAN_MARKER_Z])
+                    // Demo-only display choice:
+                    // the core metadata is anchored to the original source-edge direction,
+                    // then we flip per span so the rod reads consistently against the
+                    // displayed boundary-span parameter direction.
                     draw_dihedral_direction(
                         (($ps_boundary_span_source_t1 > $ps_boundary_span_source_t0) ? -1 : 1)
                         * $ps_boundary_span_adj_face_dir_span_local
