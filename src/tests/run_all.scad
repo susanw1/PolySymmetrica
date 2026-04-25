@@ -6,6 +6,7 @@ use <core/TestCleanup.scad>
 use <core/TestValidity.scad>
 use <core/TestClassify.scad>
 use <core/TestPlacement.scad>
+use <core/TestFaceRegions.scad>
 use <core/TestPrisms.scad>
 use <core/TestAttach.scad>
 use <core/TestRender.scad>
@@ -21,6 +22,7 @@ run_TestCleanup();
 run_TestValidity();
 run_TestClassify();
 run_TestPlacement();
+run_TestFaceRegions();
 run_TestPrisms();
 run_TestAttach();
 run_TestRender();
