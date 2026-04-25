@@ -312,6 +312,12 @@ See [segments.md](segments.md) for the face-local analysis layer:
 Use this layer when you want analyzable face-local cells, cuts, and visibility,
 not arbitrary 3D clipping.
 
+See [face_regions.md](face_regions.md) for positive face-local volumes built
+from those boundary spans:
+
+- `ps_face_anti_interference_shells(...)`
+- `ps_face_anti_interference_volume(...)`
+
 See [face_arrangement.md](face_arrangement.md) for the planned next layer:
 
 - `ps_face_arrangement(...)`
