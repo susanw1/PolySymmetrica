@@ -379,13 +379,13 @@ function ps_face_anti_interference_shells(
  * Returns: none; intended for use inside `place_on_faces(...)`, usually inside `intersection()`
  * Limitations/Gotchas: this is only the boundary-span volume primitive; it does not yet subtract or union proxy punch-through voids
  */
-module ps_face_anti_interference_volume_ctx(z0, z1, mode="nonzero", max_project=undef, eps=1e-8, convexity=6) {
-    assert(!is_undef($ps_face_pts3d_local), "ps_face_anti_interference_volume_ctx: requires place_on_faces context ($ps_face_pts3d_local)");
-    assert(!is_undef($ps_face_idx), "ps_face_anti_interference_volume_ctx: requires place_on_faces context ($ps_face_idx)");
-    assert(!is_undef($ps_poly_faces_idx), "ps_face_anti_interference_volume_ctx: requires place_on_faces context ($ps_poly_faces_idx)");
-    assert(!is_undef($ps_poly_verts_local), "ps_face_anti_interference_volume_ctx: requires place_on_faces context ($ps_poly_verts_local)");
-    assert(!is_undef($ps_face_neighbors_idx), "ps_face_anti_interference_volume_ctx: requires place_on_faces context ($ps_face_neighbors_idx)");
-    assert(!is_undef($ps_face_dihedrals), "ps_face_anti_interference_volume_ctx: requires place_on_faces context ($ps_face_dihedrals)");
+module ps_face_anti_interference_volume(z0, z1, mode="nonzero", max_project=undef, eps=1e-8, convexity=6) {
+    assert(!is_undef($ps_face_pts3d_local), "ps_face_anti_interference_volume: requires place_on_faces context ($ps_face_pts3d_local)");
+    assert(!is_undef($ps_face_idx), "ps_face_anti_interference_volume: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "ps_face_anti_interference_volume: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "ps_face_anti_interference_volume: requires place_on_faces context ($ps_poly_verts_local)");
+    assert(!is_undef($ps_face_neighbors_idx), "ps_face_anti_interference_volume: requires place_on_faces context ($ps_face_neighbors_idx)");
+    assert(!is_undef($ps_face_dihedrals), "ps_face_anti_interference_volume: requires place_on_faces context ($ps_face_dihedrals)");
 
     shells = ps_face_anti_interference_shells(
         $ps_face_pts3d_local,
@@ -404,7 +404,7 @@ module ps_face_anti_interference_volume_ctx(z0, z1, mode="nonzero", max_project=
     union() {
         for (shell = shells) {
             if (shell[3] > 0)
-                echo(str("ps_face_anti_interference_volume_ctx: capped ", shell[3], " projection(s) on face ", $ps_face_idx, " loop ", shell[2]));
+                echo(str("ps_face_anti_interference_volume: capped ", shell[3], " projection(s) on face ", $ps_face_idx, " loop ", shell[2]));
 
             polyhedron(points = shell[0], faces = shell[1], convexity = convexity);
         }

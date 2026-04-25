@@ -69,7 +69,7 @@ module draw_volume_panel(poly, face_idx, label_s) {
                         ps_polygon($ps_face_pts2d, mode = "nonzero");
 
             color("deepskyblue", 0.38)
-                ps_face_anti_interference_volume_ctx(
+                ps_face_anti_interference_volume(
                     VOL_Z_MIN,
                     VOL_Z_MAX,
                     mode = "nonzero",

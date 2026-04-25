@@ -39,7 +39,7 @@ Returns: one shell per filled boundary loop, as
 `points` and `faces` are directly usable with `polyhedron(...)`. `capped_count`
 counts span projections limited by `max_project`.
 
-### `ps_face_anti_interference_volume_ctx(...)`
+### `ps_face_anti_interference_volume(...)`
 
 Module: Emit the generated shell volume for the current `place_on_faces(...)`
 context.
@@ -52,7 +52,7 @@ Typical usage:
 ```scad
 place_on_faces(poly) {
     intersection() {
-        ps_face_anti_interference_volume_ctx(-0.8, 1.2, max_project = 20);
+        ps_face_anti_interference_volume(-0.8, 1.2, max_project = 20);
         my_face_geometry();
     }
 }

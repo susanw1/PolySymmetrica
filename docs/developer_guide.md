@@ -316,7 +316,7 @@ See [face_regions.md](face_regions.md) for positive face-local volumes built
 from those boundary spans:
 
 - `ps_face_anti_interference_shells(...)`
-- `ps_face_anti_interference_volume_ctx(...)`
+- `ps_face_anti_interference_volume(...)`
 
 See [face_arrangement.md](face_arrangement.md) for the planned next layer:
 
