@@ -233,7 +233,7 @@ Where:
 - `source_edge_idx`
   original face-loop edge that this span descends from, when applicable.
 - `source_t0`, `source_t1`
-  parametric interval on that source edge.
+  parametric interval on that source edge, oriented to match `seg2d`.
 - `kind`
   currently `"source"` for arrangement-derived spans; later layers may add `"cut"` or `"synthetic"`.
 - `left_cell_idx`, `right_cell_idx`
@@ -252,6 +252,61 @@ Provides:
 - `$ps_seg_pts3d_local`
 - `$ps_seg_parent_face_edge_idx`
 - `$ps_seg_edge_kind`
+
+### `place_on_face_boundary_spans(mode="nonzero", eps=1e-8)`
+
+Iterator wrapper over internal dihedral-aware boundary-span site records for
+use inside `place_on_faces(...)`.
+
+Use this when later geometry needs both:
+
+- the face-local filled boundary span itself
+- the adjacent-face / dihedral context inherited from the original source edge
+- the per-span filled side in the face plane
+
+This is the key distinction from source-edge-level metadata:
+the same original source edge can contribute multiple surviving boundary spans,
+and those spans can legitimately differ in direction/order.
+
+Provides:
+
+- `$ps_boundary_span_idx`
+- `$ps_boundary_span_count`
+- `$ps_boundary_span_len`
+- `$ps_boundary_span_segment2d_local`
+- `$ps_boundary_span_loop_idx`
+- `$ps_boundary_span_source_edge_idx`
+- `$ps_boundary_span_source_t0`
+- `$ps_boundary_span_source_t1`
+- `$ps_boundary_span_kind`
+- `$ps_boundary_span_filled_cell_idx`
+- `$ps_boundary_span_other_cell_idx`
+- `$ps_boundary_span_adj_face_idx`
+- `$ps_boundary_span_dihedral`
+- `$ps_boundary_span_adj_face_normal_local`
+- `$ps_boundary_span_filled_side`
+- `$ps_boundary_span_adj_face_dir_span_local`
+
+Where:
+
+- local frame:
+  - `+X` runs along the oriented boundary span
+  - `+Y` is the in-face left normal of that span
+  - `+Z` is face-local `+Z`
+- `$ps_boundary_span_source_t0/$ps_boundary_span_source_t1`
+  are oriented to match `$ps_boundary_span_segment2d_local`
+- `$ps_boundary_span_filled_side`
+  is `+1` when the filled region lies on the left side of the oriented span,
+  `-1` when it lies on the right, and `0` only for degenerate/ambiguous cases
+- `$ps_boundary_span_adj_face_dir_span_local`
+  is the direction, in the current span-local frame, of the adjacent face plane
+  perpendicular to the shared span and oriented toward the current face's local
+  `+Z` side. This is often more useful for visualization and anti-interference
+  work than the adjacent-face normal alone, especially when a single source edge
+  contributes multiple surviving boundary spans. The underlying source-edge
+  direction is projected into the current face plane before this direction is
+  derived, so warped/non-planar faces still preserve the span-frame `Y/Z`
+  contract.
 
 ### `ps_polygon(points, mode="nonzero", eps=1e-8)`
 

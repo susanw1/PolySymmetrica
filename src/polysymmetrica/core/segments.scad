@@ -468,6 +468,105 @@ function _ps_seg_boundary_span_ts(span, a, b) =
     (a == span[2] && b == span[1]) ? [span[5], span[4]] :
     [span[4], span[5]];
 
+function _ps_seg_boundary_span_adj_face_normal_local(adj_face_idx, poly_faces_idx, poly_verts_local) =
+    is_undef(adj_face_idx) ? undef :
+    ps_face_frame_normal(poly_verts_local, poly_faces_idx[adj_face_idx]);
+
+function _ps_seg_project_to_plane(v, n) =
+    v - n * v_dot(v, n);
+
+function _ps_seg_boundary_span_adj_face_dir_span_local(source_ex, ex, ey, ez, adj_face_normal_local, eps=1e-9) =
+    is_undef(adj_face_normal_local) ? undef :
+    let(
+        dir0_world = v_norm(v_cross(adj_face_normal_local, source_ex)),
+        dir1_world = v_scale(dir0_world, -1),
+        dir_world =
+            (norm(dir0_world) <= eps)
+                ? undef
+                : (v_dot(dir0_world, ez) >= v_dot(dir1_world, ez))
+                    ? dir0_world
+                    : dir1_world
+    )
+    is_undef(dir_world) ? undef : [v_dot(dir_world, ex), v_dot(dir_world, ey), v_dot(dir_world, ez)];
+
+function _ps_seg_boundary_span_filled_side(seg2d, filled_cell, eps=1e-9) =
+    let(
+        probe = is_undef(filled_cell) ? undef : _ps_seg_cycle_probe_point(filled_cell[0], eps),
+        orient = is_undef(probe) ? 0 : _ps_seg_orient2(seg2d[0], seg2d[1], probe)
+    )
+    (orient > eps) ? 1 : (orient < -eps) ? -1 : 0;
+
+/**
+ * Function: Build internal dihedral-aware boundary-span site records for the current face.
+ * Params: face_pts3d_local (loop in face-local 3D), face_idx (current face index), poly_faces_idx/poly_verts_local (full poly in current face-local coordinates), face_neighbors_idx/face_dihedrals (current face-edge metadata), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: list of boundary-span site records `[span_idx, center, ex, ey, ez, span_len, seg2d, loop_idx, source_edge_idx, source_t0, source_t1, kind, filled_cell_idx, other_cell_idx, adj_face_idx, dihedral, adj_face_normal_local, filled_side, adj_face_dir_span_local]`
+ * Limitations/Gotchas: internal helper for `place_on_face_boundary_spans(...)`; `filled_side` is `+1` when the filled region lies on the left side of `seg2d`, `-1` on the right, and `0` only for degenerate/ambiguous cases
+ */
+function _ps_face_boundary_span_sites(face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local, face_neighbors_idx, face_dihedrals, mode="nonzero", eps=1e-8) =
+    let(
+        arr = ps_face_arrangement(face_pts3d_local, eps),
+        cells = arr[4],
+        bm = ps_face_boundary_model(face_pts3d_local, mode, eps),
+        spans = bm[3]
+    )
+    [
+        for (si = [0:1:len(spans)-1])
+            let(
+                span = spans[si],
+                seg2d = span[0],
+                dx = seg2d[1][0] - seg2d[0][0],
+                dy = seg2d[1][1] - seg2d[0][1],
+                span_len = norm([dx, dy]),
+                ex = (span_len <= eps) ? [1, 0, 0] : [dx / span_len, dy / span_len, 0],
+                ey = [-ex[1], ex[0], 0],
+                ez = [0, 0, 1],
+                center = [(seg2d[0][0] + seg2d[1][0]) / 2, (seg2d[0][1] + seg2d[1][1]) / 2, 0],
+                source_edge_idx = span[2],
+                source_a = is_undef(source_edge_idx) ? undef : face_pts3d_local[source_edge_idx],
+                source_b = is_undef(source_edge_idx) ? undef : face_pts3d_local[(source_edge_idx + 1) % len(face_pts3d_local)],
+                source_ex_raw = (is_undef(source_a) || is_undef(source_b)) ? undef : (source_b - source_a),
+                source_ex_proj = is_undef(source_ex_raw) ? undef : _ps_seg_project_to_plane(source_ex_raw, ez),
+                source_ex = (is_undef(source_ex_proj) || norm(source_ex_proj) <= eps)
+                    ? ex
+                    : v_norm(source_ex_proj),
+                filled_cell_idx = span[6],
+                other_cell_idx = span[7],
+                adj_face_idx =
+                    (span[5] == "source" && !is_undef(source_edge_idx) && !is_undef(face_neighbors_idx) && source_edge_idx < len(face_neighbors_idx))
+                        ? face_neighbors_idx[source_edge_idx]
+                        : undef,
+                dihedral =
+                    (span[5] == "source" && !is_undef(source_edge_idx) && !is_undef(face_dihedrals) && source_edge_idx < len(face_dihedrals))
+                        ? face_dihedrals[source_edge_idx]
+                        : undef,
+                adj_face_normal_local = _ps_seg_boundary_span_adj_face_normal_local(adj_face_idx, poly_faces_idx, poly_verts_local),
+                filled_cell = is_undef(filled_cell_idx) ? undef : cells[filled_cell_idx],
+                filled_side = _ps_seg_boundary_span_filled_side(seg2d, filled_cell, eps),
+                adj_face_dir_span_local = _ps_seg_boundary_span_adj_face_dir_span_local(source_ex, ex, ey, ez, adj_face_normal_local, eps)
+            )
+            [
+                si,
+                center,
+                ex,
+                ey,
+                ez,
+                span_len,
+                seg2d,
+                span[1],
+                source_edge_idx,
+                span[3],
+                span[4],
+                span[5],
+                filled_cell_idx,
+                other_cell_idx,
+                adj_face_idx,
+                dihedral,
+                adj_face_normal_local,
+                filled_side,
+                adj_face_dir_span_local
+            ]
+    ];
+
 /**
  * Function: Build the planar arrangement induced by one face loop.
  * Params: face_pts3d_local (loop in face-local 3D), eps (geometric tolerance)
@@ -641,6 +740,51 @@ module place_on_face_segments(mode="nonzero", eps=1e-8) {
         $ps_seg_edge_kind = s[3];
         $ps_face_has_segments = len(segs) > 1;
         children();
+    }
+}
+
+/**
+ * Module: Iterate dihedral-aware boundary spans for the current placed face.
+ * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: none; exposes `$ps_boundary_span_*` metadata and places children in a face-local span frame
+ */
+module place_on_face_boundary_spans(mode="nonzero", eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_pts3d_local)");
+    assert(!is_undef($ps_face_idx), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "place_on_face_boundary_spans: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "place_on_face_boundary_spans: requires place_on_faces context ($ps_poly_verts_local)");
+    assert(!is_undef($ps_face_neighbors_idx), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_neighbors_idx)");
+    assert(!is_undef($ps_face_dihedrals), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_dihedrals)");
+    sites = _ps_face_boundary_span_sites(
+        $ps_face_pts3d_local,
+        $ps_face_idx,
+        $ps_poly_faces_idx,
+        $ps_poly_verts_local,
+        $ps_face_neighbors_idx,
+        $ps_face_dihedrals,
+        mode,
+        eps
+    );
+    for (site = sites) {
+        $ps_boundary_span_idx = site[0];
+        $ps_boundary_span_count = len(sites);
+        $ps_boundary_span_len = site[5];
+        $ps_boundary_span_segment2d_local = site[6];
+        $ps_boundary_span_loop_idx = site[7];
+        $ps_boundary_span_source_edge_idx = site[8];
+        $ps_boundary_span_source_t0 = site[9];
+        $ps_boundary_span_source_t1 = site[10];
+        $ps_boundary_span_kind = site[11];
+        $ps_boundary_span_filled_cell_idx = site[12];
+        $ps_boundary_span_other_cell_idx = site[13];
+        $ps_boundary_span_adj_face_idx = site[14];
+        $ps_boundary_span_dihedral = site[15];
+        $ps_boundary_span_adj_face_normal_local = site[16];
+        $ps_boundary_span_filled_side = site[17];
+        $ps_boundary_span_adj_face_dir_span_local = site[18];
+
+        multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
+            children();
     }
 }
 
