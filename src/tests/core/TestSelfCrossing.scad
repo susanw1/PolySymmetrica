@@ -19,6 +19,9 @@ module assert_list_eq(a, b, msg="") {
 function _test_punch_poly() =
     poly_antiprism(7, 3, angle = 15);
 
+function _test_punch_poly_angle0() =
+    poly_antiprism(7, 3, angle = 0);
+
 function _test_face_site(poly, face_idx) =
     ps_face_sites(poly)[face_idx];
 
@@ -102,11 +105,38 @@ module test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells(
     );
 }
 
+module test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges() {
+    site = _test_face_site(_test_punch_poly_angle0(), TRI_FACE_IDX);
+    cuts = ps_face_geom_cut_entries(site[10], site[0], site[13], site[12], mode = MODE, filter_parent = true);
+    visible = ps_face_visible_segments(site[10], site[0], site[13], site[12], mode = MODE, filter_parent = true);
+
+    assert_int_eq(len(cuts), 6, "angle=0 triangle punch-through cut count");
+    assert_list_eq(
+        [for (c = cuts) c[1]],
+        [3, 8, 9, 10, 14, 15],
+        "angle=0 triangle punch-through cutter face ids"
+    );
+    assert_int_eq(len(visible), 5, "angle=0 triangle should split into five visible cells");
+    assert_list_eq([for (seg = visible) len(seg[0])], [4, 3, 3, 3, 3], "angle=0 triangle visible segment arities");
+    assert_list_eq(
+        [for (seg = visible) seg[3]],
+        [
+            ["parent", "parent", "cut", "cut"],
+            ["cut", "parent", "cut"],
+            ["parent", "cut", "cut"],
+            ["parent", "parent", "cut"],
+            ["cut", "parent", "parent"]
+        ],
+        "angle=0 triangle visible segment edge-kind lineage"
+    );
+}
+
 module run_TestSelfCrossing() {
     test_ps_face_arrangement__7_3_15_star_has_stable_structure();
     test_ps_face_boundary_model__7_3_15_star_has_true_nonzero_boundary();
     test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
+    test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
 }
 
 run_TestSelfCrossing();
