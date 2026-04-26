@@ -11,8 +11,10 @@ use <../../../core/segments.scad>
 // inspected without reintroducing the full proxy/carve stack.
 
 IR = 32;
-TARGET_FACE_IDX = 1;
-TARGET_SOURCE_EDGE_IDX = 0;
+STAR_FACE_IDX = 1;
+STAR_SOURCE_EDGE_IDX = 0;
+TRI_FACE_IDX = 12;
+TRI_SOURCE_EDGE_IDX = undef;
 MODE = "nonzero";
 FILTER_PARENT_CUTS = true;
 
@@ -22,6 +24,7 @@ LINE_R = 0.42;
 TXT_H = 0.32;
 TXT_S = 2.4;
 PANEL_X = 112;
+PANEL_Y = 112;
 PANEL_LABEL_Y = -50;
 VOL_Z_MIN = -2;
 VOL_Z_MAX = 2;
@@ -112,15 +115,16 @@ module draw_polygon_fill(pts2d, z = 0) {
  * Params: pts2d (source face loop)
  * Returns: none
  */
-module draw_source_edge_labels(pts2d) {
+module draw_source_edge_labels(pts2d, source_edge_idx = undef) {
     centre = ps_centroid2d(pts2d);
     for (ei = [0:1:len(pts2d)-1]) {
         seg2d = [pts2d[ei], pts2d[(ei + 1) % len(pts2d)]];
         mid = segment_midpoint2d(seg2d);
         offset_dir = unit2d(mid, centre);
-        label = (ei == TARGET_SOURCE_EDGE_IDX) ? str("*se", ei) : str("se", ei);
+        is_target_source = !is_undef(source_edge_idx) && ei == source_edge_idx;
+        label = is_target_source ? str("*se", ei) : str("se", ei);
 
-        color((ei == TARGET_SOURCE_EDGE_IDX) ? "red" : "dimgray")
+        color(is_target_source ? "red" : "dimgray")
             translate([mid[0] + 3.0 * offset_dir[0], mid[1] + 3.0 * offset_dir[1], 1.1 * FACE_THK])
                 draw_text2d(label, size = 1.35);
     }
@@ -128,10 +132,10 @@ module draw_source_edge_labels(pts2d) {
 
 /**
  * Module: Draw global poly context with face and edge labels.
- * Params: poly (poly descriptor)
+ * Params: poly (poly descriptor), face_idx (selected face)
  * Returns: none
  */
-module draw_poly_context(poly) {
+module draw_poly_context(poly, face_idx) {
     color("silver")
         place_on_edges(poly, IR)
             cube([$ps_edge_len, 0.35, 0.85], center = true);
@@ -141,18 +145,18 @@ module draw_poly_context(poly) {
             sphere(1.0, $fn = 12);
 
     place_on_faces(poly, IR) {
-        if ($ps_face_idx == TARGET_FACE_IDX)
+        if ($ps_face_idx == face_idx)
             color("tomato", 0.46)
                 linear_extrude(height = FACE_THK, center = true)
                     ps_polygon($ps_face_pts2d, MODE);
 
-        color(($ps_face_idx == TARGET_FACE_IDX) ? "black" : "gray")
+        color(($ps_face_idx == face_idx) ? "black" : "gray")
             translate([0, 0, 1.3])
                 draw_text2d(str("f", $ps_face_idx), size = 1.55);
     }
 
     place_on_edges(poly, IR) {
-        if (_ps_list_contains($ps_edge_adj_faces_idx, TARGET_FACE_IDX))
+        if (_ps_list_contains($ps_edge_adj_faces_idx, face_idx))
             color("black")
                 translate([0, 0, 1.0])
                     draw_text2d(str("e", $ps_edge_idx), size = 1.35);
@@ -161,10 +165,10 @@ module draw_poly_context(poly) {
 
 /**
  * Module: Echo summary counts for the target face once during render.
- * Params: face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local
+ * Params: label_s (case label), face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local
  * Returns: none
  */
-module draw_echo_target_summary(face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local) {
+module draw_echo_target_summary(label_s, face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local) {
     arr = ps_face_arrangement(face_pts3d_local);
     bm = ps_face_boundary_model(face_pts3d_local, MODE);
     cuts = ps_face_geom_cut_entries(
@@ -185,7 +189,7 @@ module draw_echo_target_summary(face_pts3d_local, face_idx, poly_faces_idx, poly
     );
 
     echo(str(
-        "7/3+15 punch-through probe f", face_idx,
+        "7/3+15 punch-through probe ", label_s, " f", face_idx,
         ": crossings=", len(arr[1]),
         " nodes=", len(arr[2]),
         " arrangement_spans=", len(arr[3]),
@@ -200,12 +204,12 @@ module draw_echo_target_summary(face_pts3d_local, face_idx, poly_faces_idx, poly
 
 /**
  * Module: Draw arrangement nodes, spans, and source-edge labels for the target face.
- * Params: poly (poly descriptor)
+ * Params: poly (poly descriptor), face_idx (target face), source_edge_idx (optional highlighted source edge), label_s (panel label)
  * Returns: none
  */
-module draw_arrangement_panel(poly) {
+module draw_arrangement_panel(poly, face_idx, source_edge_idx, label_s) {
     place_on_faces(poly, IR) {
-        if ($ps_face_idx == TARGET_FACE_IDX) {
+        if ($ps_face_idx == face_idx) {
             arr = ps_face_arrangement($ps_face_pts3d_local);
             nodes = arr[2];
             spans = arr[3];
@@ -217,7 +221,7 @@ module draw_arrangement_panel(poly) {
 
             for (si = [0:1:len(spans)-1]) {
                 span = spans[si];
-                is_target_source = span[3] == TARGET_SOURCE_EDGE_IDX;
+                is_target_source = !is_undef(source_edge_idx) && span[3] == source_edge_idx;
                 color(is_target_source ? "red" : "slategray")
                     draw_segment_stroke(span[0], r = is_target_source ? LINE_R * 0.8 : LINE_R * 0.45);
             }
@@ -229,22 +233,22 @@ module draw_arrangement_panel(poly) {
                         sphere(r = NODE_R, $fn = 12);
             }
 
-            draw_source_edge_labels($ps_face_pts2d);
-            draw_echo_target_summary($ps_face_pts3d_local, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local);
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
+            draw_echo_target_summary(label_s, $ps_face_pts3d_local, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local);
         }
     }
 
-    draw_panel_label("arrangement");
+    draw_panel_label(str(label_s, " arrangement"));
 }
 
 /**
  * Module: Draw nonzero filled boundary loops and source-edge lineage.
- * Params: poly (poly descriptor)
+ * Params: poly (poly descriptor), face_idx (target face), source_edge_idx (optional highlighted source edge), label_s (panel label)
  * Returns: none
  */
-module draw_boundary_panel(poly) {
+module draw_boundary_panel(poly, face_idx, source_edge_idx, label_s) {
     place_on_faces(poly, IR) {
-        if ($ps_face_idx == TARGET_FACE_IDX) {
+        if ($ps_face_idx == face_idx) {
             bm = ps_face_boundary_model($ps_face_pts3d_local, MODE);
             loops = bm[2];
             spans = bm[3];
@@ -260,7 +264,7 @@ module draw_boundary_panel(poly) {
 
             for (si = [0:1:len(spans)-1]) {
                 span = spans[si];
-                is_target_source = span[2] == TARGET_SOURCE_EDGE_IDX;
+                is_target_source = !is_undef(source_edge_idx) && span[2] == source_edge_idx;
                 mid = segment_midpoint2d(span[0]);
 
                 color(is_target_source ? "red" : "black")
@@ -271,21 +275,21 @@ module draw_boundary_panel(poly) {
                         draw_text2d(str("b", si, "/se", span[2]), size = 1.15);
             }
 
-            draw_source_edge_labels($ps_face_pts2d);
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
         }
     }
 
-    draw_panel_label("filled boundary");
+    draw_panel_label(str(label_s, " boundary"));
 }
 
 /**
  * Module: Draw geometry cuts from other faces and the retained visible cells.
- * Params: poly (poly descriptor)
+ * Params: poly (poly descriptor), face_idx (target face), source_edge_idx (optional highlighted source edge), label_s (panel label)
  * Returns: none
  */
-module draw_cut_visibility_panel(poly) {
+module draw_cut_visibility_panel(poly, face_idx, source_edge_idx, label_s) {
     place_on_faces(poly, IR) {
-        if ($ps_face_idx == TARGET_FACE_IDX) {
+        if ($ps_face_idx == face_idx) {
             color("gainsboro", 0.16)
                 translate([0, 0, -FACE_THK])
                     linear_extrude(height = FACE_THK, center = true)
@@ -322,21 +326,21 @@ module draw_cut_visibility_panel(poly) {
                         draw_text2d(str("c", ci, "/f", cut[1]), size = 1.1);
             }
 
-            draw_source_edge_labels($ps_face_pts2d);
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
         }
     }
 
-    draw_panel_label("cuts + visible");
+    draw_panel_label(str(label_s, " cuts"));
 }
 
 /**
  * Module: Draw dihedral-aware boundary spans and positive anti-interference volume.
- * Params: poly (poly descriptor)
+ * Params: poly (poly descriptor), face_idx (target face), source_edge_idx (optional highlighted source edge), label_s (panel label)
  * Returns: none
  */
-module draw_volume_panel(poly) {
+module draw_volume_panel(poly, face_idx, source_edge_idx, label_s) {
     place_on_faces(poly, IR) {
-        if ($ps_face_idx == TARGET_FACE_IDX) {
+        if ($ps_face_idx == face_idx) {
             color("gainsboro", 0.18)
                 translate([0, 0, -FACE_THK])
                     linear_extrude(height = FACE_THK, center = true)
@@ -351,7 +355,7 @@ module draw_volume_panel(poly) {
                 );
 
             place_on_face_boundary_spans(mode = MODE) {
-                is_target_source = $ps_boundary_span_source_edge_idx == TARGET_SOURCE_EDGE_IDX;
+                is_target_source = !is_undef(source_edge_idx) && $ps_boundary_span_source_edge_idx == source_edge_idx;
                 color(is_target_source ? "red" : "black")
                     cube([$ps_boundary_span_len, is_target_source ? 0.95 : 0.55, 0.55], center = true);
 
@@ -369,20 +373,28 @@ module draw_volume_panel(poly) {
         }
     }
 
-    draw_panel_label("span volume");
+    draw_panel_label(str(label_s, " volume"));
 }
 
-translate([-1.5 * PANEL_X, 0, 0])
-    draw_poly_context(P);
+module draw_probe_row(face_idx, source_edge_idx, label_s) {
+    translate([-2 * PANEL_X, 0, 0])
+        draw_poly_context(P, face_idx);
 
-translate([-0.5 * PANEL_X, 0, 0])
-    draw_arrangement_panel(P);
+    translate([-1 * PANEL_X, 0, 0])
+        draw_arrangement_panel(P, face_idx, source_edge_idx, label_s);
 
-translate([0.5 * PANEL_X, 0, 0])
-    draw_boundary_panel(P);
+    translate([0 * PANEL_X, 0, 0])
+        draw_boundary_panel(P, face_idx, source_edge_idx, label_s);
 
-translate([1.5 * PANEL_X, 0, 0])
-    draw_cut_visibility_panel(P);
+    translate([1 * PANEL_X, 0, 0])
+        draw_cut_visibility_panel(P, face_idx, source_edge_idx, label_s);
 
-translate([2.5 * PANEL_X, 0, 0])
-    draw_volume_panel(P);
+    translate([2 * PANEL_X, 0, 0])
+        draw_volume_panel(P, face_idx, source_edge_idx, label_s);
+}
+
+translate([0, 0.5 * PANEL_Y, 0])
+    draw_probe_row(STAR_FACE_IDX, STAR_SOURCE_EDGE_IDX, "star");
+
+translate([0, -0.5 * PANEL_Y, 0])
+    draw_probe_row(TRI_FACE_IDX, TRI_SOURCE_EDGE_IDX, "tri");
