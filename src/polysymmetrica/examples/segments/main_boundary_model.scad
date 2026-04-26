@@ -67,14 +67,6 @@ function source_edge_color(i) =
     "sienna";
 
 /**
- * Function: Compute the midpoint of a 2D segment.
- * Params: seg2d (`[[x0,y0],[x1,y1]]`)
- * Returns: midpoint `[x, y]`
- */
-function segment_midpoint2d(seg2d) =
-    [(seg2d[0][0] + seg2d[1][0]) / 2, (seg2d[0][1] + seg2d[1][1]) / 2];
-
-/**
  * Module: Draw a world-space label below one panel.
  * Params: s (label string)
  * Returns: none
@@ -167,7 +159,7 @@ module draw_dihedral_direction(dir_span_local) {
 module draw_source_edge_labels(pts2d) {
     for (ei = [0:1:len(pts2d)-1]) {
         seg2d = [pts2d[ei], pts2d[(ei+1)%len(pts2d)]];
-        mid = segment_midpoint2d(seg2d);
+        mid = ps_segment_midpoint2d(seg2d);
         inward = ps_centroid2d(pts2d) - mid;
         offset = (norm(inward) <= 1e-9) ? [0, 0] : inward / norm(inward);
 
@@ -240,7 +232,7 @@ module draw_panel_boundary_model(poly, face_idx, mode, label_s) {
                     draw_local_segment_stroke(span[0], r = LINE_R * 0.6);
 
                 color("black") {
-                    mid = segment_midpoint2d(span[0]);
+                    mid = ps_segment_midpoint2d(span[0]);
                     translate([mid[0], mid[1], FACE_THK / 2 + 0.02])
                         linear_extrude(height = TXT_H)
                             text(str(si), size = 1.5, halign = "center", valign = "center");

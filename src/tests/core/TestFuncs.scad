@@ -165,6 +165,11 @@ module test_ps_centroid2d__basic() {
     assert_near(c2[1], 3, EPS, "centroid2d tri y");
 }
 
+module test_ps_segment_midpoint2d__basic() {
+    assert(ps_segment_midpoint2d([[0,0],[2,4]]) == [1,2], "segment midpoint");
+    assert(ps_segment_midpoint2d([[-1,3],[3,-1]]) == [1,1], "segment midpoint mixed signs");
+}
+
 module test_ps_xy__projects_points() {
     assert(ps_xy([]) == [], "xy empty");
     assert(ps_xy([[1,2,3], [4,5,6]]) == [[1,2], [4,5]], "xy from vec3");
@@ -663,6 +668,7 @@ module run_TestFuncs() {
     test_sum__numbers();
     test_v_sum__vec3_list();
     test_ps_centroid2d__basic();
+    test_ps_segment_midpoint2d__basic();
     test_ps_xy__projects_points();
     test_ps_cyclic_pairs__basic();
     test_ps_ordered_pair__basic();

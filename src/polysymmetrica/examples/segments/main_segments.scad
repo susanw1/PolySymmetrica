@@ -33,14 +33,6 @@ function cell_color(i) =
     "darkorange";
 
 /**
- * Function: Compute the midpoint of a 2D segment.
- * Params: seg2d (`[[x0,y0],[x1,y1]]`)
- * Returns: midpoint `[x, y]`
- */
-function segment_midpoint2d(seg2d) =
-    [(seg2d[0][0] + seg2d[1][0]) / 2, (seg2d[0][1] + seg2d[1][1]) / 2];
-
-/**
  * Module: Draw a world-space label below one panel.
  * Params: s (label string)
  * Returns: none
@@ -168,7 +160,7 @@ module draw_panel_geom_cuts() {
                                 text("x", size = 1.4, halign = "center", valign = "center");
 
                 color("black") {
-                    mid = segment_midpoint2d($ps_face_cut_segment2d_local);
+                    mid = ps_segment_midpoint2d($ps_face_cut_segment2d_local);
                     translate([mid[0], mid[1], FACE_THK / 2 + 0.02])
                         linear_extrude(height = TXT_H)
                             text(str($ps_face_cut_idx), size = 1.8, halign = "center", valign = "center");
