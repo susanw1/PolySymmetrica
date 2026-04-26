@@ -16,6 +16,10 @@ module assert_list_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
 }
 
+module assert_near(a, b, eps=EPS, msg="") {
+    assert(abs(a - b) <= eps, str(msg, " expected=", b, " got=", a));
+}
+
 function _test_punch_poly() =
     poly_antiprism(7, 3, angle = 15);
 
@@ -70,6 +74,24 @@ module test_ps_face_boundary_model__7_3_15_star_has_true_nonzero_boundary() {
         [0, 4, 5, 2, 3, 0, 1, 5, 6, 3, 4, 1, 2, 6],
         "star face filled segment source-edge lineage"
     );
+}
+
+module test_ps_face_filled_boundary_source_edges__7_3_15_star_groups_surviving_spans() {
+    site = _test_face_site(_test_punch_poly(), STAR_FACE_IDX);
+    source_edges = ps_face_filled_boundary_source_edges(site[11], MODE);
+
+    assert_int_eq(len(source_edges), 7, "star face should expose one filled-boundary record per source edge");
+    assert_list_eq([for (e = source_edges) e[0]], [0, 1, 2, 3, 4, 5, 6], "star face source-edge ids");
+    assert_list_eq([for (e = source_edges) len(e[2])], [2, 2, 2, 2, 2, 2, 2], "star face surviving span count per source edge");
+    assert_list_eq(
+        [for (e = source_edges) [for (span = e[2]) span[8]]],
+        [[1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]],
+        "star face filled side per surviving span"
+    );
+    assert_near(source_edges[0][2][0][3], 0.356896, 1e-6, "star face source edge 0 first span t0");
+    assert_near(source_edges[0][2][0][4], 0, EPS, "star face source edge 0 first span t1");
+    assert_near(source_edges[0][2][1][3], 1, EPS, "star face source edge 0 second span t0");
+    assert_near(source_edges[0][2][1][4], 0.643104, 1e-6, "star face source edge 0 second span t1");
 }
 
 module test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters() {
@@ -131,12 +153,59 @@ module test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges()
     );
 }
 
+module test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary() {
+    site = _test_face_site(_test_punch_poly_angle0(), TRI_FACE_IDX);
+    source_edges = ps_face_filled_boundary_source_edges(site[11], MODE);
+
+    assert_int_eq(len(source_edges), 3, "simple triangle should expose three filled-boundary source edges");
+    assert_list_eq([for (e = source_edges) e[0]], [0, 1, 2], "simple triangle source-edge ids");
+    assert_list_eq([for (e = source_edges) len(e[2])], [1, 1, 1], "simple triangle surviving span count per source edge");
+    assert_list_eq(
+        [for (e = source_edges) [for (span = e[2]) span[8]]],
+        [[1], [1], [1]],
+        "simple triangle filled side per source edge"
+    );
+    assert_list_eq(
+        [for (e = source_edges) [for (span = e[2]) [span[3], span[4]]]],
+        [[[1, 0]], [[1, 0]], [[1, 0]]],
+        "simple triangle boundary span ranges are oriented to boundary traversal"
+    );
+}
+
+module test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_context() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == STAR_FACE_IDX) {
+            place_on_face_filled_boundary_source_edges(MODE) {
+                assert_int_eq($ps_filled_boundary_source_edge_count, 7, "placed source-edge record count");
+                assert_int_eq($ps_filled_boundary_source_edge_span_count, 2, "placed source-edge span count");
+                assert(
+                    $ps_filled_boundary_source_edge_idx >= 0 && $ps_filled_boundary_source_edge_idx < 7,
+                    str("placed source-edge idx in range: ", $ps_filled_boundary_source_edge_idx)
+                );
+                assert_int_eq(
+                    len($ps_filled_boundary_source_edge_boundary_span_idxs),
+                    $ps_filled_boundary_source_edge_span_count,
+                    "placed source-edge boundary-span id arity"
+                );
+                assert_int_eq(
+                    len($ps_filled_boundary_source_edge_filled_sides),
+                    $ps_filled_boundary_source_edge_span_count,
+                    "placed source-edge filled-side arity"
+                );
+            }
+        }
+    }
+}
+
 module run_TestSelfCrossing() {
     test_ps_face_arrangement__7_3_15_star_has_stable_structure();
     test_ps_face_boundary_model__7_3_15_star_has_true_nonzero_boundary();
+    test_ps_face_filled_boundary_source_edges__7_3_15_star_groups_surviving_spans();
     test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
+    test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();
+    test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_context();
 }
 
 run_TestSelfCrossing();
