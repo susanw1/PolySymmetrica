@@ -576,7 +576,7 @@ function _ps_face_boundary_span_sites(face_pts3d_local, face_idx, poly_faces_idx
 function ps_face_arrangement(face_pts3d_local, eps=1e-8) =
     let(
         n = len(face_pts3d_local),
-        face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]]
+        face_pts2d = ps_xy(face_pts3d_local)
     )
     (n < 3) ? [face_pts2d, [], [], [], []] :
     let(
@@ -716,7 +716,7 @@ function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
         ]
     )
     (len(filtered) == 0)
-        ? [[[for (p = face_pts3d_local) [p[0], p[1]]], face_pts3d_local, [for (i = [0:1:n-1]) i], [for (_i = [0:1:n-1]) "parent"]]]
+        ? [[ps_xy(face_pts3d_local), face_pts3d_local, [for (i = [0:1:n-1]) i], [for (_i = [0:1:n-1]) "parent"]]]
         : filtered;
 
 /**
