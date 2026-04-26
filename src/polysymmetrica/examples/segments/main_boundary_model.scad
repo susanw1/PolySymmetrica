@@ -27,6 +27,7 @@ SPAN_ARROW_LEN = 7;
 DIH_RAY_LEN = 10;
 FACE_LABEL_Z = 0.8;
 SOURCE_EDGE_MARKER_Z = 1.5 * FACE_THK;
+SOURCE_SIDE_LEN = 5.2;
 
 STAR_POLY = poly_antiprism(5, 2);
 STAR_FACE_IDX = 1;
@@ -320,49 +321,51 @@ module draw_panel_boundary_source_edges(poly, face_idx, mode, label_s) {
 
     place_on_faces(poly, IR) {
         if ($ps_face_idx == face_idx) {
-            source_edges = ps_face_filled_boundary_source_edges($ps_face_pts3d_local, mode = mode);
-
             color("gainsboro", 0.20)
                 translate([0, 0, RAW_FILL_Z])
                     draw_polygon($ps_face_pts2d);
 
             draw_source_edge_labels($ps_face_pts2d);
 
-            for (source_edge = source_edges) {
-                echo(str(label_s, "draw_panel_boundary_source_edges::", source_edge[0]));
-                source_edge_idx = source_edge[0];
-                source_seg2d = source_edge[1];
-                source_spans = source_edge[2];
-                label_mid = segment_midpoint2d(source_seg2d);
+            place_on_face_filled_boundary_source_edges(mode = mode) {
+                echo(str(label_s, "draw_panel_boundary_source_edges::", $ps_filled_boundary_source_edge_idx));
 
-                color(source_edge_color(source_edge_idx), 0.25)
+                color(source_edge_color($ps_filled_boundary_source_edge_idx), 0.25)
                     translate([0, 0, SOURCE_EDGE_MARKER_Z - 0.35])
-                        draw_local_segment_stroke(source_seg2d, r = LINE_R * 0.85);
+                        cube([$ps_filled_boundary_source_edge_len, LINE_R * 1.7, FACE_THK], center = true);
 
-                for (si = [0:1:len(source_spans)-1]) {
-                    source_span = source_spans[si];
-                    span_seg2d = source_span[1];
-                    filled_side = source_span[8];
-                    mid = segment_midpoint2d(span_seg2d);
+                for (si = [0:1:$ps_filled_boundary_source_edge_span_count-1]) {
+                    t_range = $ps_filled_boundary_source_edge_span_t_ranges_frame_local[si];
+                    span_filled_side = $ps_filled_boundary_source_edge_span_filled_sides_frame_local[si];
+                    side_dir = (span_filled_side >= 0) ? 1 : -1;
+                    x0 = (t_range[0] - 0.5) * $ps_filled_boundary_source_edge_len;
+                    x1 = (t_range[1] - 0.5) * $ps_filled_boundary_source_edge_len;
+                    x_mid = (x0 + x1) / 2;
+                    span_len = abs(x1 - x0);
 
-                    color(source_edge_color(source_edge_idx))
-                        translate([0, 0, SOURCE_EDGE_MARKER_Z])
-                            draw_local_segment_stroke(span_seg2d, r = LINE_R * 0.55);
+                    color(source_edge_color($ps_filled_boundary_source_edge_idx))
+                        translate([x_mid, 0, SOURCE_EDGE_MARKER_Z])
+                            cube([span_len, LINE_R * 1.1, FACE_THK], center = true);
 
-                    color(filled_side >= 0 ? "limegreen" : "crimson")
-                        translate([mid[0], mid[1], SOURCE_EDGE_MARKER_Z + 0.8])
-                            sphere(r = 0.9, $fn = 12);
+                    color(span_filled_side >= 0 ? "limegreen" : "crimson")
+                        translate([0, 0, SOURCE_EDGE_MARKER_Z + 0.8])
+                            union() {
+                                translate([x_mid, side_dir * SOURCE_SIDE_LEN / 2, 0])
+                                    cube([LINE_R * 0.45, SOURCE_SIDE_LEN, LINE_R * 0.45], center = true);
+                                translate([x_mid, side_dir * SOURCE_SIDE_LEN, 0])
+                                    sphere(r = 0.9, $fn = 12);
+                            }
                 }
 
                 color("white")
-                    translate([label_mid[0], label_mid[1], SOURCE_EDGE_MARKER_Z + 2.1])
+                    translate([0, SOURCE_SIDE_LEN + 1.2, SOURCE_EDGE_MARKER_Z + 2.1])
                         linear_extrude(height = TXT_H)
                             text(
                                 str(
                                     "se",
-                                    source_edge_idx,
+                                    $ps_filled_boundary_source_edge_idx,
                                     ":",
-                                    len(source_spans),
+                                    $ps_filled_boundary_source_edge_span_count,
                                     " spans"
                                 ),
                                 size = 1.45,

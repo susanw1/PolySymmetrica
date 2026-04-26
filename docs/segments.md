@@ -322,11 +322,13 @@ Provides:
 Iterator wrapper over `ps_face_filled_boundary_source_edges(...)` for use inside
 `place_on_faces(...)`.
 
-Children are placed in the original source-edge frame:
+Children are placed in a normalized source-edge frame:
 
-- local `+X` runs along the original source edge
-- local `+Y` is the in-face left normal of that source edge
+- local `+X` runs along the source edge, reversed when needed
+- local `+Y` is the in-face left normal of local `+X`
 - local `+Z` is face-local `+Z`
+- the filled region is on local `-Y` when the source edge has an unambiguous
+  filled side
 
 Provides:
 
@@ -340,6 +342,18 @@ Provides:
 - `$ps_filled_boundary_source_edge_span_segments2d_local`
 - `$ps_filled_boundary_source_edge_span_t_ranges`
 - `$ps_filled_boundary_source_edge_filled_sides`
+- `$ps_filled_boundary_source_edge_frame_reversed`
+- `$ps_filled_boundary_source_edge_frame_source_filled_side`
+- `$ps_filled_boundary_source_edge_frame_filled_side`
+- `$ps_filled_boundary_source_edge_span_t_ranges_frame_local`
+- `$ps_filled_boundary_source_edge_span_filled_sides_frame_local`
+
+The raw record metadata remains source-oriented. The `*_frame_*` variables
+describe the child placement frame, and `*_span_t_ranges_frame_local` is the
+same span interval expressed in that child frame. If one source edge contributes
+spans with mixed filled sides, use
+`$ps_filled_boundary_source_edge_span_filled_sides_frame_local` per span rather
+than assuming every span has the representative frame side.
 
 ### `place_on_face_boundary_spans(mode="nonzero", eps=1e-8)`
 
