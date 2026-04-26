@@ -232,6 +232,14 @@ function ps_centroid2d(points) =
     (len(points) == 0) ? [0, 0] :
     v_scale(v_sum(points), 1 / len(points));
 
+/**
+ * Function: Project points to the XY plane.
+ * Params: points (2D/3D/ND point list)
+ * Returns: `[[x, y], ...]`
+ */
+function ps_xy(points) =
+    [for (p = points) [p[0], p[1]]];
+
 // Rotate vector v around axis by ang (degrees).
 function ps_rot_axis(v, axis, ang) =
     let(

@@ -4,7 +4,7 @@ use <../../core/placement.scad>
 use <../../core/prisms.scad>
 use <../../core/segments.scad>
 use <../../core/truncation.scad>
-use <../../models/tetrahedron.scad>
+use <../../models/platonics_all.scad>
 
 // Face anti-interference volume demo.
 // Shows the positive face-local shell built from filled boundary spans for:
@@ -20,6 +20,9 @@ LINE_R = 0.55;
 TXT_H = 0.35;
 TXT_S = 3.2;
 PANEL_X = 130;
+
+DOD_POLY = dodecahedron();
+DOD_FACE_IDX = 0;
 
 STAR_POLY = poly_antiprism(5, 2);
 STAR_FACE_IDX = 0;
@@ -109,3 +112,6 @@ translate([-0.5 * PANEL_X, 0, 0])
 
 translate([0.5 * PANEL_X, 0, 0])
     draw_volume_panel(ANTI_POLY, ANTI_FACE_IDX, "anti-tet hex volume");
+
+translate([1.5 * PANEL_X, 0, 0])
+    draw_volume_panel(DOD_POLY, DOD_FACE_IDX, "dodeca volume");

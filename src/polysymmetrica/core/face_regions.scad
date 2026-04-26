@@ -123,7 +123,7 @@ function _ps_fr_winding_number(pt, poly, eps=1e-9) =
  * Returns: list of cell winding signs (`+1`, `-1`, or `0`)
  */
 function _ps_fr_cell_winding_signs(face_pts3d_local, cells, eps=1e-8) =
-    let(face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]])
+    let(face_pts2d = ps_xy(face_pts3d_local))
     [
         for (cell = cells)
             let(
@@ -348,7 +348,7 @@ function ps_face_anti_interference_shells(
         _z0 = assert(!is_undef(z0), "ps_face_anti_interference_shells: z0 must be defined"),
         _z1 = assert(!is_undef(z1), "ps_face_anti_interference_shells: z1 must be defined"),
         arr = ps_face_arrangement(face_pts3d_local, eps),
-        input_area = _ps_seg_poly_area2([for (p = face_pts3d_local) [p[0], p[1]]]),
+        input_area = _ps_seg_poly_area2(ps_xy(face_pts3d_local)),
         input_sign = (input_area >= 0) ? 1 : -1,
         cell_winding_signs = _ps_fr_cell_winding_signs(face_pts3d_local, arr[4], eps),
         sites = _ps_face_boundary_span_sites(

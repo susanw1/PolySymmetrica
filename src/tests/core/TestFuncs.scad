@@ -165,6 +165,12 @@ module test_ps_centroid2d__basic() {
     assert_near(c2[1], 3, EPS, "centroid2d tri y");
 }
 
+module test_ps_xy__projects_points() {
+    assert(ps_xy([]) == [], "xy empty");
+    assert(ps_xy([[1,2,3], [4,5,6]]) == [[1,2], [4,5]], "xy from vec3");
+    assert(ps_xy([[7,8], [9,10]]) == [[7,8], [9,10]], "xy from vec2");
+}
+
 module test_ps_cyclic_pairs__basic() {
     assert(ps_cyclic_pairs([]) == [], "cyclic pairs empty");
     assert(ps_cyclic_pairs([5]) == [], "cyclic pairs singleton");
@@ -657,6 +663,7 @@ module run_TestFuncs() {
     test_sum__numbers();
     test_v_sum__vec3_list();
     test_ps_centroid2d__basic();
+    test_ps_xy__projects_points();
     test_ps_cyclic_pairs__basic();
     test_ps_ordered_pair__basic();
     test_ps_reverse__edge_cases();

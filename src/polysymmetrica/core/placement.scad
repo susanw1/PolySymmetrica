@@ -130,7 +130,7 @@ function ps_face_sites(poly, inter_radius = 1, edge_len = undef, classify = unde
                 face_pts3d_local = [for (p = face_verts_local) [p[0], p[1], p[2] - zmean]],
                 poly_center_local = [poly_center_local_raw[0], poly_center_local_raw[1], poly_center_local_raw[2] - zmean],
                 poly_verts_local = [for (p = poly_verts_local_raw) [p[0], p[1], p[2] - zmean]],
-                face_pts2d = [for (p = face_pts3d_local) [p[0], p[1]]],
+                face_pts2d = ps_xy(face_pts3d_local),
                 face_neighbors_idx = _ps_face_site_neighbors_idx(f, fi, faces0, edges, edge_faces),
                 face_dihedrals = _ps_face_site_dihedrals(f, fi, faces0, edges, edge_faces, face_n)
             )
