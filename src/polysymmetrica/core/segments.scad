@@ -687,6 +687,53 @@ function ps_face_boundary_model(face_pts3d_local, mode="nonzero", eps=1e-8) =
     [mode, filled_cell_ids, boundary_loops, boundary_spans];
 
 /**
+ * Function: Group true filled-boundary spans by their original source edge.
+ * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: `[[source_edge_idx, source_seg2d, source_boundary_spans], ...]`
+ * Limitations/Gotchas: returns only source edges with at least one surviving filled-boundary span
+ */
+function ps_face_filled_boundary_source_edges(face_pts3d_local, mode="nonzero", eps=1e-8) =
+    let(
+        n = len(face_pts3d_local),
+        arr = ps_face_arrangement(face_pts3d_local, eps),
+        cells = arr[4],
+        bm = ps_face_boundary_model(face_pts3d_local, mode, eps),
+        spans = bm[3]
+    )
+    [
+        for (ei = [0:1:n-1])
+            let(
+                source_seg2d = [
+                    [face_pts3d_local[ei][0], face_pts3d_local[ei][1]],
+                    [face_pts3d_local[(ei + 1) % n][0], face_pts3d_local[(ei + 1) % n][1]]
+                ],
+                source_boundary_spans = [
+                    for (si = [0:1:len(spans)-1])
+                        let(
+                            span = spans[si],
+                            filled_cell_idx = span[6],
+                            filled_cell = is_undef(filled_cell_idx) ? undef : cells[filled_cell_idx],
+                            filled_side = _ps_seg_boundary_span_filled_side(span[0], filled_cell, eps)
+                        )
+                        if (span[2] == ei)
+                            [
+                                si,
+                                span[0],
+                                span[1],
+                                span[3],
+                                span[4],
+                                span[5],
+                                filled_cell_idx,
+                                span[7],
+                                filled_side
+                            ]
+                ]
+            )
+            if (len(source_boundary_spans) > 0)
+                [ei, source_seg2d, source_boundary_spans]
+    ];
+
+/**
  * Function: Split a face loop into simple face-local cells.
  * Params: face_pts3d_local (loop in face-local 3D), mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
  * Returns: `[[seg_pts2d, seg_pts3d_local, seg_parent_edge_ids, seg_edge_kinds], ...]`
@@ -720,6 +767,16 @@ function ps_face_segments(face_pts3d_local, mode="nonzero", eps=1e-8) =
         : filtered;
 
 /**
+ * Function: Return the first nonzero side marker from a list.
+ * Params: sides (list of signed side values), i (scan index)
+ * Returns: first nonzero value, or `0` if all values are zero
+ */
+function _ps_seg_first_nonzero_side(sides, i=0) =
+    (i >= len(sides)) ? 0 :
+    (sides[i] != 0) ? sides[i] :
+    _ps_seg_first_nonzero_side(sides, i + 1);
+
+/**
  * Module: Iterate simple face-local cells for the current placed face.
  * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
  * Returns: none; exposes `$ps_seg_*` metadata and calls children once per cell
@@ -740,6 +797,63 @@ module place_on_face_segments(mode="nonzero", eps=1e-8) {
         $ps_seg_edge_kind = s[3];
         $ps_face_has_segments = len(segs) > 1;
         children();
+    }
+}
+
+/**
+ * Module: Iterate source edges that contribute to the current face's true filled boundary.
+ * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
+ * Returns: none; exposes `$ps_boundary_source_edge_*` metadata and places children in a normalized source-edge frame
+ */
+module place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8) {
+    assert(!is_undef($ps_face_pts3d_local), "place_on_face_filled_boundary_source_edges: requires place_on_faces context ($ps_face_pts3d_local)");
+    records = ps_face_filled_boundary_source_edges($ps_face_pts3d_local, mode, eps);
+    for (ri = [0:1:len(records)-1]) {
+        record = records[ri];
+        seg2d = record[1];
+        dx = seg2d[1][0] - seg2d[0][0];
+        dy = seg2d[1][1] - seg2d[0][1];
+        source_len = norm([dx, dy]);
+        ex_raw = (source_len <= eps) ? [1, 0, 0] : [dx / source_len, dy / source_len, 0];
+        ey_raw = [-ex_raw[1], ex_raw[0], 0];
+        ez = [0, 0, 1];
+        center = [(seg2d[0][0] + seg2d[1][0]) / 2, (seg2d[0][1] + seg2d[1][1]) / 2, 0];
+        spans = record[2];
+        source_filled_sides = [
+            for (s = spans)
+                (s[8] == 0) ? 0 : ((s[4] >= s[3]) ? s[8] : -s[8])
+        ];
+        frame_source_filled_side = _ps_seg_first_nonzero_side(source_filled_sides);
+        frame_reversed = frame_source_filled_side > 0;
+        ex = frame_reversed ? -ex_raw : ex_raw;
+        ey = frame_reversed ? -ey_raw : ey_raw;
+        frame_t_ranges = [
+            for (s = spans)
+                frame_reversed ? [1 - s[3], 1 - s[4]] : [s[3], s[4]]
+        ];
+        frame_filled_sides = [
+            for (side = source_filled_sides)
+                frame_reversed ? -side : side
+        ];
+
+        $ps_boundary_source_edge_idx = record[0];
+        $ps_boundary_source_edge_count = len(records);
+        $ps_boundary_source_edge_len = source_len;
+        $ps_boundary_source_edge_segment2d_local = seg2d;
+        $ps_boundary_source_edge_span_count = len(spans);
+        $ps_boundary_source_edge_spans = spans;
+        $ps_boundary_source_edge_boundary_span_idxs = [for (s = spans) s[0]];
+        $ps_boundary_source_edge_span_segments2d_local = [for (s = spans) s[1]];
+        $ps_boundary_source_edge_span_t_ranges = [for (s = spans) [s[3], s[4]]];
+        $ps_boundary_source_edge_sides = [for (s = spans) s[8]];
+        $ps_boundary_source_edge_frame_reversed = frame_reversed;
+        $ps_boundary_source_edge_frame_source_side = frame_source_filled_side;
+        $ps_boundary_source_edge_frame_side = (frame_source_filled_side == 0) ? 0 : -1;
+        $ps_boundary_source_edge_span_t_ranges_local = frame_t_ranges;
+        $ps_boundary_source_edge_span_sides_local = frame_filled_sides;
+
+        multmatrix(ps_frame_matrix(center, ex, ey, ez))
+            children();
     }
 }
 

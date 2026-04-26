@@ -2,11 +2,14 @@ use <../../polysymmetrica/core/funcs.scad>
 use <../../polysymmetrica/core/placement.scad>
 use <../../polysymmetrica/core/prisms.scad>
 use <../../polysymmetrica/core/segments.scad>
+use <../../polysymmetrica/core/truncation.scad>
+use <../../polysymmetrica/models/tetrahedron.scad>
 
 EPS = 1e-8;
 MODE = "nonzero";
 STAR_FACE_IDX = 1;
 TRI_FACE_IDX = 12;
+ANTI_FACE_IDX = 0;
 
 module assert_int_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
@@ -16,11 +19,18 @@ module assert_list_eq(a, b, msg="") {
     assert(a == b, str(msg, " expected=", b, " got=", a));
 }
 
+module assert_near(a, b, eps=EPS, msg="") {
+    assert(abs(a - b) <= eps, str(msg, " expected=", b, " got=", a));
+}
+
 function _test_punch_poly() =
     poly_antiprism(7, 3, angle = 15);
 
 function _test_punch_poly_angle0() =
     poly_antiprism(7, 3, angle = 0);
+
+function _test_antitet_poly() =
+    poly_truncate(tetrahedron(), t = -0.5);
 
 function _test_face_site(poly, face_idx) =
     ps_face_sites(poly)[face_idx];
@@ -70,6 +80,24 @@ module test_ps_face_boundary_model__7_3_15_star_has_true_nonzero_boundary() {
         [0, 4, 5, 2, 3, 0, 1, 5, 6, 3, 4, 1, 2, 6],
         "star face filled segment source-edge lineage"
     );
+}
+
+module test_ps_face_filled_boundary_source_edges__7_3_15_star_groups_surviving_spans() {
+    site = _test_face_site(_test_punch_poly(), STAR_FACE_IDX);
+    source_edges = ps_face_filled_boundary_source_edges(site[11], MODE);
+
+    assert_int_eq(len(source_edges), 7, "star face should expose one filled-boundary record per source edge");
+    assert_list_eq([for (e = source_edges) e[0]], [0, 1, 2, 3, 4, 5, 6], "star face source-edge ids");
+    assert_list_eq([for (e = source_edges) len(e[2])], [2, 2, 2, 2, 2, 2, 2], "star face surviving span count per source edge");
+    assert_list_eq(
+        [for (e = source_edges) [for (span = e[2]) span[8]]],
+        [[-1, -1], [-1, -1], [-1, -1], [-1, -1], [-1, -1], [-1, -1], [-1, -1]],
+        "star face filled side per surviving span"
+    );
+    assert_near(source_edges[0][2][0][3], 0, EPS, "star face source edge 0 first span t0");
+    assert_near(source_edges[0][2][0][4], 0.356896, 1e-6, "star face source edge 0 first span t1");
+    assert_near(source_edges[0][2][1][3], 0.643104, 1e-6, "star face source edge 0 second span t0");
+    assert_near(source_edges[0][2][1][4], 1, EPS, "star face source edge 0 second span t1");
 }
 
 module test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters() {
@@ -131,12 +159,98 @@ module test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges()
     );
 }
 
+module test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary() {
+    site = _test_face_site(_test_punch_poly_angle0(), TRI_FACE_IDX);
+    source_edges = ps_face_filled_boundary_source_edges(site[11], MODE);
+
+    assert_int_eq(len(source_edges), 3, "simple triangle should expose three filled-boundary source edges");
+    assert_list_eq([for (e = source_edges) e[0]], [0, 1, 2], "simple triangle source-edge ids");
+    assert_list_eq([for (e = source_edges) len(e[2])], [1, 1, 1], "simple triangle surviving span count per source edge");
+    assert_list_eq(
+        [for (e = source_edges) [for (span = e[2]) span[8]]],
+        [[-1], [-1], [-1]],
+        "simple triangle filled side per source edge"
+    );
+    assert_list_eq(
+        [for (e = source_edges) [for (span = e[2]) [span[3], span[4]]]],
+        [[[0, 1]], [[0, 1]], [[0, 1]]],
+        "simple triangle boundary span ranges are oriented to boundary traversal"
+    );
+}
+
+module test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_context() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == STAR_FACE_IDX) {
+            place_on_face_filled_boundary_source_edges(MODE) {
+                assert_int_eq($ps_boundary_source_edge_count, 7, "placed source-edge record count");
+                assert_int_eq($ps_boundary_source_edge_span_count, 2, "placed source-edge span count");
+                assert(
+                    $ps_boundary_source_edge_idx >= 0 && $ps_boundary_source_edge_idx < 7,
+                    str("placed source-edge idx in range: ", $ps_boundary_source_edge_idx)
+                );
+                assert_int_eq(
+                    len($ps_boundary_source_edge_boundary_span_idxs),
+                    $ps_boundary_source_edge_span_count,
+                    "placed source-edge boundary-span id arity"
+                );
+                assert_int_eq(
+                    len($ps_boundary_source_edge_sides),
+                    $ps_boundary_source_edge_span_count,
+                    "placed source-edge filled-side arity"
+                );
+                assert_int_eq(
+                    $ps_boundary_source_edge_frame_side,
+                    -1,
+                    "placed source-edge frame normalizes filled side to local right"
+                );
+                assert_int_eq(
+                    len($ps_boundary_source_edge_span_t_ranges_local),
+                    $ps_boundary_source_edge_span_count,
+                    "placed source-edge frame-local t-range arity"
+                );
+                assert_int_eq(
+                    len($ps_boundary_source_edge_span_sides_local),
+                    $ps_boundary_source_edge_span_count,
+                    "placed source-edge frame-local filled-side arity"
+                );
+            }
+        }
+    }
+}
+
+module test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direction() {
+    place_on_faces(_test_antitet_poly()) {
+        if ($ps_face_idx == ANTI_FACE_IDX) {
+            place_on_face_filled_boundary_source_edges(MODE) {
+                if ($ps_boundary_source_edge_idx == 1) {
+                    assert_list_eq(
+                        $ps_boundary_source_edge_span_sides_local,
+                        [-1, 1, 1],
+                        "antitet long source edge has middle/end spans on opposite frame sides"
+                    );
+                }
+                if ($ps_boundary_source_edge_idx == 0) {
+                    assert_list_eq(
+                        $ps_boundary_source_edge_span_sides_local,
+                        [-1],
+                        "antitet short end source edge normalizes from source-param direction"
+                    );
+                }
+            }
+        }
+    }
+}
+
 module run_TestSelfCrossing() {
     test_ps_face_arrangement__7_3_15_star_has_stable_structure();
     test_ps_face_boundary_model__7_3_15_star_has_true_nonzero_boundary();
+    test_ps_face_filled_boundary_source_edges__7_3_15_star_groups_surviving_spans();
     test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
+    test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();
+    test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_context();
+    test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direction();
 }
 
 run_TestSelfCrossing();

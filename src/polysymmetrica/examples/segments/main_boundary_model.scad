@@ -3,12 +3,14 @@ use <../../core/placement.scad>
 use <../../core/prisms.scad>
 use <../../core/segments.scad>
 use <../../core/truncation.scad>
+use <../../models/dodecahedron.scad>
 use <../../models/tetrahedron.scad>
 
 // Boundary-model demo surface.
 // Shows the reconstructed filled boundary loops/spans for:
 // - one star face on a star antiprism
 // - one self-crossing hex face on an antitruncated tetrahedron
+// - one plain face on a dodecahedron as a control
 
 IR = 30;
 FACE_THK = 0.35;
@@ -17,18 +19,24 @@ TXT_H = 0.4;
 TXT_S = 3.6;
 PANEL_X = 135;
 PANEL_Y = 118;
+ROW_LABEL_X = -2.35 * PANEL_X;
 RAW_FILL_Z = -1.2 * FACE_THK;
 BOUNDARY_FILL_Z = 0.15 * FACE_THK;
 SPAN_MARKER_Z = 1.2 * FACE_THK;
 SPAN_ARROW_LEN = 7;
 DIH_RAY_LEN = 10;
 FACE_LABEL_Z = 0.8;
+SOURCE_EDGE_MARKER_Z = 1.5 * FACE_THK;
+SOURCE_SIDE_LEN = 5.2;
 
 STAR_POLY = poly_antiprism(5, 2);
 STAR_FACE_IDX = 1;
 
 ANTI_POLY = poly_truncate(tetrahedron(), t = -0.5);
 ANTI_FACE_IDX = 0;
+
+DODECA_POLY = dodecahedron();
+DODECA_FACE_IDX = 0;
 
 /**
  * Function: Pick a readable named color for one boundary loop.
@@ -42,6 +50,21 @@ function boundary_loop_color(i) =
     (i % 6 == 3) ? "mediumseagreen" :
     (i % 6 == 4) ? "orchid" :
     "darkorange";
+
+/**
+ * Function: Pick a readable named color for one source edge.
+ * Params: i (source edge index)
+ * Returns: a named color string
+ */
+function source_edge_color(i) =
+    (i % 8 == 0) ? "tomato" :
+    (i % 8 == 1) ? "deepskyblue" :
+    (i % 8 == 2) ? "gold" :
+    (i % 8 == 3) ? "mediumseagreen" :
+    (i % 8 == 4) ? "orchid" :
+    (i % 8 == 5) ? "darkorange" :
+    (i % 8 == 6) ? "turquoise" :
+    "sienna";
 
 /**
  * Function: Compute the midpoint of a 2D segment.
@@ -60,6 +83,18 @@ module draw_panel_label(s) {
     translate([0, -58, -34])
         linear_extrude(height = TXT_H)
             text(s, size = TXT_S, halign = "center", valign = "center");
+}
+
+/**
+ * Module: Draw a world-space label for one row of panels.
+ * Params: s (row label string)
+ * Returns: none
+ */
+module draw_row_label(s) {
+    translate([ROW_LABEL_X, 0, -34])
+        rotate([0, 0, 90])
+            linear_extrude(height = TXT_H)
+                text(s, size = TXT_S + 0.4, halign = "center", valign = "center");
 }
 
 /**
@@ -276,20 +311,96 @@ module draw_panel_boundary_spans(poly, face_idx, mode, label_s) {
     draw_panel_label(label_s);
 }
 
-translate([-1 * PANEL_X,  0.5 * PANEL_Y, 0])
-    draw_panel_boundary_model(STAR_POLY, STAR_FACE_IDX, "nonzero", "star boundary nonzero");
+/**
+ * Module: Draw one source-edge grouped boundary panel for one selected face.
+ * Params: poly (poly descriptor), face_idx (target face index), mode (`"nonzero"` or `"evenodd"`), label_s (panel label)
+ * Returns: none
+ */
+module draw_panel_boundary_source_edges(poly, face_idx, mode, label_s) {
+    draw_wireframe(poly, IR, true);
 
-translate([0 * PANEL_X,  0.5 * PANEL_Y, 0])
-    draw_panel_boundary_model(STAR_POLY, STAR_FACE_IDX, "evenodd", "star boundary evenodd");
+    place_on_faces(poly, IR) {
+        if ($ps_face_idx == face_idx) {
+            color("gainsboro", 0.20)
+                translate([0, 0, RAW_FILL_Z])
+                    draw_polygon($ps_face_pts2d);
 
-translate([1 * PANEL_X,  0.5 * PANEL_Y, 0])
-    draw_panel_boundary_spans(STAR_POLY, STAR_FACE_IDX, "nonzero", "star boundary spans");
+            draw_source_edge_labels($ps_face_pts2d);
 
-translate([-1 * PANEL_X, -0.5 * PANEL_Y, 0])
-    draw_panel_boundary_model(ANTI_POLY, ANTI_FACE_IDX, "nonzero", "anti-tet hex nonzero");
+            place_on_face_filled_boundary_source_edges(mode = mode) {
+                echo(str(label_s, "draw_panel_boundary_source_edges::", $ps_boundary_source_edge_idx));
 
-translate([0 * PANEL_X, -0.5 * PANEL_Y, 0])
-    draw_panel_boundary_model(ANTI_POLY, ANTI_FACE_IDX, "evenodd", "anti-tet hex evenodd");
+                color(source_edge_color($ps_boundary_source_edge_idx), 0.25)
+                    translate([0, 0, SOURCE_EDGE_MARKER_Z - 0.35])
+                        cube([$ps_boundary_source_edge_len, LINE_R * 1.7, FACE_THK], center = true);
 
-translate([1 * PANEL_X, -0.5 * PANEL_Y, 0])
-    draw_panel_boundary_spans(ANTI_POLY, ANTI_FACE_IDX, "nonzero", "anti-tet hex spans");
+                for (si = [0:1:$ps_boundary_source_edge_span_count-1]) {
+                    t_range = $ps_boundary_source_edge_span_t_ranges_local[si];
+                    span_filled_side = $ps_boundary_source_edge_span_sides_local[si];
+                    side_dir = (span_filled_side >= 0) ? 1 : -1;
+                    x0 = (t_range[0] - 0.5) * $ps_boundary_source_edge_len;
+                    x1 = (t_range[1] - 0.5) * $ps_boundary_source_edge_len;
+                    x_mid = (x0 + x1) / 2;
+                    span_len = abs(x1 - x0);
+
+                    color(source_edge_color($ps_boundary_source_edge_idx))
+                        translate([x_mid, 0, SOURCE_EDGE_MARKER_Z])
+                            cube([span_len, LINE_R * 1.1, FACE_THK], center = true);
+
+                    color(span_filled_side >= 0 ? "limegreen" : "crimson")
+                        translate([0, 0, SOURCE_EDGE_MARKER_Z + 0.8])
+                            union() {
+                                translate([x_mid, side_dir * SOURCE_SIDE_LEN / 2, 0])
+                                    cube([LINE_R * 0.45, SOURCE_SIDE_LEN, LINE_R * 0.45], center = true);
+                                translate([x_mid, side_dir * SOURCE_SIDE_LEN, 0])
+                                    sphere(r = 0.9, $fn = 12);
+                            }
+                }
+
+                color("white")
+                    translate([0, SOURCE_SIDE_LEN + 1.2, SOURCE_EDGE_MARKER_Z + 2.1])
+                        linear_extrude(height = TXT_H)
+                            text(
+                                str(
+                                    "se",
+                                    $ps_boundary_source_edge_idx,
+                                    ":",
+                                    $ps_boundary_source_edge_span_count,
+                                    " spans"
+                                ),
+                                size = 1.45,
+                                halign = "center",
+                                valign = "center"
+                            );
+            }
+        }
+    }
+
+    draw_panel_label(label_s);
+}
+
+/**
+ * Module: Draw the four boundary-model panels for one selected face.
+ * Params: poly (poly descriptor), face_idx (target face index), row_s (row label), y (row offset)
+ * Returns: none
+ */
+module draw_boundary_row(poly, face_idx, row_s, y) {
+    translate([0, y, 0])
+        draw_row_label(row_s);
+
+    translate([-1.5 * PANEL_X, y, 0])
+        draw_panel_boundary_model(poly, face_idx, "nonzero", "boundary nonzero");
+
+    translate([-0.5 * PANEL_X, y, 0])
+        draw_panel_boundary_model(poly, face_idx, "evenodd", "boundary evenodd");
+
+    translate([0.5 * PANEL_X, y, 0])
+        draw_panel_boundary_spans(poly, face_idx, "nonzero", "boundary spans");
+
+    translate([1.5 * PANEL_X, y, 0])
+        draw_panel_boundary_source_edges(poly, face_idx, "nonzero", "source edges");
+}
+
+draw_boundary_row(STAR_POLY, STAR_FACE_IDX, "star antiprism", PANEL_Y);
+draw_boundary_row(ANTI_POLY, ANTI_FACE_IDX, "anti-tet hex", 0);
+draw_boundary_row(DODECA_POLY, DODECA_FACE_IDX, "dodeca control", -PANEL_Y);

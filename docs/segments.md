@@ -212,7 +212,7 @@ Sub-records are:
 
 ```scad
 boundary_loop = [pts2d, span_ids]
-boundary_span = [seg2d, loop_idx, source_edge_idx, source_t0, source_t1, kind, left_cell_idx, right_cell_idx]
+boundary_span = [seg2d, loop_idx, source_edge_idx, source_t0, source_t1, kind, filled_cell_idx, other_cell_idx]
 ```
 
 Where:
@@ -236,8 +236,72 @@ Where:
   parametric interval on that source edge, oriented to match `seg2d`.
 - `kind`
   currently `"source"` for arrangement-derived spans; later layers may add `"cut"` or `"synthetic"`.
-- `left_cell_idx`, `right_cell_idx`
-  arrangement cell indices adjacent to the span, with one side possibly `undef` on the outside.
+- `filled_cell_idx`, `other_cell_idx`
+  arrangement cell indices adjacent to the span, with `other_cell_idx` possibly
+  `undef` on the outside.
+
+### `ps_face_filled_boundary_source_edges(face_pts3d_local, mode="nonzero", eps=1e-8)`
+
+Groups true filled-boundary spans by the original source edge they came from.
+
+Returns:
+
+```scad
+[
+    [source_edge_idx, source_seg2d, source_boundary_spans],
+    ...
+]
+```
+
+Where:
+
+- `source_edge_idx`
+  original face-loop edge index.
+- `source_seg2d`
+  the original source edge segment in face-local 2D.
+- `source_boundary_spans`
+  all surviving filled-boundary spans descended from that source edge.
+
+Only source edges with at least one surviving filled-boundary span are returned.
+The returned source-edge records are ordered by `source_edge_idx`.
+
+Sub-records are:
+
+```scad
+source_boundary_span = [
+    boundary_span_idx,
+    seg2d,
+    loop_idx,
+    source_t0,
+    source_t1,
+    kind,
+    filled_cell_idx,
+    other_cell_idx,
+    filled_side
+]
+```
+
+Where:
+
+- `boundary_span_idx`
+  index into `ps_face_boundary_model(...)[3]`.
+- `seg2d`
+  oriented span segment in filled-boundary traversal order.
+- `loop_idx`
+  filled-boundary loop containing this span.
+- `source_t0`, `source_t1`
+  source-edge parameter range, oriented to match `seg2d`.
+- `kind`
+  currently `"source"` for arrangement-derived spans.
+- `filled_cell_idx`, `other_cell_idx`
+  arrangement cells on either side of the span.
+- `filled_side`
+  `+1` when the filled region lies on the left of `seg2d`, `-1` when it lies
+  on the right, and `0` only for degenerate/ambiguous spans.
+
+Use this when source-edge lineage is the primary structure. Use
+`place_on_face_boundary_spans(...)` instead when each surviving span needs its
+own local frame or adjacent-face/dihedral context.
 
 ### `place_on_face_segments(mode="nonzero", eps=1e-8)`
 
@@ -252,6 +316,44 @@ Provides:
 - `$ps_seg_pts3d_local`
 - `$ps_seg_parent_face_edge_idx`
 - `$ps_seg_edge_kind`
+
+### `place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8)`
+
+Iterator wrapper over `ps_face_filled_boundary_source_edges(...)` for use inside
+`place_on_faces(...)`.
+
+Children are placed in a normalized source-edge frame:
+
+- local `+X` runs along the source edge, reversed when needed
+- local `+Y` is the in-face left normal of local `+X`
+- local `+Z` is face-local `+Z`
+- the filled region is on local `-Y` when the source edge has an unambiguous
+  filled side
+
+Provides:
+
+- `$ps_boundary_source_edge_idx`
+- `$ps_boundary_source_edge_count`
+- `$ps_boundary_source_edge_len`
+- `$ps_boundary_source_edge_segment2d_local`
+- `$ps_boundary_source_edge_span_count`
+- `$ps_boundary_source_edge_spans`
+- `$ps_boundary_source_edge_boundary_span_idxs`
+- `$ps_boundary_source_edge_span_segments2d_local`
+- `$ps_boundary_source_edge_span_t_ranges`
+- `$ps_boundary_source_edge_sides`
+- `$ps_boundary_source_edge_frame_reversed`
+- `$ps_boundary_source_edge_frame_source_side`
+- `$ps_boundary_source_edge_frame_side`
+- `$ps_boundary_source_edge_span_t_ranges_local`
+- `$ps_boundary_source_edge_span_sides_local`
+
+The raw record metadata remains source-oriented. The `*_frame_*` variables
+describe the child placement frame, and `*_span_t_ranges_local` is the
+same span interval expressed in that child frame. If one source edge contributes
+spans with mixed filled sides, use
+`$ps_boundary_source_edge_span_sides_local` per span rather than assuming every
+span has the representative frame side.
 
 ### `place_on_face_boundary_spans(mode="nonzero", eps=1e-8)`
 
