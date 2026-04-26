@@ -7,6 +7,7 @@ use <core/TestValidity.scad>
 use <core/TestClassify.scad>
 use <core/TestPlacement.scad>
 use <core/TestFaceRegions.scad>
+use <core/TestSelfCrossing.scad>
 use <core/TestPrisms.scad>
 use <core/TestAttach.scad>
 use <core/TestRender.scad>
@@ -23,6 +24,7 @@ run_TestValidity();
 run_TestClassify();
 run_TestPlacement();
 run_TestFaceRegions();
+run_TestSelfCrossing();
 run_TestPrisms();
 run_TestAttach();
 run_TestRender();
