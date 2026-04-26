@@ -328,22 +328,22 @@ module draw_panel_boundary_source_edges(poly, face_idx, mode, label_s) {
             draw_source_edge_labels($ps_face_pts2d);
 
             place_on_face_filled_boundary_source_edges(mode = mode) {
-                echo(str(label_s, "draw_panel_boundary_source_edges::", $ps_filled_boundary_source_edge_idx));
+                echo(str(label_s, "draw_panel_boundary_source_edges::", $ps_boundary_source_edge_idx));
 
-                color(source_edge_color($ps_filled_boundary_source_edge_idx), 0.25)
+                color(source_edge_color($ps_boundary_source_edge_idx), 0.25)
                     translate([0, 0, SOURCE_EDGE_MARKER_Z - 0.35])
-                        cube([$ps_filled_boundary_source_edge_len, LINE_R * 1.7, FACE_THK], center = true);
+                        cube([$ps_boundary_source_edge_len, LINE_R * 1.7, FACE_THK], center = true);
 
-                for (si = [0:1:$ps_filled_boundary_source_edge_span_count-1]) {
-                    t_range = $ps_filled_boundary_source_edge_span_t_ranges_frame_local[si];
-                    span_filled_side = $ps_filled_boundary_source_edge_span_filled_sides_frame_local[si];
+                for (si = [0:1:$ps_boundary_source_edge_span_count-1]) {
+                    t_range = $ps_boundary_source_edge_span_t_ranges_local[si];
+                    span_filled_side = $ps_boundary_source_edge_span_sides_local[si];
                     side_dir = (span_filled_side >= 0) ? 1 : -1;
-                    x0 = (t_range[0] - 0.5) * $ps_filled_boundary_source_edge_len;
-                    x1 = (t_range[1] - 0.5) * $ps_filled_boundary_source_edge_len;
+                    x0 = (t_range[0] - 0.5) * $ps_boundary_source_edge_len;
+                    x1 = (t_range[1] - 0.5) * $ps_boundary_source_edge_len;
                     x_mid = (x0 + x1) / 2;
                     span_len = abs(x1 - x0);
 
-                    color(source_edge_color($ps_filled_boundary_source_edge_idx))
+                    color(source_edge_color($ps_boundary_source_edge_idx))
                         translate([x_mid, 0, SOURCE_EDGE_MARKER_Z])
                             cube([span_len, LINE_R * 1.1, FACE_THK], center = true);
 
@@ -363,9 +363,9 @@ module draw_panel_boundary_source_edges(poly, face_idx, mode, label_s) {
                             text(
                                 str(
                                     "se",
-                                    $ps_filled_boundary_source_edge_idx,
+                                    $ps_boundary_source_edge_idx,
                                     ":",
-                                    $ps_filled_boundary_source_edge_span_count,
+                                    $ps_boundary_source_edge_span_count,
                                     " spans"
                                 ),
                                 size = 1.45,

@@ -182,35 +182,35 @@ module test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_cont
     place_on_faces(_test_punch_poly()) {
         if ($ps_face_idx == STAR_FACE_IDX) {
             place_on_face_filled_boundary_source_edges(MODE) {
-                assert_int_eq($ps_filled_boundary_source_edge_count, 7, "placed source-edge record count");
-                assert_int_eq($ps_filled_boundary_source_edge_span_count, 2, "placed source-edge span count");
+                assert_int_eq($ps_boundary_source_edge_count, 7, "placed source-edge record count");
+                assert_int_eq($ps_boundary_source_edge_span_count, 2, "placed source-edge span count");
                 assert(
-                    $ps_filled_boundary_source_edge_idx >= 0 && $ps_filled_boundary_source_edge_idx < 7,
-                    str("placed source-edge idx in range: ", $ps_filled_boundary_source_edge_idx)
+                    $ps_boundary_source_edge_idx >= 0 && $ps_boundary_source_edge_idx < 7,
+                    str("placed source-edge idx in range: ", $ps_boundary_source_edge_idx)
                 );
                 assert_int_eq(
-                    len($ps_filled_boundary_source_edge_boundary_span_idxs),
-                    $ps_filled_boundary_source_edge_span_count,
+                    len($ps_boundary_source_edge_boundary_span_idxs),
+                    $ps_boundary_source_edge_span_count,
                     "placed source-edge boundary-span id arity"
                 );
                 assert_int_eq(
-                    len($ps_filled_boundary_source_edge_filled_sides),
-                    $ps_filled_boundary_source_edge_span_count,
+                    len($ps_boundary_source_edge_sides),
+                    $ps_boundary_source_edge_span_count,
                     "placed source-edge filled-side arity"
                 );
                 assert_int_eq(
-                    $ps_filled_boundary_source_edge_frame_filled_side,
+                    $ps_boundary_source_edge_frame_side,
                     -1,
                     "placed source-edge frame normalizes filled side to local right"
                 );
                 assert_int_eq(
-                    len($ps_filled_boundary_source_edge_span_t_ranges_frame_local),
-                    $ps_filled_boundary_source_edge_span_count,
+                    len($ps_boundary_source_edge_span_t_ranges_local),
+                    $ps_boundary_source_edge_span_count,
                     "placed source-edge frame-local t-range arity"
                 );
                 assert_int_eq(
-                    len($ps_filled_boundary_source_edge_span_filled_sides_frame_local),
-                    $ps_filled_boundary_source_edge_span_count,
+                    len($ps_boundary_source_edge_span_sides_local),
+                    $ps_boundary_source_edge_span_count,
                     "placed source-edge frame-local filled-side arity"
                 );
             }
@@ -222,16 +222,16 @@ module test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direct
     place_on_faces(_test_antitet_poly()) {
         if ($ps_face_idx == ANTI_FACE_IDX) {
             place_on_face_filled_boundary_source_edges(MODE) {
-                if ($ps_filled_boundary_source_edge_idx == 1) {
+                if ($ps_boundary_source_edge_idx == 1) {
                     assert_list_eq(
-                        $ps_filled_boundary_source_edge_span_filled_sides_frame_local,
+                        $ps_boundary_source_edge_span_sides_local,
                         [-1, 1, 1],
                         "antitet long source edge has middle/end spans on opposite frame sides"
                     );
                 }
-                if ($ps_filled_boundary_source_edge_idx == 0) {
+                if ($ps_boundary_source_edge_idx == 0) {
                     assert_list_eq(
-                        $ps_filled_boundary_source_edge_span_filled_sides_frame_local,
+                        $ps_boundary_source_edge_span_sides_local,
                         [-1],
                         "antitet short end source edge normalizes from source-param direction"
                     );

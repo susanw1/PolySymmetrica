@@ -332,28 +332,28 @@ Children are placed in a normalized source-edge frame:
 
 Provides:
 
-- `$ps_filled_boundary_source_edge_idx`
-- `$ps_filled_boundary_source_edge_count`
-- `$ps_filled_boundary_source_edge_len`
-- `$ps_filled_boundary_source_edge_segment2d_local`
-- `$ps_filled_boundary_source_edge_span_count`
-- `$ps_filled_boundary_source_edge_spans`
-- `$ps_filled_boundary_source_edge_boundary_span_idxs`
-- `$ps_filled_boundary_source_edge_span_segments2d_local`
-- `$ps_filled_boundary_source_edge_span_t_ranges`
-- `$ps_filled_boundary_source_edge_filled_sides`
-- `$ps_filled_boundary_source_edge_frame_reversed`
-- `$ps_filled_boundary_source_edge_frame_source_filled_side`
-- `$ps_filled_boundary_source_edge_frame_filled_side`
-- `$ps_filled_boundary_source_edge_span_t_ranges_frame_local`
-- `$ps_filled_boundary_source_edge_span_filled_sides_frame_local`
+- `$ps_boundary_source_edge_idx`
+- `$ps_boundary_source_edge_count`
+- `$ps_boundary_source_edge_len`
+- `$ps_boundary_source_edge_segment2d_local`
+- `$ps_boundary_source_edge_span_count`
+- `$ps_boundary_source_edge_spans`
+- `$ps_boundary_source_edge_boundary_span_idxs`
+- `$ps_boundary_source_edge_span_segments2d_local`
+- `$ps_boundary_source_edge_span_t_ranges`
+- `$ps_boundary_source_edge_sides`
+- `$ps_boundary_source_edge_frame_reversed`
+- `$ps_boundary_source_edge_frame_source_side`
+- `$ps_boundary_source_edge_frame_side`
+- `$ps_boundary_source_edge_span_t_ranges_local`
+- `$ps_boundary_source_edge_span_sides_local`
 
 The raw record metadata remains source-oriented. The `*_frame_*` variables
-describe the child placement frame, and `*_span_t_ranges_frame_local` is the
+describe the child placement frame, and `*_span_t_ranges_local` is the
 same span interval expressed in that child frame. If one source edge contributes
 spans with mixed filled sides, use
-`$ps_filled_boundary_source_edge_span_filled_sides_frame_local` per span rather
-than assuming every span has the representative frame side.
+`$ps_boundary_source_edge_span_sides_local` per span rather than assuming every
+span has the representative frame side.
 
 ### `place_on_face_boundary_spans(mode="nonzero", eps=1e-8)`
 
