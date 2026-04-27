@@ -392,7 +392,7 @@ module draw_boundary_row(poly, face_idx, row_s, y) {
 
     translate([-2.5 * PANEL_X, y, 0])
         place_on_faces(poly, IR)
-            linear_extrude(h = 0.1) ps_polygon($ps_face_pts2d);
+            linear_extrude(height = 0.1) ps_polygon($ps_face_pts2d);
 
     translate([-1.5 * PANEL_X, y, 0])
         draw_panel_boundary_model(poly, face_idx, "nonzero", "boundary nonzero");
