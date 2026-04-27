@@ -317,12 +317,18 @@ Provides:
 - `$ps_seg_parent_face_edge_idx`
 - `$ps_seg_edge_kind`
 
-### `place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8)`
+### `place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8, coords="element")`
 
 Iterator wrapper over `ps_face_filled_boundary_source_edges(...)` for use inside
 `place_on_faces(...)`.
 
-Children are placed in a normalized source-edge frame:
+`coords` controls the child coordinate system:
+
+- `"element"` (default): place children in a normalized source-edge coordinate
+  system.
+- `"parent"`: leave children in the enclosing face-local coordinate system.
+
+In element coordinates:
 
 - local `+X` runs along the source edge, reversed when needed
 - local `+Y` is the in-face left normal of local `+X`
@@ -350,12 +356,17 @@ Provides:
 
 The raw record metadata remains source-oriented. The `*_frame_*` variables
 describe the child placement frame, and `*_span_t_ranges_local` is the
-same span interval expressed in that child frame. If one source edge contributes
+same span interval expressed in that element coordinate system. If one source edge contributes
 spans with mixed filled sides, use
 `$ps_boundary_source_edge_span_sides_local` per span rather than assuming every
 span has the representative frame side.
 
-### `place_on_face_boundary_spans(mode="nonzero", eps=1e-8)`
+When `coords="parent"`, the exposed segment records such as
+`$ps_boundary_source_edge_segment2d_local` and
+`$ps_boundary_source_edge_span_segments2d_local` can be drawn directly in the
+current face-local coordinates.
+
+### `place_on_face_boundary_spans(mode="nonzero", eps=1e-8, coords="element")`
 
 Iterator wrapper over internal dihedral-aware boundary-span site records for
 use inside `place_on_faces(...)`.
@@ -369,6 +380,12 @@ Use this when later geometry needs both:
 This is the key distinction from source-edge-level metadata:
 the same original source edge can contribute multiple surviving boundary spans,
 and those spans can legitimately differ in direction/order.
+
+`coords` controls the child coordinate system:
+
+- `"element"` (default): place children in the current boundary-span coordinate
+  system.
+- `"parent"`: leave children in the enclosing face-local coordinate system.
 
 Provides:
 

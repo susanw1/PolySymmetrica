@@ -3,6 +3,7 @@ use <../../../core/funcs.scad>
 use <../../../core/placement.scad>
 use <../../../core/prisms.scad>
 use <../../../core/segments.scad>
+use <../../../core/render.scad>
 
 // Dedicated self-crossing punch-through probe for poly_antiprism(7, 3, angle=15).
 // This is a developer experiment, not a printable example. It keeps the target
@@ -46,6 +47,14 @@ function draw_color(i) =
     (i % 8 == 5) ? "darkorange" :
     (i % 8 == 6) ? "turquoise" :
     "sienna";
+
+/**
+ * Function: Compute a 2D segment midpoint.
+ * Params: seg2d (`[[x0,y0],[x1,y1]]`)
+ * Returns: midpoint `[x, y]`
+ */
+function segment_midpoint2d(seg2d) =
+    [(seg2d[0][0] + seg2d[1][0]) / 2, (seg2d[0][1] + seg2d[1][1]) / 2];
 
 /**
  * Function: Compute a unit 2D direction from one point to another.
@@ -111,7 +120,7 @@ module draw_source_edge_labels(pts2d, source_edge_idx = undef) {
     centre = ps_centroid2d(pts2d);
     for (ei = [0:1:len(pts2d)-1]) {
         seg2d = [pts2d[ei], pts2d[(ei + 1) % len(pts2d)]];
-        mid = ps_segment_midpoint2d(seg2d);
+        mid = segment_midpoint2d(seg2d);
         offset_dir = unit2d(mid, centre);
         is_target_source = !is_undef(source_edge_idx) && ei == source_edge_idx;
         label = is_target_source ? str("*se", ei) : str("se", ei);
@@ -257,7 +266,7 @@ module draw_boundary_panel(poly, face_idx, source_edge_idx, label_s) {
             for (si = [0:1:len(spans)-1]) {
                 span = spans[si];
                 is_target_source = !is_undef(source_edge_idx) && span[2] == source_edge_idx;
-                mid = ps_segment_midpoint2d(span[0]);
+                mid = segment_midpoint2d(span[0]);
 
                 color(is_target_source ? "red" : "black")
                     draw_segment_stroke(span[0], r = is_target_source ? LINE_R * 0.95 : LINE_R * 0.58, z = 0.25);
@@ -308,7 +317,7 @@ module draw_cut_visibility_panel(poly, face_idx, source_edge_idx, label_s) {
 
             for (ci = [0:1:len(cuts)-1]) {
                 cut = cuts[ci];
-                mid = ps_segment_midpoint2d(cut[0]);
+                mid = segment_midpoint2d(cut[0]);
 
                 color("darkorange")
                     draw_segment_stroke(cut[0], r = LINE_R * 0.5, z = 0.45);
@@ -369,6 +378,9 @@ module draw_volume_panel(poly, face_idx, source_edge_idx, label_s) {
 }
 
 module draw_probe_row(face_idx, source_edge_idx, label_s) {
+    translate([-3 * PANEL_X, 0, 0])
+        poly_render(P, IR);
+
     translate([-2 * PANEL_X, 0, 0])
         draw_poly_context(P, face_idx);
 
