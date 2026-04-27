@@ -2,6 +2,7 @@ use <../../core/funcs.scad>
 use <../../core/placement.scad>
 use <../../core/prisms.scad>
 use <../../core/segments.scad>
+use <../../core/render.scad>
 use <../../core/truncation.scad>
 use <../../models/dodecahedron.scad>
 use <../../models/tetrahedron.scad>
@@ -388,6 +389,10 @@ module draw_panel_boundary_source_edges(poly, face_idx, mode, label_s) {
 module draw_boundary_row(poly, face_idx, row_s, y) {
     translate([0, y, 0])
         draw_row_label(row_s);
+
+    translate([-2.5 * PANEL_X, y, 0])
+        place_on_faces(poly, IR)
+            linear_extrude(h = 0.1) ps_polygon($ps_face_pts2d);
 
     translate([-1.5 * PANEL_X, y, 0])
         draw_panel_boundary_model(poly, face_idx, "nonzero", "boundary nonzero");

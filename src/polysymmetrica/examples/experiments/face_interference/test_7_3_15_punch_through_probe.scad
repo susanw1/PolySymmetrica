@@ -38,7 +38,7 @@ P = poly_antiprism(7, 3, angle = 15);
  * Params: i (index)
  * Returns: named color string
  */
-function draw_color(i) =
+function example_color(i) =
     (i % 8 == 0) ? "tomato" :
     (i % 8 == 1) ? "deepskyblue" :
     (i % 8 == 2) ? "gold" :
@@ -47,14 +47,6 @@ function draw_color(i) =
     (i % 8 == 5) ? "darkorange" :
     (i % 8 == 6) ? "turquoise" :
     "sienna";
-
-/**
- * Function: Compute a 2D segment midpoint.
- * Params: seg2d (`[[x0,y0],[x1,y1]]`)
- * Returns: midpoint `[x, y]`
- */
-function segment_midpoint2d(seg2d) =
-    [(seg2d[0][0] + seg2d[1][0]) / 2, (seg2d[0][1] + seg2d[1][1]) / 2];
 
 /**
  * Function: Compute a unit 2D direction from one point to another.
@@ -120,7 +112,7 @@ module draw_source_edge_labels(pts2d, source_edge_idx = undef) {
     centre = ps_centroid2d(pts2d);
     for (ei = [0:1:len(pts2d)-1]) {
         seg2d = [pts2d[ei], pts2d[(ei + 1) % len(pts2d)]];
-        mid = segment_midpoint2d(seg2d);
+        mid = ps_segment_midpoint2d(seg2d);
         offset_dir = unit2d(mid, centre);
         is_target_source = !is_undef(source_edge_idx) && ei == source_edge_idx;
         label = is_target_source ? str("*se", ei) : str("se", ei);
@@ -169,7 +161,7 @@ module draw_poly_context(poly, face_idx) {
  * Params: label_s (case label), face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local
  * Returns: none
  */
-module draw_echo_target_summary(label_s, face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local) {
+module echo_target_summary(label_s, face_pts3d_local, face_idx, poly_faces_idx, poly_verts_local) {
     arr = ps_face_arrangement(face_pts3d_local);
     bm = ps_face_boundary_model(face_pts3d_local, MODE);
     cuts = ps_face_geom_cut_entries(
@@ -235,7 +227,7 @@ module draw_arrangement_panel(poly, face_idx, source_edge_idx, label_s) {
             }
 
             draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
-            draw_echo_target_summary(label_s, $ps_face_pts3d_local, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local);
+            echo_target_summary(label_s, $ps_face_pts3d_local, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local);
         }
     }
 
@@ -260,13 +252,13 @@ module draw_boundary_panel(poly, face_idx, source_edge_idx, label_s) {
                         ps_polygon($ps_face_pts2d, MODE);
 
             for (li = [0:1:len(loops)-1])
-                color(draw_color(li), 0.38)
+                color(example_color(li), 0.38)
                     draw_polygon_fill(loops[li][0], z = -0.15);
 
             for (si = [0:1:len(spans)-1]) {
                 span = spans[si];
                 is_target_source = !is_undef(source_edge_idx) && span[2] == source_edge_idx;
-                mid = segment_midpoint2d(span[0]);
+                mid = ps_segment_midpoint2d(span[0]);
 
                 color(is_target_source ? "red" : "black")
                     draw_segment_stroke(span[0], r = is_target_source ? LINE_R * 0.95 : LINE_R * 0.58, z = 0.25);
@@ -297,7 +289,7 @@ module draw_cut_visibility_panel(poly, face_idx, source_edge_idx, label_s) {
                         ps_polygon($ps_face_pts2d, MODE);
 
             place_on_face_visible_segments(mode = MODE, filter_parent = FILTER_PARENT_CUTS) {
-                color(draw_color($ps_vis_seg_idx), 0.35)
+                color(example_color($ps_vis_seg_idx), 0.35)
                     draw_polygon_fill($ps_vis_seg_pts2d, z = -0.05);
 
                 centre = ps_centroid2d($ps_vis_seg_pts2d);
@@ -317,7 +309,7 @@ module draw_cut_visibility_panel(poly, face_idx, source_edge_idx, label_s) {
 
             for (ci = [0:1:len(cuts)-1]) {
                 cut = cuts[ci];
-                mid = segment_midpoint2d(cut[0]);
+                mid = ps_segment_midpoint2d(cut[0]);
 
                 color("darkorange")
                     draw_segment_stroke(cut[0], r = LINE_R * 0.5, z = 0.45);
