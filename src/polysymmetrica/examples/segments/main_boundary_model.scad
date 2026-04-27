@@ -319,38 +319,47 @@ module draw_panel_boundary_source_edges(poly, face_idx, mode, label_s) {
 
             draw_source_edge_labels($ps_face_pts2d);
 
-            place_on_face_filled_boundary_source_edges(mode = mode) {
+            place_on_face_filled_boundary_source_edges(mode = mode, coords = "parent") {
                 echo(str(label_s, "draw_panel_boundary_source_edges::", $ps_boundary_source_edge_idx));
+
+                source_seg = $ps_boundary_source_edge_segment2d_local;
+                source_mid = ps_segment_midpoint2d(source_seg);
+                source_d = source_seg[1] - source_seg[0];
+                source_len = norm(source_d);
+                source_left = (source_len <= 1e-9) ? [0, 1] : [-source_d[1] / source_len, source_d[0] / source_len];
 
                 color(source_edge_color($ps_boundary_source_edge_idx), 0.25)
                     translate([0, 0, SOURCE_EDGE_MARKER_Z - 0.35])
-                        cube([$ps_boundary_source_edge_len, LINE_R * 1.7, FACE_THK], center = true);
+                        draw_local_segment_stroke(source_seg, r = LINE_R * 1.2);
 
                 for (si = [0:1:$ps_boundary_source_edge_span_count-1]) {
-                    t_range = $ps_boundary_source_edge_span_t_ranges_local[si];
-                    span_filled_side = $ps_boundary_source_edge_span_sides_local[si];
+                    span_seg = $ps_boundary_source_edge_span_segments2d_local[si];
+                    span_filled_side = $ps_boundary_source_edge_sides[si];
                     side_dir = (span_filled_side >= 0) ? 1 : -1;
-                    x0 = (t_range[0] - 0.5) * $ps_boundary_source_edge_len;
-                    x1 = (t_range[1] - 0.5) * $ps_boundary_source_edge_len;
-                    x_mid = (x0 + x1) / 2;
-                    span_len = abs(x1 - x0);
+                    span_mid = ps_segment_midpoint2d(span_seg);
+                    span_d = span_seg[1] - span_seg[0];
+                    span_len = norm(span_d);
+                    span_left = (span_len <= 1e-9) ? [0, 1] : [-span_d[1] / span_len, span_d[0] / span_len];
+                    side_tip = span_mid + side_dir * SOURCE_SIDE_LEN * span_left;
 
                     color(source_edge_color($ps_boundary_source_edge_idx))
-                        translate([x_mid, 0, SOURCE_EDGE_MARKER_Z])
-                            cube([span_len, LINE_R * 1.1, FACE_THK], center = true);
+                        translate([0, 0, SOURCE_EDGE_MARKER_Z])
+                            draw_local_segment_stroke(span_seg, r = LINE_R * 0.75);
 
                     color(span_filled_side >= 0 ? "limegreen" : "crimson")
-                        translate([0, 0, SOURCE_EDGE_MARKER_Z + 0.8])
-                            union() {
-                                translate([x_mid, side_dir * SOURCE_SIDE_LEN / 2, 0])
-                                    cube([LINE_R * 0.45, SOURCE_SIDE_LEN, LINE_R * 0.45], center = true);
-                                translate([x_mid, side_dir * SOURCE_SIDE_LEN, 0])
-                                    sphere(r = 0.9, $fn = 12);
-                            }
+                        translate([0, 0, SOURCE_EDGE_MARKER_Z + 0.8]) {
+                            draw_local_segment_stroke([span_mid, side_tip], r = LINE_R * 0.32);
+                            translate([side_tip[0], side_tip[1], 0])
+                                sphere(r = 0.9, $fn = 12);
+                        }
                 }
 
                 color("white")
-                    translate([0, SOURCE_SIDE_LEN + 1.2, SOURCE_EDGE_MARKER_Z + 2.1])
+                    translate([
+                        source_mid[0] + source_left[0] * (SOURCE_SIDE_LEN + 1.2),
+                        source_mid[1] + source_left[1] * (SOURCE_SIDE_LEN + 1.2),
+                        SOURCE_EDGE_MARKER_Z + 2.1
+                    ])
                         linear_extrude(height = TXT_H)
                             text(
                                 str(

@@ -241,6 +241,27 @@ module test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direct
     }
 }
 
+module test_face_local_iterators__parent_coords_preserve_metadata() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == STAR_FACE_IDX) {
+            place_on_face_filled_boundary_source_edges(mode = MODE, coords = "parent") {
+                assert_int_eq($ps_boundary_source_edge_count, 7, "parent-coords source-edge record count");
+                assert_int_eq(len($ps_boundary_source_edge_segment2d_local), 2, "parent-coords source edge segment arity");
+                assert_int_eq(
+                    len($ps_boundary_source_edge_span_segments2d_local),
+                    $ps_boundary_source_edge_span_count,
+                    "parent-coords source-edge span segment arity"
+                );
+            }
+
+            place_on_face_boundary_spans(mode = MODE, coords = "parent") {
+                assert($ps_boundary_span_count > 0, "parent-coords boundary span count");
+                assert_int_eq(len($ps_boundary_span_segment2d_local), 2, "parent-coords boundary span segment arity");
+            }
+        }
+    }
+}
+
 module run_TestSelfCrossing() {
     test_ps_face_arrangement__7_3_15_star_has_stable_structure();
     test_ps_face_boundary_model__7_3_15_star_has_true_nonzero_boundary();
@@ -251,6 +272,7 @@ module run_TestSelfCrossing() {
     test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();
     test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_context();
     test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direction();
+    test_face_local_iterators__parent_coords_preserve_metadata();
 }
 
 run_TestSelfCrossing();

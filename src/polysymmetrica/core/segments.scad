@@ -802,11 +802,12 @@ module place_on_face_segments(mode="nonzero", eps=1e-8) {
 
 /**
  * Module: Iterate source edges that contribute to the current face's true filled boundary.
- * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
- * Returns: none; exposes `$ps_boundary_source_edge_*` metadata and places children in a normalized source-edge frame
+ * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance), coords (`"element"` or `"parent"`)
+ * Returns: none; exposes `$ps_boundary_source_edge_*` metadata and places children in normalized source-edge coords or parent face coords
  */
-module place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8) {
+module place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8, coords="element") {
     assert(!is_undef($ps_face_pts3d_local), "place_on_face_filled_boundary_source_edges: requires place_on_faces context ($ps_face_pts3d_local)");
+    assert(coords == "element" || coords == "parent", "place_on_face_filled_boundary_source_edges: coords must be \"element\" or \"parent\"");
     records = ps_face_filled_boundary_source_edges($ps_face_pts3d_local, mode, eps);
     for (ri = [0:1:len(records)-1]) {
         record = records[ri];
@@ -852,23 +853,27 @@ module place_on_face_filled_boundary_source_edges(mode="nonzero", eps=1e-8) {
         $ps_boundary_source_edge_span_t_ranges_local = frame_t_ranges;
         $ps_boundary_source_edge_span_sides_local = frame_filled_sides;
 
-        multmatrix(ps_frame_matrix(center, ex, ey, ez))
+        if (coords == "element")
+            multmatrix(ps_frame_matrix(center, ex, ey, ez))
+                children();
+        else
             children();
     }
 }
 
 /**
  * Module: Iterate dihedral-aware boundary spans for the current placed face.
- * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance)
- * Returns: none; exposes `$ps_boundary_span_*` metadata and places children in a face-local span frame
+ * Params: mode (`"nonzero"`, `"evenodd"`, or `"all"`), eps (geometric tolerance), coords (`"element"` or `"parent"`)
+ * Returns: none; exposes `$ps_boundary_span_*` metadata and places children in span coords or parent face coords
  */
-module place_on_face_boundary_spans(mode="nonzero", eps=1e-8) {
+module place_on_face_boundary_spans(mode="nonzero", eps=1e-8, coords="element") {
     assert(!is_undef($ps_face_pts3d_local), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_pts3d_local)");
     assert(!is_undef($ps_face_idx), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_idx)");
     assert(!is_undef($ps_poly_faces_idx), "place_on_face_boundary_spans: requires place_on_faces context ($ps_poly_faces_idx)");
     assert(!is_undef($ps_poly_verts_local), "place_on_face_boundary_spans: requires place_on_faces context ($ps_poly_verts_local)");
     assert(!is_undef($ps_face_neighbors_idx), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_neighbors_idx)");
     assert(!is_undef($ps_face_dihedrals), "place_on_face_boundary_spans: requires place_on_faces context ($ps_face_dihedrals)");
+    assert(coords == "element" || coords == "parent", "place_on_face_boundary_spans: coords must be \"element\" or \"parent\"");
     sites = _ps_face_boundary_span_sites(
         $ps_face_pts3d_local,
         $ps_face_idx,
@@ -897,7 +902,10 @@ module place_on_face_boundary_spans(mode="nonzero", eps=1e-8) {
         $ps_boundary_span_filled_side = site[17];
         $ps_boundary_span_adj_face_dir_span_local = site[18];
 
-        multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
+        if (coords == "element")
+            multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
+                children();
+        else
             children();
     }
 }
