@@ -12,8 +12,9 @@ anti-interference data visible without reintroducing the proxy/carve stack.
   `poly_truncate(tetrahedron(), t=-0.5)`, where a single source edge can
   contribute boundary spans with opposite adjacent-face directions.
 - `test_minimal_printable_punch_through_probe.scad`
-  Pre-punch-through printable-style integration probe for
+  Minimal printable-style punch-through integration probe for
   `poly_antiprism(7,3, angle=15)`. It intersects raw face material with the
-  visible-cell mask and positive anti-interference volume, while drawing
-  exact intrusion strips and simple clearance volumes as provenance/inspection
-  aids. It does not yet apply the clearance volumes to the printable keep-body.
+  visible-cell mask and positive anti-interference volume, then compares that
+  keep-body with a version that subtracts exact-intrusion clearance volumes.
+  This still stays local to the probe; general face-plate integration is a
+  later step.
