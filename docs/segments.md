@@ -507,6 +507,12 @@ This API intentionally does not answer clearance questions such as “does a
 4mm-wide edge site come within 2mm of this face?”. Those are conservative
 placement-envelope candidates and belong in a later geometry/proxy layer.
 
+For exact foreign face intrusions, `placement.scad` can convert these records
+into replay sites with `ps_face_foreign_face_replay_sites(...)` and
+`place_on_face_foreign_face_replay_sites(...)`. Those APIs rebuild each foreign
+face frame in the current target face-local coordinate system so later proxy
+geometry can be replayed deliberately.
+
 ### `place_on_face_geom_cut_segments(...)`
 
 Iterator wrapper over geometry-derived cut segments.

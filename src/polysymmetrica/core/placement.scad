@@ -77,6 +77,225 @@ function _ps_vertex_site_neighbors_idx(edges, vi) =
     ];
 
 /**
+ * Function: Pick a stable axis perpendicular to a normal for degenerate local face frames.
+ * Params: n (unit normal)
+ * Returns: unit vector perpendicular to `n`
+ */
+function _ps_any_perp(n) =
+    abs(n[0]) < 0.9
+        ? v_norm(v_cross(n, [1, 0, 0]))
+        : v_norm(v_cross(n, [0, 1, 0]));
+
+/**
+ * Function: Build a projected local face-frame X axis from target-local poly vertices.
+ * Params: verts_local (poly vertices in target-local coordinates), f (face index loop), center (face center), ez (face normal), eps (degeneracy tolerance)
+ * Returns: unit X axis in target-local coordinates
+ */
+function _ps_local_face_ex(verts_local, f, center, ez, eps=1e-12) =
+    let(
+        ex_raw = verts_local[f[0]] - center,
+        ex_proj = ex_raw - ez * v_dot(ex_raw, ez),
+        ex_fallback_raw = verts_local[f[1]] - verts_local[f[0]],
+        ex_fallback = ex_fallback_raw - ez * v_dot(ex_fallback_raw, ez)
+    )
+    norm(ex_proj) > eps
+        ? v_norm(ex_proj)
+        : norm(ex_fallback) > eps
+        ? v_norm(ex_fallback)
+        : _ps_any_perp(ez);
+
+/**
+ * Function: Transform all target-local poly vertices into a foreign face-local frame.
+ * Params: verts_local (poly vertices in target-local coordinates), center/ex/ey/ez (foreign face frame in target-local coordinates), zmean (foreign face local-z mean)
+ * Returns: all poly vertices in foreign face-local coordinates
+ */
+function _ps_replay_poly_verts_local(verts_local, center, ex, ey, ez, zmean) =
+    [
+        for (p0 = verts_local)
+            let(p = p0 - center)
+                [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) - zmean]
+    ];
+
+/**
+ * Function: Build one foreign face replay site from an intrusion record.
+ * Params: replay_idx (site index), record (foreign intrusion record), poly_faces_idx/poly_verts_local/poly_center_local (target-local poly context), eps (degeneracy tolerance)
+ * Returns: replay site record for `place_on_face_foreign_face_replay_sites(...)`
+ */
+function _ps_face_foreign_face_replay_site(replay_idx, record, poly_faces_idx, poly_verts_local, poly_center_local, eps=1e-12) =
+    let(
+        foreign_face_idx = ps_intrusion_foreign_idx(record),
+        f = poly_faces_idx[foreign_face_idx],
+        center = ps_face_centroid(poly_verts_local, f),
+        ez = ps_face_frame_normal(poly_verts_local, f, eps),
+        ex = _ps_local_face_ex(poly_verts_local, f, center, ez, eps),
+        ey = v_cross(ez, ex),
+        face_pts3d_raw = [
+            for (vid = f)
+                let(p = poly_verts_local[vid] - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        zvals = [for (p = face_pts3d_raw) p[2]],
+        zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals),
+        face_pts3d_local = [for (p = face_pts3d_raw) [p[0], p[1], p[2] - zmean]],
+        poly_verts_replay_local = _ps_replay_poly_verts_local(poly_verts_local, center, ex, ey, ez, zmean),
+        poly_center_delta = (is_undef(poly_center_local) ? [0, 0, 0] : poly_center_local) - center,
+        poly_center_replay_local = [
+            v_dot(poly_center_delta, ex),
+            v_dot(poly_center_delta, ey),
+            v_dot(poly_center_delta, ez) - zmean
+        ]
+    )
+    [
+        replay_idx,
+        record,
+        center,
+        ex,
+        ey,
+        ez,
+        foreign_face_idx,
+        ps_xy(face_pts3d_local),
+        face_pts3d_local,
+        poly_verts_replay_local,
+        poly_center_replay_local,
+        f,
+        ps_intrusion_foreign_kind(record),
+        ps_intrusion_segment2d_local(record),
+        ps_intrusion_dihedral(record),
+        ps_intrusion_confidence(record)
+    ];
+
+/**
+ * Function: Build target-local replay sites for exact foreign face intrusions.
+ * Params: face_pts2d (target face loop), face_idx (target face index), poly_faces_idx/poly_verts_local/poly_center_local (current `place_on_faces(...)` metadata), eps (tolerance), mode (foreign face fill rule), filter_parent (drop parent-edge cuts)
+ * Returns: replay site records for intruding foreign faces, with frames expressed in the target face-local coordinate system
+ * Limitations/Gotchas: only exact `"face"` intrusion records are converted; edge/vertex proxy replay belongs to later APIs
+ */
+function ps_face_foreign_face_replay_sites(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, poly_center_local=undef, eps=1e-8, mode="nonzero", filter_parent=true) =
+    let(
+        records = [
+            for (r = ps_face_foreign_intrusion_records(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent))
+                if (ps_intrusion_foreign_kind(r) == "face")
+                    r
+        ]
+    )
+    [
+        for (ri = [0:1:len(records)-1])
+            _ps_face_foreign_face_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
+    ];
+
+/**
+ * Function: Get replay site index.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: zero-based replay site index
+ */
+function ps_replay_site_idx(site) = site[0];
+
+/**
+ * Function: Get source intrusion record from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: foreign intrusion record
+ */
+function ps_replay_site_intrusion_record(site) = site[1];
+
+/**
+ * Function: Get target-local replay frame center.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: center in current target face-local coordinates
+ */
+function ps_replay_site_center_local(site) = site[2];
+
+/**
+ * Function: Get target-local replay frame X axis.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: unit X axis in current target face-local coordinates
+ */
+function ps_replay_site_ex_local(site) = site[3];
+
+/**
+ * Function: Get target-local replay frame Y axis.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: unit Y axis in current target face-local coordinates
+ */
+function ps_replay_site_ey_local(site) = site[4];
+
+/**
+ * Function: Get target-local replay frame Z axis.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: unit Z axis in current target face-local coordinates
+ */
+function ps_replay_site_ez_local(site) = site[5];
+
+/**
+ * Function: Get foreign face index from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: foreign face index
+ */
+function ps_replay_site_foreign_idx(site) = site[6];
+
+/**
+ * Function: Get foreign face 2D points in replay local coordinates.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: `pts2d` for the foreign face in replay local coordinates
+ */
+function ps_replay_site_face_pts2d(site) = site[7];
+
+/**
+ * Function: Get foreign face 3D points in replay local coordinates.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: `pts3d` for the foreign face in replay local coordinates
+ */
+function ps_replay_site_face_pts3d_local(site) = site[8];
+
+/**
+ * Function: Get all poly vertices in replay local coordinates.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: vertex list transformed into the replay frame
+ */
+function ps_replay_site_poly_verts_local(site) = site[9];
+
+/**
+ * Function: Get poly center vector in replay local coordinates.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: vector from replay origin to poly center in replay local coordinates
+ */
+function ps_replay_site_poly_center_local(site) = site[10];
+
+/**
+ * Function: Get foreign face vertex indices from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: face vertex index loop
+ */
+function ps_replay_site_face_verts_idx(site) = site[11];
+
+/**
+ * Function: Get foreign element kind from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: foreign element kind, currently `"face"`
+ */
+function ps_replay_site_foreign_kind(site) = site[12];
+
+/**
+ * Function: Get target-local intrusion segment from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: `seg2d` in target face-local coordinates
+ */
+function ps_replay_site_intrusion_segment2d_local(site) = site[13];
+
+/**
+ * Function: Get cut dihedral from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: face-plane cut dihedral
+ */
+function ps_replay_site_intrusion_dihedral(site) = site[14];
+
+/**
+ * Function: Get confidence/classification from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: confidence string
+ */
+function ps_replay_site_intrusion_confidence(site) = site[15];
+
+/**
  * Function: Build face placement site records for `place_on_faces(...)`.
  * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context)
  * Returns: list of face site records `[face_idx, center, ex, ey, ez, edge_len, vertex_count, face_midradius, face_radius, poly_center_local, face_pts2d, face_pts3d_local, poly_verts_local, poly_faces_idx, face_planarity_err, face_is_planar, face_family_id, face_family_count, edge_family_count, vertex_family_count, face_neighbors_idx, face_dihedrals]`
@@ -192,6 +411,53 @@ module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef
         $ps_face_dihedrals     = site[21];
 
         multmatrix(ps_frame_matrix(center, ex, ey, ez))
+            children();
+    }
+}
+
+/**
+ * Module: Replay exact foreign face intrusion sites inside the current placed target face.
+ * Params: mode (foreign face fill rule), eps (tolerance), filter_parent (drop parent-edge cuts), coords (`"element"` or `"parent"`)
+ * Returns: none; exposes `$ps_replay_*` metadata and optionally places children in the foreign face replay frame
+ * Limitations/Gotchas: requires `place_on_faces(...)`; does not generate or subtract proxy geometry
+ */
+module place_on_face_foreign_face_replay_sites(mode="nonzero", eps=1e-8, filter_parent=true, coords="element") {
+    assert(!is_undef($ps_face_pts2d), "place_on_face_foreign_face_replay_sites: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_idx), "place_on_face_foreign_face_replay_sites: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "place_on_face_foreign_face_replay_sites: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "place_on_face_foreign_face_replay_sites: requires place_on_faces context ($ps_poly_verts_local)");
+    assert(coords == "element" || coords == "parent", "place_on_face_foreign_face_replay_sites: coords must be \"element\" or \"parent\"");
+
+    sites = ps_face_foreign_face_replay_sites($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, $ps_poly_center_local, eps, mode, filter_parent);
+    for (site = sites) {
+        $ps_replay_idx = ps_replay_site_idx(site);
+        $ps_replay_count = len(sites);
+        $ps_replay_intrusion_record = ps_replay_site_intrusion_record(site);
+        $ps_replay_kind = "foreign_face";
+        $ps_replay_foreign_kind = ps_replay_site_foreign_kind(site);
+        $ps_replay_foreign_idx = ps_replay_site_foreign_idx(site);
+        $ps_replay_center_local = ps_replay_site_center_local(site);
+        $ps_replay_ex_local = ps_replay_site_ex_local(site);
+        $ps_replay_ey_local = ps_replay_site_ey_local(site);
+        $ps_replay_ez_local = ps_replay_site_ez_local(site);
+        $ps_replay_face_pts2d = ps_replay_site_face_pts2d(site);
+        $ps_replay_face_pts3d_local = ps_replay_site_face_pts3d_local(site);
+        $ps_replay_poly_verts_local = ps_replay_site_poly_verts_local(site);
+        $ps_replay_poly_center_local = ps_replay_site_poly_center_local(site);
+        $ps_replay_face_verts_idx = ps_replay_site_face_verts_idx(site);
+        $ps_replay_intrusion_segment2d_local = ps_replay_site_intrusion_segment2d_local(site);
+        $ps_replay_intrusion_dihedral = ps_replay_site_intrusion_dihedral(site);
+        $ps_replay_intrusion_confidence = ps_replay_site_intrusion_confidence(site);
+
+        if (coords == "element")
+            multmatrix(ps_frame_matrix(
+                ps_replay_site_center_local(site),
+                ps_replay_site_ex_local(site),
+                ps_replay_site_ey_local(site),
+                ps_replay_site_ez_local(site)
+            ))
+                children();
+        else
             children();
     }
 }

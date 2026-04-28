@@ -187,6 +187,43 @@ module test_ps_face_foreign_intrusion_records__preserves_coincident_foreign_face
     );
 }
 
+module test_ps_face_foreign_face_replay_sites__7_3_15_triangle_builds_target_local_frames() {
+    site = _test_face_site(_test_punch_poly(), TRI_FACE_IDX);
+    replay = ps_face_foreign_face_replay_sites(site[10], site[0], site[13], site[12], site[9], mode = MODE, filter_parent = true);
+
+    assert_int_eq(len(replay), 6, "triangle foreign face replay site count");
+    assert_list_eq(
+        [for (s = replay) ps_replay_site_foreign_idx(s)],
+        [3, 8, 9, 10, 14, 15],
+        "triangle replay foreign face ids"
+    );
+    assert_list_eq(
+        [for (s = replay) ps_replay_site_foreign_kind(s)],
+        ["face", "face", "face", "face", "face", "face"],
+        "triangle replay foreign kinds"
+    );
+    assert_list_eq(
+        [for (s = replay) len(ps_replay_site_intrusion_segment2d_local(s))],
+        [2, 2, 2, 2, 2, 2],
+        "triangle replay keeps target-local intrusion segment"
+    );
+    assert_list_eq(
+        [for (s = replay) len(ps_replay_site_face_pts2d(s))],
+        [3, 3, 3, 3, 3, 3],
+        "triangle replay face point arities"
+    );
+
+    for (s = replay) {
+        assert_near(norm(ps_replay_site_ex_local(s)), 1, EPS, "replay ex is unit");
+        assert_near(norm(ps_replay_site_ey_local(s)), 1, EPS, "replay ey is unit");
+        assert_near(norm(ps_replay_site_ez_local(s)), 1, EPS, "replay ez is unit");
+        assert_near(v_dot(ps_replay_site_ex_local(s), ps_replay_site_ey_local(s)), 0, EPS, "replay ex/ey orthogonal");
+        assert_near(v_dot(ps_replay_site_ex_local(s), ps_replay_site_ez_local(s)), 0, EPS, "replay ex/ez orthogonal");
+        assert_near(v_dot(ps_replay_site_ey_local(s), ps_replay_site_ez_local(s)), 0, EPS, "replay ey/ez orthogonal");
+        assert(max([for (p = ps_replay_site_face_pts3d_local(s)) abs(p[2])]) <= 1e-6, "planar replay face lies near local z=0");
+    }
+}
+
 module test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells() {
     site = _test_face_site(_test_punch_poly(), TRI_FACE_IDX);
     visible = ps_face_visible_segments(site[10], site[0], site[13], site[12], mode = MODE, filter_parent = true);
@@ -328,6 +365,25 @@ module test_place_on_face_foreign_intrusions__7_3_15_triangle_exposes_context() 
     }
 }
 
+module test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_context() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == TRI_FACE_IDX) {
+            place_on_face_foreign_face_replay_sites(mode = MODE, coords = "parent") {
+                assert_int_eq($ps_replay_count, 6, "triangle replay iterator count");
+                assert($ps_replay_idx >= 0 && $ps_replay_idx < $ps_replay_count, "triangle replay iterator idx bounds");
+                assert($ps_replay_kind == "foreign_face", "triangle replay iterator kind");
+                assert($ps_replay_foreign_kind == "face", "triangle replay iterator foreign kind");
+                assert($ps_replay_intrusion_confidence == "exact", "triangle replay iterator confidence");
+                assert_int_eq(len($ps_replay_intrusion_segment2d_local), 2, "triangle replay intrusion segment arity");
+                assert_int_eq(len($ps_replay_face_pts2d), 3, "triangle replay face point arity");
+                assert_near(norm($ps_replay_ex_local), 1, EPS, "triangle replay ex unit");
+                assert_near(norm($ps_replay_ey_local), 1, EPS, "triangle replay ey unit");
+                assert_near(norm($ps_replay_ez_local), 1, EPS, "triangle replay ez unit");
+            }
+        }
+    }
+}
+
 module test_face_local_iterators__parent_coords_preserve_metadata() {
     place_on_faces(_test_punch_poly()) {
         if ($ps_face_idx == STAR_FACE_IDX) {
@@ -356,12 +412,14 @@ module run_TestSelfCrossing() {
     test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters();
     test_ps_face_foreign_intrusion_records__7_3_15_triangle_wraps_exact_face_cuts();
     test_ps_face_foreign_intrusion_records__preserves_coincident_foreign_face_provenance();
+    test_ps_face_foreign_face_replay_sites__7_3_15_triangle_builds_target_local_frames();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
     test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();
     test_place_on_face_filled_boundary_source_edges__7_3_15_star_exposes_context();
     test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direction();
     test_place_on_face_foreign_intrusions__7_3_15_triangle_exposes_context();
+    test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_context();
     test_face_local_iterators__parent_coords_preserve_metadata();
 }
 
