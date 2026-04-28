@@ -318,6 +318,7 @@ iterator built from those records:
 
 - `ps_face_foreign_face_replay_sites(...)`
 - `place_on_face_foreign_face_replay_sites(...)`
+- `place_on_face_foreign_proxy_sites(...)`
 
 These identify exact foreign face intruders and rebuild each foreign face frame
 inside the current target face-local coordinate system. They intentionally do
@@ -334,6 +335,12 @@ target face-local frame and only exposes metadata. The main metadata vars are:
 - `$ps_replay_face_pts2d`, `$ps_replay_face_pts3d_local`, `$ps_replay_face_verts_idx`
 - `$ps_replay_poly_verts_local`, `$ps_replay_poly_center_local`
 - `$ps_replay_intrusion_record`, `$ps_replay_intrusion_segment2d_local`, `$ps_replay_intrusion_dihedral`, `$ps_replay_intrusion_confidence`
+
+See [proxy_interaction.md](proxy_interaction.md) for the higher-level proxy
+child contract. In short, `place_on_face_foreign_proxy_sites(...)` dispatches
+candidate foreign sites to child slots (`face`, reserved `edge`, reserved
+`vertex`) and exposes `$ps_proxy_*` metadata so caller-supplied closed proxy
+bodies can be replayed deliberately.
 
 See [face_regions.md](face_regions.md) for positive face-local volumes built
 from those boundary spans:

@@ -384,6 +384,41 @@ module test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_con
     }
 }
 
+module _test_assert_triangle_proxy_face_child(expected_child_idx) {
+    assert_int_eq($ps_proxy_count, 6, "triangle proxy iterator count");
+    assert($ps_proxy_idx >= 0 && $ps_proxy_idx < $ps_proxy_count, "triangle proxy iterator idx bounds");
+    assert($ps_proxy_kind == "foreign_face", "triangle proxy kind");
+    assert($ps_proxy_source_kind == "face", "triangle proxy source kind");
+    assert_int_eq($ps_proxy_child_idx, expected_child_idx, "triangle face proxy child slot");
+    assert_int_eq($ps_proxy_target_face_idx, TRI_FACE_IDX, "triangle proxy target face id");
+    assert_int_eq(len($ps_proxy_intrusion_segment2d_local), 2, "triangle proxy intrusion segment arity");
+    assert($ps_proxy_intrusion_confidence == "exact", "triangle proxy intrusion confidence");
+    assert_int_eq(len($ps_proxy_face_pts2d), 3, "triangle proxy face point arity");
+    assert_near(norm($ps_proxy_ex_local), 1, EPS, "triangle proxy ex unit");
+    assert_near(norm($ps_proxy_ey_local), 1, EPS, "triangle proxy ey unit");
+    assert_near(norm($ps_proxy_ez_local), 1, EPS, "triangle proxy ez unit");
+}
+
+module _test_assert_unreachable_proxy_child(kind) {
+    assert(false, str("triangle proxy should not dispatch ", kind, " child for face intrusions"));
+}
+
+module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_child() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == TRI_FACE_IDX) {
+            place_on_face_foreign_proxy_sites(mode = MODE, coords = "parent") {
+                _test_assert_triangle_proxy_face_child(0);
+            }
+
+            place_on_face_foreign_proxy_sites(mode = MODE, coords = "parent", face_child = 1, edge_child = 0, vertex_child = 2) {
+                _test_assert_unreachable_proxy_child("edge");
+                _test_assert_triangle_proxy_face_child(1);
+                _test_assert_unreachable_proxy_child("vertex");
+            }
+        }
+    }
+}
+
 module test_face_local_iterators__parent_coords_preserve_metadata() {
     place_on_faces(_test_punch_poly()) {
         if ($ps_face_idx == STAR_FACE_IDX) {
@@ -420,6 +455,7 @@ module run_TestSelfCrossing() {
     test_place_on_face_filled_boundary_source_edges__antitet_uses_span_direction();
     test_place_on_face_foreign_intrusions__7_3_15_triangle_exposes_context();
     test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_context();
+    test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_child();
     test_face_local_iterators__parent_coords_preserve_metadata();
 }
 

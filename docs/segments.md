@@ -513,6 +513,10 @@ into replay sites with `ps_face_foreign_face_replay_sites(...)` and
 face frame in the current target face-local coordinate system so later proxy
 geometry can be replayed deliberately.
 
+For caller-supplied proxy geometry, use
+`place_on_face_foreign_proxy_sites(...)`; see
+[proxy_interaction.md](proxy_interaction.md).
+
 ### `place_on_face_geom_cut_segments(...)`
 
 Iterator wrapper over geometry-derived cut segments.

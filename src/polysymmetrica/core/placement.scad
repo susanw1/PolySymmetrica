@@ -463,6 +463,91 @@ module place_on_face_foreign_face_replay_sites(mode="nonzero", eps=1e-8, filter_
 }
 
 /**
+ * Module: Replay caller-supplied proxy geometry for foreign sites affecting the current placed face.
+ * Params: mode (foreign face fill rule), eps (tolerance), filter_parent (drop parent-edge cuts), coords (`"element"` or `"parent"`), face_child/edge_child/vertex_child (child slots)
+ * Returns: none; exposes `$ps_proxy_*` metadata and calls the child slot matching the foreign source kind
+ * Limitations/Gotchas: currently only exact foreign face sites are discovered; edge/vertex child slots are reserved for later candidate APIs
+ */
+module place_on_face_foreign_proxy_sites(
+    mode="nonzero",
+    eps=1e-8,
+    filter_parent=true,
+    coords="element",
+    face_child=0,
+    edge_child=1,
+    vertex_child=2
+) {
+    assert(!is_undef($ps_face_pts2d), "place_on_face_foreign_proxy_sites: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_idx), "place_on_face_foreign_proxy_sites: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "place_on_face_foreign_proxy_sites: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "place_on_face_foreign_proxy_sites: requires place_on_faces context ($ps_poly_verts_local)");
+    assert(coords == "element" || coords == "parent", "place_on_face_foreign_proxy_sites: coords must be \"element\" or \"parent\"");
+    assert(face_child >= 0 && edge_child >= 0 && vertex_child >= 0, "place_on_face_foreign_proxy_sites: child slot indices must be non-negative");
+
+    sites = ps_face_foreign_face_replay_sites($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, $ps_poly_center_local, eps, mode, filter_parent);
+    for (site = sites) {
+        source_kind = ps_replay_site_foreign_kind(site);
+        child_idx =
+            source_kind == "face" ? face_child :
+            source_kind == "edge" ? edge_child :
+            source_kind == "vertex" ? vertex_child :
+            undef;
+
+        $ps_proxy_idx = ps_replay_site_idx(site);
+        $ps_proxy_count = len(sites);
+        $ps_proxy_kind = str("foreign_", source_kind);
+        $ps_proxy_source_kind = source_kind;
+        $ps_proxy_source_idx = ps_replay_site_foreign_idx(site);
+        $ps_proxy_target_face_idx = $ps_face_idx;
+        $ps_proxy_child_idx = child_idx;
+        $ps_proxy_intrusion_record = ps_replay_site_intrusion_record(site);
+        $ps_proxy_intrusion_segment2d_local = ps_replay_site_intrusion_segment2d_local(site);
+        $ps_proxy_intrusion_dihedral = ps_replay_site_intrusion_dihedral(site);
+        $ps_proxy_intrusion_confidence = ps_replay_site_intrusion_confidence(site);
+        $ps_proxy_center_local = ps_replay_site_center_local(site);
+        $ps_proxy_ex_local = ps_replay_site_ex_local(site);
+        $ps_proxy_ey_local = ps_replay_site_ey_local(site);
+        $ps_proxy_ez_local = ps_replay_site_ez_local(site);
+        $ps_proxy_face_pts2d = ps_replay_site_face_pts2d(site);
+        $ps_proxy_face_pts3d_local = ps_replay_site_face_pts3d_local(site);
+        $ps_proxy_face_verts_idx = ps_replay_site_face_verts_idx(site);
+        $ps_proxy_poly_verts_local = ps_replay_site_poly_verts_local(site);
+        $ps_proxy_poly_center_local = ps_replay_site_poly_center_local(site);
+        $ps_replay_idx = ps_replay_site_idx(site);
+        $ps_replay_count = len(sites);
+        $ps_replay_intrusion_record = ps_replay_site_intrusion_record(site);
+        $ps_replay_kind = str("foreign_", source_kind);
+        $ps_replay_foreign_kind = source_kind;
+        $ps_replay_foreign_idx = ps_replay_site_foreign_idx(site);
+        $ps_replay_center_local = ps_replay_site_center_local(site);
+        $ps_replay_ex_local = ps_replay_site_ex_local(site);
+        $ps_replay_ey_local = ps_replay_site_ey_local(site);
+        $ps_replay_ez_local = ps_replay_site_ez_local(site);
+        $ps_replay_face_pts2d = ps_replay_site_face_pts2d(site);
+        $ps_replay_face_pts3d_local = ps_replay_site_face_pts3d_local(site);
+        $ps_replay_poly_verts_local = ps_replay_site_poly_verts_local(site);
+        $ps_replay_poly_center_local = ps_replay_site_poly_center_local(site);
+        $ps_replay_face_verts_idx = ps_replay_site_face_verts_idx(site);
+        $ps_replay_intrusion_segment2d_local = ps_replay_site_intrusion_segment2d_local(site);
+        $ps_replay_intrusion_dihedral = ps_replay_site_intrusion_dihedral(site);
+        $ps_replay_intrusion_confidence = ps_replay_site_intrusion_confidence(site);
+
+        if (!is_undef(child_idx) && child_idx < $children) {
+            if (coords == "element")
+                multmatrix(ps_frame_matrix(
+                    ps_replay_site_center_local(site),
+                    ps_replay_site_ex_local(site),
+                    ps_replay_site_ey_local(site),
+                    ps_replay_site_ez_local(site)
+                ))
+                    children(child_idx);
+            else
+                children(child_idx);
+        }
+    }
+}
+
+/**
  * Function: Build edge placement site records for `place_on_edges(...)`.
  * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context)
  * Returns: list of edge site records `[edge_idx, center, ex, ey, ez, edge_len, edge_midradius, poly_center_local, edge_pts_local, edge_verts_idx, edge_adj_faces_idx, edge_family_id, face_family_count, edge_family_count, vertex_family_count]`

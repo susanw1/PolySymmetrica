@@ -6,7 +6,8 @@ anti-interference data visible without reintroducing the proxy/carve stack.
 
 - `test_7_3_15_punch_through_probe.scad`
   Focuses on the `poly_antiprism(7, 3, angle=15)` punch-through case, comparing
-  a star face with a triangular face crossed by other arms.
+  a star face with a triangular face crossed by other arms. It also includes a
+  simple proxy-replay panel using `place_on_face_foreign_proxy_sites(...)`.
 - `test_antitruncated_tetrahedron_hex_probe.scad`
   Focuses on the self-crossing hex face produced by
   `poly_truncate(tetrahedron(), t=-0.5)`, where a single source edge can
