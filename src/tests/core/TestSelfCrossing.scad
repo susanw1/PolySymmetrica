@@ -41,6 +41,20 @@ function _test_source_counts(records, source_idx_pos, n) =
             len([for (r = records) if (r[source_idx_pos] == ei) 1])
     ];
 
+function _test_coincident_intrusion_verts_local() =
+    [
+        [-2, -2, 0], [2, -2, 0], [2, 2, 0], [-2, 2, 0],
+        [0, -2, -1], [0, 0, 1], [0, 2, -1],
+        [0, -2, -1], [0, 0, 1], [0, 2, -1]
+    ];
+
+function _test_coincident_intrusion_faces_idx() =
+    [
+        [0, 1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9]
+    ];
+
 module test_ps_face_arrangement__7_3_15_star_has_stable_structure() {
     site = _test_face_site(_test_punch_poly(), STAR_FACE_IDX);
     arr = ps_face_arrangement(site[11]);
@@ -150,6 +164,26 @@ module test_ps_face_foreign_intrusion_records__7_3_15_triangle_wraps_exact_face_
     assert(
         min([for (r = records) ps_intrusion_dihedral(r)]) > 90 && max([for (r = records) ps_intrusion_dihedral(r)]) < 140,
         str("triangle intrusion dihedrals should stay in expected range: ", [for (r = records) ps_intrusion_dihedral(r)])
+    );
+}
+
+module test_ps_face_foreign_intrusion_records__preserves_coincident_foreign_face_provenance() {
+    face_pts2d = [[-2, -2], [2, -2], [2, 2], [-2, 2]];
+    records = ps_face_foreign_intrusion_records(
+        face_pts2d,
+        0,
+        _test_coincident_intrusion_faces_idx(),
+        _test_coincident_intrusion_verts_local(),
+        mode = MODE,
+        filter_parent = true
+    );
+
+    assert_int_eq(len(records), 2, "coincident cuts from distinct foreign faces should both survive");
+    assert_list_eq([for (r = records) ps_intrusion_foreign_idx(r)], [1, 2], "coincident intrusion foreign face ids");
+    assert_list_eq(
+        [for (r = records) ps_intrusion_segment2d_local(r)],
+        [ps_intrusion_segment2d_local(records[0]), ps_intrusion_segment2d_local(records[0])],
+        "coincident intrusion segments remain geometrically identical"
     );
 }
 
@@ -321,6 +355,7 @@ module run_TestSelfCrossing() {
     test_ps_face_filled_boundary_source_edges__7_3_15_star_groups_surviving_spans();
     test_ps_face_geom_cut_entries__7_3_15_triangle_records_foreign_cutters();
     test_ps_face_foreign_intrusion_records__7_3_15_triangle_wraps_exact_face_cuts();
+    test_ps_face_foreign_intrusion_records__preserves_coincident_foreign_face_provenance();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
     test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();

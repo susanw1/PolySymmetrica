@@ -1275,7 +1275,7 @@ function _ps_seg_cut_entries_dedupe(entries, eps=1e-8, i=0, acc=[]) =
     (i >= len(entries)) ? acc :
     let(
         e = entries[i],
-        hit = len([for (a = acc) if (_ps_seg2_eq(a[0], e[0], eps)) 1]) > 0,
+        hit = len([for (a = acc) if (a[1] == e[1] && _ps_seg2_eq(a[0], e[0], eps)) 1]) > 0,
         acc2 = hit ? acc : concat(acc, [e])
     )
     _ps_seg_cut_entries_dedupe(entries, eps, i + 1, acc2);
