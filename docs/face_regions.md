@@ -18,6 +18,9 @@ that is allowed to exist and intersect user geometry with it.
 - **Anti-interference shell:** A closed polyhedron made by projecting each
   boundary span to two face-local Z planes along its dihedral-bisector
   direction, then intersecting neighbouring projected boundary lines.
+- **Intrusion clearance profile:** A simple target-face-local 2D strip around
+  an exact foreign intrusion segment. This is proxy geometry: useful for
+  inspection and later boolean clearance, but not yet user-geometry-aware.
 
 ## Main APIs
 
@@ -58,6 +61,43 @@ place_on_faces(poly) {
 }
 ```
 
+### `ps_face_intrusion_clearance_profiles(...)`
+
+Function: Build simple 2D clearance profiles from exact foreign intrusion
+records.
+
+Params: `face_pts2d`, `face_idx`, `poly_faces_idx`, `poly_verts_local`,
+`clearance_width=1`, `extend=0.5`, `eps=1e-8`, `mode="nonzero"`,
+`filter_parent=true`.
+
+Returns: one profile per non-degenerate intrusion segment, as
+`[pts2d, intrusion_record, seg2d_local, clearance_width, extend]`.
+
+Accessor helpers:
+
+- `ps_intrusion_clearance_profile_pts2d(profile)`
+- `ps_intrusion_clearance_profile_record(profile)`
+- `ps_intrusion_clearance_profile_segment2d_local(profile)`
+- `ps_intrusion_clearance_profile_width(profile)`
+- `ps_intrusion_clearance_profile_extend(profile)`
+
+### `ps_face_intrusion_clearance_volume(...)`
+
+Module: Emit prism volumes from the current placed face's exact intrusion
+clearance profiles.
+
+Params: `z0`, `z1`, `clearance_width=1`, `extend=0.5`, `eps=1e-8`,
+`mode="nonzero"`, `filter_parent=true`, `convexity=4`.
+
+Typical inspection usage:
+
+```scad
+place_on_faces(poly) {
+    color("crimson", 0.35)
+        ps_face_intrusion_clearance_volume(-0.5, 1.0, clearance_width = 2);
+}
+```
+
 ## Projection Model
 
 For each boundary span, the implementation reconstructs the source-edge
@@ -86,8 +126,9 @@ bound the offset distance.
 
 ## Current Limits
 
-- Proxy punch-through holes are not part of this primitive; later proxy work
-  should union/intersect additional well-defined volumes with these shells.
+- Intrusion clearance volumes are simple strip-prism proxies around exact
+  face-plane cuts. They do not yet account for arbitrary user geometry placed
+  on foreign faces/edges/vertices.
 - Each filled boundary loop becomes one shell. Do not rely on holed cap faces;
   use multiple shells for multiple loops.
 - The shell is an admissible region, not a finished printable face plate.
