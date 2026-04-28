@@ -5,18 +5,20 @@ use <../../../core/prisms.scad>
 use <../../../core/segments.scad>
 use <../../../core/render.scad>
 
-// Minimal pre-punch-through printable integration probe for
-// poly_antiprism(7,3,15). This deliberately stays narrow: it combines the
-// stable face-local data APIs into one positive keep-body without reintroducing
-// the old proxy/carve stack.
+// Minimal printable punch-through integration probe for poly_antiprism(7,3,15).
+// This deliberately stays narrow: it combines the stable face-local data APIs
+// into one positive keep-body and applies exact-intrusion clearance volumes
+// only in the final comparison panel.
 //
-// The final panel in each row computes:
+// The keep-body panel in each row computes:
 //   raw face slab ∩ visible-cell mask ∩ positive anti-interference volume
 //
-// Orange cut strips are drawn as inspection aids only. They are not used as the
-// primary integration strategy here, because this probe is testing the positive
-// intersection model before any broader printable/proxy machinery returns.
-// It does not yet model explicit foreign intrusion/clearance volumes.
+// The cleared-body panel then subtracts:
+//   exact-intrusion clearance strip-prisms
+//
+// Orange intrusion strips and crimson clearance bodies are drawn as inspection
+// aids. The core printable integration path remains isolated to this probe;
+// broader face-plate integration belongs to the next step.
 
 IR = 32;
 MODE = "nonzero";
@@ -32,8 +34,8 @@ VOL_Z_MAX = 2;
 MAX_PROJECT = 45;
 LINE_R = 0.45;
 TXT_H = 0.30;
-TXT_S = 2.4;
-PANEL_X = 104;
+TXT_S = 2.25;
+PANEL_X = 92;
 PANEL_Y = 112;
 PANEL_LABEL_Y = -50;
 CUT_KERF = 1.0;
@@ -166,6 +168,18 @@ module printable_keep_body() {
         face_material_slab();
         face_visible_mask(FACE_THK, z_pad = 0.04, mode = MODE, filter_parent = FILTER_PARENT_CUTS);
         anti_interference_volume();
+    }
+}
+
+/**
+ * Module: Emit the keep-body after subtracting exact intrusion clearance volumes.
+ * Params: none
+ * Returns: none
+ */
+module printable_keep_body_with_clearance() {
+    difference() {
+        printable_keep_body();
+        intrusion_clearance_volume();
     }
 }
 
@@ -342,6 +356,28 @@ module draw_printable_result_panel(face_idx, source_edge_idx, label_s) {
 }
 
 /**
+ * Module: Draw the minimal printable keep-body after intrusion clearance.
+ * Params: face_idx (selected face), source_edge_idx (optional highlighted source edge), label_s (panel label)
+ * Returns: none
+ */
+module draw_cleared_result_panel(face_idx, source_edge_idx, label_s) {
+    place_on_faces(P, IR) {
+        if ($ps_face_idx == face_idx) {
+            color("white")
+                printable_keep_body_with_clearance();
+
+            color("crimson", 0.18)
+                intrusion_clearance_volume();
+
+            draw_cut_strips();
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
+        }
+    }
+
+    draw_panel_label(label_s);
+}
+
+/**
  * Module: Echo summary counts for one row.
  * Params: label_s (row label), face_idx (selected face)
  * Returns: none
@@ -378,7 +414,7 @@ module echo_row_summary(label_s, face_idx) {
             );
 
             echo(str(
-                "minimal printable pre-punch-through ", label_s, " f", face_idx,
+                "minimal printable punch-through ", label_s, " f", face_idx,
                 ": boundary_loops=", len(bm[2]),
                 " boundary_spans=", len(bm[3]),
                 " intrusions=", len(intrusions),
@@ -395,20 +431,23 @@ module echo_row_summary(label_s, face_idx) {
  * Returns: none
  */
 module draw_probe_row(face_idx, source_edge_idx, label_s, y) {
-    translate([-2 * PANEL_X, y, 0])
+    translate([-2.5 * PANEL_X, y, 0])
         draw_context_panel(face_idx, str(label_s, " context"));
 
-    translate([-1 * PANEL_X, y, 0])
+    translate([-1.5 * PANEL_X, y, 0])
         draw_visible_data_panel(face_idx, source_edge_idx, str(label_s, " visible/intrusions"));
 
-    translate([0, y, 0])
+    translate([-0.5 * PANEL_X, y, 0])
         draw_clearance_data_panel(face_idx, source_edge_idx, str(label_s, " clearance"));
 
-    translate([1 * PANEL_X, y, 0])
+    translate([0.5 * PANEL_X, y, 0])
         draw_volume_data_panel(face_idx, source_edge_idx, str(label_s, " anti-volume"));
 
-    translate([2 * PANEL_X, y, 0])
+    translate([1.5 * PANEL_X, y, 0])
         draw_printable_result_panel(face_idx, source_edge_idx, str(label_s, " keep-body"));
+
+    translate([2.5 * PANEL_X, y, 0])
+        draw_cleared_result_panel(face_idx, source_edge_idx, str(label_s, " cleared-body"));
 
     echo_row_summary(label_s, face_idx);
 }
