@@ -369,24 +369,68 @@ module draw_volume_panel(poly, face_idx, source_edge_idx, label_s) {
     draw_panel_label(str(label_s, " volume"));
 }
 
+/**
+ * Module: Draw exact foreign face replay frames in the target face-local context.
+ * Params: poly (poly descriptor), face_idx (target face), source_edge_idx (optional highlighted source edge), label_s (panel label)
+ * Returns: none
+ */
+module draw_foreign_replay_panel(poly, face_idx, source_edge_idx, label_s) {
+    place_on_faces(poly, IR) {
+        if ($ps_face_idx == face_idx) {
+            color("gainsboro", 0.94)
+                translate([0, 0, -FACE_THK])
+                    linear_extrude(height = FACE_THK, center = true)
+                        ps_polygon($ps_face_pts2d, MODE);
+
+            place_on_face_foreign_face_replay_sites(mode = MODE, filter_parent = FILTER_PARENT_CUTS, coords = "parent") {
+                mid = ps_segment_midpoint2d($ps_replay_intrusion_segment2d_local);
+
+                color(example_color($ps_replay_idx))
+                    draw_segment_stroke($ps_replay_intrusion_segment2d_local, r = LINE_R * 0.52, z = 0.25);
+
+                color(example_color($ps_replay_idx), 0.30)
+                    multmatrix(ps_frame_matrix(
+                        $ps_replay_center_local,
+                        $ps_replay_ex_local,
+                        $ps_replay_ey_local,
+                        $ps_replay_ez_local
+                    ))
+                        linear_extrude(height = FACE_THK, center = true)
+                            ps_polygon($ps_replay_face_pts2d, MODE);
+
+                color("black")
+                    translate([mid[0], mid[1], 1.4 * FACE_THK])
+                        draw_text2d(str("r", $ps_replay_idx, "/f", $ps_replay_foreign_idx), size = 1.0);
+            }
+
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
+        }
+    }
+
+    draw_panel_label(str(label_s, " replay"));
+}
+
 module draw_probe_row(face_idx, source_edge_idx, label_s) {
     translate([-3 * PANEL_X, 0, 0])
         poly_render(P, IR);
 
-    translate([-2 * PANEL_X, 0, 0])
+    *translate([-2 * PANEL_X, 0, 0])
         draw_poly_context(P, face_idx);
 
-    translate([-1 * PANEL_X, 0, 0])
+    *translate([-1 * PANEL_X, 0, 0])
         draw_arrangement_panel(P, face_idx, source_edge_idx, label_s);
 
-    translate([0 * PANEL_X, 0, 0])
+    *translate([0 * PANEL_X, 0, 0])
         draw_boundary_panel(P, face_idx, source_edge_idx, label_s);
 
-    translate([1 * PANEL_X, 0, 0])
+    *translate([1 * PANEL_X, 0, 0])
         draw_cut_visibility_panel(P, face_idx, source_edge_idx, label_s);
 
-    translate([2 * PANEL_X, 0, 0])
+    *translate([2 * PANEL_X, 0, 0])
         draw_volume_panel(P, face_idx, source_edge_idx, label_s);
+
+    translate([3 * PANEL_X, 0, 0])
+        draw_foreign_replay_panel(P, face_idx, source_edge_idx, label_s);
 }
 
 translate([0, 0.5 * PANEL_Y, 0])
