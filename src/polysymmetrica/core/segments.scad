@@ -1313,6 +1313,67 @@ function ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_ver
     out;
 
 /**
+ * Function: Get the record kind from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: record kind string, currently `"face_plane_cut"`
+ */
+function ps_intrusion_kind(record) = record[0];
+
+/**
+ * Function: Get the target face index from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: target face index
+ */
+function ps_intrusion_target_face_idx(record) = record[1];
+
+/**
+ * Function: Get the foreign element kind from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: foreign element kind string, currently `"face"`
+ */
+function ps_intrusion_foreign_kind(record) = record[2];
+
+/**
+ * Function: Get the foreign element index from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: foreign element index
+ */
+function ps_intrusion_foreign_idx(record) = record[3];
+
+/**
+ * Function: Get the target-local 2D intrusion segment from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: `seg2d` in target face-local coordinates
+ */
+function ps_intrusion_segment2d_local(record) = record[4];
+
+/**
+ * Function: Get the face-plane cut dihedral from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: cut dihedral angle
+ */
+function ps_intrusion_dihedral(record) = record[5];
+
+/**
+ * Function: Get the confidence/classification from a foreign intrusion record.
+ * Params: record (from `ps_face_foreign_intrusion_records(...)`)
+ * Returns: confidence string, currently `"exact"`
+ */
+function ps_intrusion_confidence(record) = record[6];
+
+/**
+ * Function: Derive exact foreign intrusion records for the current face plane.
+ * Params: face_pts2d (target face loop), face_idx (target face index), poly_faces_idx/poly_verts_local (full poly in target face-local coordinates), eps (tolerance), mode (foreign face triangulation fill rule), filter_parent (drop cuts that coincide with parent edges)
+ * Returns: `[[record_kind, target_face_idx, foreign_kind, foreign_idx, seg2d_local, cut_dihed, confidence], ...]`
+ * Limitations/Gotchas: currently only reports exact foreign face-plane crossings; clearance/envelope candidates belong to a later API layer
+ */
+function ps_face_foreign_intrusion_records(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true) =
+    [
+        for (e = ps_face_geom_cut_entries(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent))
+            ["face_plane_cut", face_idx, "face", e[1], e[0], e[2], "exact"]
+    ];
+
+/**
  * Function: Return only the 2D cut segments from `ps_face_geom_cut_entries(...)`.
  * Params: face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent
  * Returns: `[seg2d, ...]`
@@ -1360,6 +1421,35 @@ module place_on_face_geom_cut_segments(mode="nonzero", eps=1e-8, filter_parent=t
         $ps_face_cut_count = len(segs);
         $ps_face_cut_segment2d_local = segs[si];
         $ps_face_cut_segments2d_local = segs;
+        children();
+    }
+}
+
+/**
+ * Module: Iterate exact foreign intrusion records for the current placed face.
+ * Params: mode (foreign face triangulation fill rule), eps (tolerance), filter_parent (drop cuts that coincide with parent edges)
+ * Returns: none; exposes `$ps_intrusion_*` metadata and calls children once per intrusion record
+ * Limitations/Gotchas: currently reports only `"face_plane_cut"` records; no clearance/envelope candidates are generated here
+ */
+module place_on_face_foreign_intrusions(mode="nonzero", eps=1e-8, filter_parent=true) {
+    assert(!is_undef($ps_face_pts2d), "place_on_face_foreign_intrusions: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_idx), "place_on_face_foreign_intrusions: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "place_on_face_foreign_intrusions: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "place_on_face_foreign_intrusions: requires place_on_faces context ($ps_poly_verts_local)");
+
+    records = ps_face_foreign_intrusion_records($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, mode, filter_parent);
+    for (ii = [0:1:len(records)-1]) {
+        record = records[ii];
+        $ps_intrusion_idx = ii;
+        $ps_intrusion_count = len(records);
+        $ps_intrusion_record = record;
+        $ps_intrusion_kind = ps_intrusion_kind(record);
+        $ps_intrusion_target_face_idx = ps_intrusion_target_face_idx(record);
+        $ps_intrusion_foreign_kind = ps_intrusion_foreign_kind(record);
+        $ps_intrusion_foreign_idx = ps_intrusion_foreign_idx(record);
+        $ps_intrusion_segment2d_local = ps_intrusion_segment2d_local(record);
+        $ps_intrusion_dihedral = ps_intrusion_dihedral(record);
+        $ps_intrusion_confidence = ps_intrusion_confidence(record);
         children();
     }
 }
