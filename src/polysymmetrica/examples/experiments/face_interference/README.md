@@ -11,3 +11,9 @@ anti-interference data visible without reintroducing the proxy/carve stack.
   Focuses on the self-crossing hex face produced by
   `poly_truncate(tetrahedron(), t=-0.5)`, where a single source edge can
   contribute boundary spans with opposite adjacent-face directions.
+- `test_minimal_printable_punch_through_probe.scad`
+  Pre-punch-through printable-style integration probe for
+  `poly_antiprism(7,3, angle=15)`. It intersects raw face material with the
+  visible-cell mask and positive anti-interference volume, while drawing
+  geometry-cut strips only as provenance/inspection aids. It does not yet model
+  explicit foreign intrusion/clearance volumes.
