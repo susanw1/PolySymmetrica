@@ -27,6 +27,14 @@ function _test_shell_points_are_finite(points) =
                 1
     ]) == len(points);
 
+function _test_profile_points_are_finite(profile) =
+    let(pts = ps_intrusion_clearance_profile_pts2d(profile))
+    len([
+        for (p = pts)
+            if (!is_undef(p) && len(p) == 2 && norm(p) < 1e9)
+                1
+    ]) == len(pts);
+
 module test_ps_face_anti_interference_shells__cube_face_single_quad_shell() {
     p = hexahedron();
     site = _test_face_site(p, 0);
@@ -156,6 +164,40 @@ module test_ps_face_anti_interference_projection_cap__limits_offset() {
     assert_near(_ps_fr_project_offset(10, 0, 3), 3, EPS, "near-flat projection uses cap");
 }
 
+module test_ps_face_intrusion_clearance_profiles__triangle_builds_one_profile_per_intrusion() {
+    p = poly_antiprism(7, 3, angle = 15);
+    site = _test_face_site(p, 12);
+    profiles = ps_face_intrusion_clearance_profiles(
+        site[10],
+        site[0],
+        site[13],
+        site[12],
+        clearance_width = 1.25,
+        extend = 0.75,
+        mode = "nonzero",
+        filter_parent = true
+    );
+
+    assert_int_eq(len(profiles), 6, "triangle should build one clearance profile per exact intrusion");
+    assert_int_eq(
+        len([for (profile = profiles) if (len(ps_intrusion_clearance_profile_pts2d(profile)) == 4) 1]),
+        6,
+        "triangle intrusion clearance profiles should be rectangles"
+    );
+    assert_int_eq(
+        len([for (profile = profiles) if (_test_profile_points_are_finite(profile)) 1]),
+        6,
+        "triangle intrusion clearance profile points should be finite"
+    );
+    assert_int_eq(
+        len([for (profile = profiles) if (ps_intrusion_kind(ps_intrusion_clearance_profile_record(profile)) == "face_plane_cut") 1]),
+        6,
+        "triangle clearance profiles should retain intrusion provenance"
+    );
+    assert_near(ps_intrusion_clearance_profile_width(profiles[0]), 1.25, EPS, "triangle clearance profile width");
+    assert_near(ps_intrusion_clearance_profile_extend(profiles[0]), 0.75, EPS, "triangle clearance profile extend");
+}
+
 module run_TestFaceRegions() {
     test_ps_face_anti_interference_shells__cube_face_single_quad_shell();
     test_ps_face_anti_interference_shells__matches_boundary_loop_count();
@@ -163,6 +205,7 @@ module run_TestFaceRegions() {
     test_ps_face_anti_interference_shells__anti_tet_hex_is_finite();
     test_ps_face_anti_interference_shells__anti_tet_winding_splits_z_direction();
     test_ps_face_anti_interference_projection_cap__limits_offset();
+    test_ps_face_intrusion_clearance_profiles__triangle_builds_one_profile_per_intrusion();
 }
 
 run_TestFaceRegions();

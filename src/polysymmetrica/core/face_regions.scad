@@ -294,6 +294,100 @@ function _ps_fr_side_faces(n, loop_area_sign) =
     ];
 
 /**
+ * Function: Build a rectangular clearance profile around one target-local segment.
+ * Params: seg2d (target-local centerline), clearance_width (full strip width), extend (extra length at each end), eps (zero-length tolerance)
+ * Returns: 2D rectangle points, or `[]` for a degenerate segment
+ */
+function _ps_fr_segment_clearance_rect2d(seg2d, clearance_width=1, extend=0.5, eps=1e-8) =
+    let(
+        a = seg2d[0],
+        b = seg2d[1],
+        d = [b[0] - a[0], b[1] - a[1]],
+        len_d = norm(d)
+    )
+    (len_d <= eps) ? [] :
+    let(
+        u = d / len_d,
+        n = [-u[1], u[0]],
+        hw = clearance_width / 2,
+        a2 = [a[0] - u[0] * extend, a[1] - u[1] * extend],
+        b2 = [b[0] + u[0] * extend, b[1] + u[1] * extend]
+    )
+    [
+        [a2[0] + n[0] * hw, a2[1] + n[1] * hw],
+        [b2[0] + n[0] * hw, b2[1] + n[1] * hw],
+        [b2[0] - n[0] * hw, b2[1] - n[1] * hw],
+        [a2[0] - n[0] * hw, a2[1] - n[1] * hw]
+    ];
+
+/**
+ * Function: Get the 2D rectangle from an intrusion clearance profile.
+ * Params: profile (from `ps_face_intrusion_clearance_profiles(...)`)
+ * Returns: profile rectangle points in target face-local 2D
+ */
+function ps_intrusion_clearance_profile_pts2d(profile) = profile[0];
+
+/**
+ * Function: Get the source intrusion record from an intrusion clearance profile.
+ * Params: profile (from `ps_face_intrusion_clearance_profiles(...)`)
+ * Returns: foreign intrusion record
+ */
+function ps_intrusion_clearance_profile_record(profile) = profile[1];
+
+/**
+ * Function: Get the source intrusion centerline from an intrusion clearance profile.
+ * Params: profile (from `ps_face_intrusion_clearance_profiles(...)`)
+ * Returns: `seg2d` in target face-local 2D
+ */
+function ps_intrusion_clearance_profile_segment2d_local(profile) = profile[2];
+
+/**
+ * Function: Get the full clearance width from an intrusion clearance profile.
+ * Params: profile (from `ps_face_intrusion_clearance_profiles(...)`)
+ * Returns: clearance width
+ */
+function ps_intrusion_clearance_profile_width(profile) = profile[3];
+
+/**
+ * Function: Get the end extension distance from an intrusion clearance profile.
+ * Params: profile (from `ps_face_intrusion_clearance_profiles(...)`)
+ * Returns: extension distance
+ */
+function ps_intrusion_clearance_profile_extend(profile) = profile[4];
+
+/**
+ * Function: Build local clearance profiles from exact foreign intrusion records.
+ * Params: face_pts2d (target face loop), face_idx (target face index), poly_faces_idx/poly_verts_local (full poly in target face-local coordinates), clearance_width (full strip width), extend (extra length at each end), eps (tolerance), mode (foreign face triangulation fill rule), filter_parent (drop cuts that coincide with parent edges)
+ * Returns: `[[pts2d, intrusion_record, seg2d_local, clearance_width, extend], ...]`
+ * Limitations/Gotchas: only consumes exact `"face_plane_cut"` records; conservative clearance candidates are intentionally outside this primitive
+ */
+function ps_face_intrusion_clearance_profiles(
+    face_pts2d,
+    face_idx,
+    poly_faces_idx,
+    poly_verts_local,
+    clearance_width=1,
+    extend=0.5,
+    eps=1e-8,
+    mode="nonzero",
+    filter_parent=true
+) =
+    let(
+        _width = assert(clearance_width > 0, "ps_face_intrusion_clearance_profiles: clearance_width must be > 0"),
+        _extend = assert(extend >= 0, "ps_face_intrusion_clearance_profiles: extend must be >= 0"),
+        records = ps_face_foreign_intrusion_records(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent)
+    )
+    [
+        for (record = records)
+            let(
+                seg2d = ps_intrusion_segment2d_local(record),
+                pts2d = _ps_fr_segment_clearance_rect2d(seg2d, clearance_width, extend, eps)
+            )
+            if (len(pts2d) == 4)
+                [pts2d, record, seg2d, clearance_width, extend]
+    ];
+
+/**
  * Function: Build one anti-interference shell record for one boundary loop.
  * Params: face_pts3d_local (source face loop), loop_sites (sites for one boundary loop), loop_idx (loop id), z0/z1 (target Z planes), input_sign (source loop winding sign), cell_winding_signs (per-cell winding signs), max_project (optional cap), eps (tolerance)
  * Returns: shell record `[points, faces, loop_idx, capped_count, bottom_loop2d, top_loop2d]`
@@ -409,4 +503,39 @@ module ps_face_anti_interference_volume(z0, z1, mode="nonzero", max_project=unde
             polyhedron(points = shell[0], faces = shell[1], convexity = convexity);
         }
     }
+}
+
+/**
+ * Module: Emit local clearance volumes for exact foreign intrusion records.
+ * Params: z0/z1 (target local Z planes), clearance_width (full strip width), extend (extra length at each end), eps (geometric tolerance), mode (foreign face triangulation fill rule), filter_parent (drop cuts that coincide with parent edges), convexity (OpenSCAD extrusion hint)
+ * Returns: none; intended for inspection or later boolean application inside `place_on_faces(...)`
+ * Limitations/Gotchas: this is a simple strip-prism proxy per exact face-plane intrusion, not yet a user-geometry-aware clearance envelope
+ */
+module ps_face_intrusion_clearance_volume(z0, z1, clearance_width=1, extend=0.5, eps=1e-8, mode="nonzero", filter_parent=true, convexity=4) {
+    assert(!is_undef($ps_face_pts2d), "ps_face_intrusion_clearance_volume: requires place_on_faces context ($ps_face_pts2d)");
+    assert(!is_undef($ps_face_idx), "ps_face_intrusion_clearance_volume: requires place_on_faces context ($ps_face_idx)");
+    assert(!is_undef($ps_poly_faces_idx), "ps_face_intrusion_clearance_volume: requires place_on_faces context ($ps_poly_faces_idx)");
+    assert(!is_undef($ps_poly_verts_local), "ps_face_intrusion_clearance_volume: requires place_on_faces context ($ps_poly_verts_local)");
+    assert(abs(z1 - z0) > eps, "ps_face_intrusion_clearance_volume: z0 and z1 must be distinct");
+
+    zmin = min(z0, z1);
+    height = abs(z1 - z0);
+    profiles = ps_face_intrusion_clearance_profiles(
+        $ps_face_pts2d,
+        $ps_face_idx,
+        $ps_poly_faces_idx,
+        $ps_poly_verts_local,
+        clearance_width,
+        extend,
+        eps,
+        mode,
+        filter_parent
+    );
+
+    translate([0, 0, zmin])
+        linear_extrude(height = height, convexity = convexity)
+            union() {
+                for (profile = profiles)
+                    polygon(points = ps_intrusion_clearance_profile_pts2d(profile));
+            }
 }

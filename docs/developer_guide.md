@@ -318,6 +318,8 @@ from those boundary spans:
 
 - `ps_face_anti_interference_shells(...)`
 - `ps_face_anti_interference_volume(...)`
+- `ps_face_intrusion_clearance_profiles(...)`
+- `ps_face_intrusion_clearance_volume(...)`
 
 See [face_arrangement.md](face_arrangement.md) for the planned next layer:
 

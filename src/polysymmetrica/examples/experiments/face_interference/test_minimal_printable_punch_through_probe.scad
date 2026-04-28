@@ -33,10 +33,12 @@ MAX_PROJECT = 45;
 LINE_R = 0.45;
 TXT_H = 0.30;
 TXT_S = 2.4;
-PANEL_X = 116;
+PANEL_X = 104;
 PANEL_Y = 112;
 PANEL_LABEL_Y = -50;
 CUT_KERF = 1.0;
+CLEARANCE_WIDTH = 3.2;
+CLEARANCE_EXTEND = 1.4;
 
 P = poly_antiprism(7, 3, angle = 15);
 
@@ -168,6 +170,22 @@ module printable_keep_body() {
 }
 
 /**
+ * Module: Emit simple strip-prism clearance volumes from exact intrusion records.
+ * Params: none
+ * Returns: none
+ */
+module intrusion_clearance_volume() {
+    ps_face_intrusion_clearance_volume(
+        VOL_Z_MIN,
+        VOL_Z_MAX,
+        clearance_width = CLEARANCE_WIDTH,
+        extend = CLEARANCE_EXTEND,
+        mode = MODE,
+        filter_parent = FILTER_PARENT_CUTS
+    );
+}
+
+/**
  * Module: Draw orange exact intrusion strips as inspection aids.
  * Params: none
  * Returns: none
@@ -255,6 +273,28 @@ module draw_visible_data_panel(face_idx, source_edge_idx, label_s) {
 }
 
 /**
+ * Module: Draw generated intrusion clearance strip-prisms.
+ * Params: face_idx (selected face), source_edge_idx (optional highlighted edge), label_s (panel label)
+ * Returns: none
+ */
+module draw_clearance_data_panel(face_idx, source_edge_idx, label_s) {
+    place_on_faces(P, IR) {
+        if ($ps_face_idx == face_idx) {
+            color("gainsboro", 0.14)
+                face_material_slab();
+
+            color("crimson", 0.36)
+                intrusion_clearance_volume();
+
+            draw_cut_strips();
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
+        }
+    }
+
+    draw_panel_label(label_s);
+}
+
+/**
  * Module: Draw anti-interference volume and its boundary span skeleton.
  * Params: face_idx (selected face), source_edge_idx (optional highlighted source edge), label_s (panel label)
  * Returns: none
@@ -318,6 +358,16 @@ module echo_row_summary(label_s, face_idx) {
                 mode = MODE,
                 filter_parent = FILTER_PARENT_CUTS
             );
+            clearance_profiles = ps_face_intrusion_clearance_profiles(
+                $ps_face_pts2d,
+                $ps_face_idx,
+                $ps_poly_faces_idx,
+                $ps_poly_verts_local,
+                clearance_width = CLEARANCE_WIDTH,
+                extend = CLEARANCE_EXTEND,
+                mode = MODE,
+                filter_parent = FILTER_PARENT_CUTS
+            );
             visible = ps_face_visible_segments(
                 $ps_face_pts2d,
                 $ps_face_idx,
@@ -332,6 +382,7 @@ module echo_row_summary(label_s, face_idx) {
                 ": boundary_loops=", len(bm[2]),
                 " boundary_spans=", len(bm[3]),
                 " intrusions=", len(intrusions),
+                " clearance_profiles=", len(clearance_profiles),
                 " visible_segments=", len(visible)
             ));
         }
@@ -344,16 +395,19 @@ module echo_row_summary(label_s, face_idx) {
  * Returns: none
  */
 module draw_probe_row(face_idx, source_edge_idx, label_s, y) {
-    translate([-1.5 * PANEL_X, y, 0])
+    translate([-2 * PANEL_X, y, 0])
         draw_context_panel(face_idx, str(label_s, " context"));
 
-    translate([-0.5 * PANEL_X, y, 0])
-        draw_visible_data_panel(face_idx, source_edge_idx, str(label_s, " visible/cuts"));
+    translate([-1 * PANEL_X, y, 0])
+        draw_visible_data_panel(face_idx, source_edge_idx, str(label_s, " visible/intrusions"));
 
-    translate([0.5 * PANEL_X, y, 0])
+    translate([0, y, 0])
+        draw_clearance_data_panel(face_idx, source_edge_idx, str(label_s, " clearance"));
+
+    translate([1 * PANEL_X, y, 0])
         draw_volume_data_panel(face_idx, source_edge_idx, str(label_s, " anti-volume"));
 
-    translate([1.5 * PANEL_X, y, 0])
+    translate([2 * PANEL_X, y, 0])
         draw_printable_result_panel(face_idx, source_edge_idx, str(label_s, " keep-body"));
 
     echo_row_summary(label_s, face_idx);

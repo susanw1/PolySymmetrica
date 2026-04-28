@@ -15,5 +15,5 @@ anti-interference data visible without reintroducing the proxy/carve stack.
   Pre-punch-through printable-style integration probe for
   `poly_antiprism(7,3, angle=15)`. It intersects raw face material with the
   visible-cell mask and positive anti-interference volume, while drawing
-  geometry-cut strips only as provenance/inspection aids. It does not yet model
-  explicit foreign intrusion/clearance volumes.
+  exact intrusion strips and simple clearance volumes as provenance/inspection
+  aids. It does not yet apply the clearance volumes to the printable keep-body.
