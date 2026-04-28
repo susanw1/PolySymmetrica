@@ -461,6 +461,52 @@ Where:
 Convenience wrapper returning only the `seg2d` part of
 `ps_face_geom_cut_entries(...)`.
 
+### `ps_face_foreign_intrusion_records(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true)`
+
+Derives exact face-local foreign intrusion records for other faces that cross
+the current face plane.
+
+Returns:
+
+```scad
+[
+    [record_kind, target_face_idx, foreign_kind, foreign_idx, seg2d_local, cut_dihed, confidence],
+    ...
+]
+```
+
+Where:
+
+- `record_kind`
+  currently `"face_plane_cut"`.
+- `target_face_idx`
+  the face being tested for intrusion.
+- `foreign_kind`
+  currently `"face"`.
+- `foreign_idx`
+  the source face that generated this intrusion.
+- `seg2d_local`
+  the intrusion segment in target face-local 2D.
+- `cut_dihed`
+  the face-plane cut angle inherited from `ps_face_geom_cut_entries(...)`.
+- `confidence`
+  currently `"exact"`; later clearance/envelope candidates should use a
+  different classification such as `"conservative"`.
+
+Accessor helpers:
+
+- `ps_intrusion_kind(record)`
+- `ps_intrusion_target_face_idx(record)`
+- `ps_intrusion_foreign_kind(record)`
+- `ps_intrusion_foreign_idx(record)`
+- `ps_intrusion_segment2d_local(record)`
+- `ps_intrusion_dihedral(record)`
+- `ps_intrusion_confidence(record)`
+
+This API intentionally does not answer clearance questions such as “does a
+4mm-wide edge site come within 2mm of this face?”. Those are conservative
+placement-envelope candidates and belong in a later geometry/proxy layer.
+
 ### `place_on_face_geom_cut_segments(...)`
 
 Iterator wrapper over geometry-derived cut segments.
@@ -471,6 +517,23 @@ Provides:
 - `$ps_face_cut_count`
 - `$ps_face_cut_segment2d_local`
 - `$ps_face_cut_segments2d_local`
+
+### `place_on_face_foreign_intrusions(...)`
+
+Iterator wrapper over `ps_face_foreign_intrusion_records(...)`.
+
+Provides:
+
+- `$ps_intrusion_idx`
+- `$ps_intrusion_count`
+- `$ps_intrusion_record`
+- `$ps_intrusion_kind`
+- `$ps_intrusion_target_face_idx`
+- `$ps_intrusion_foreign_kind`
+- `$ps_intrusion_foreign_idx`
+- `$ps_intrusion_segment2d_local`
+- `$ps_intrusion_dihedral`
+- `$ps_intrusion_confidence`
 
 ### `ps_face_visible_segments(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps=1e-8, mode="nonzero", filter_parent=true)`
 

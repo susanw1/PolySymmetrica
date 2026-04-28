@@ -168,12 +168,12 @@ module printable_keep_body() {
 }
 
 /**
- * Module: Draw orange geometry-cut strips as inspection aids.
+ * Module: Draw orange exact intrusion strips as inspection aids.
  * Params: none
  * Returns: none
  */
 module draw_cut_strips() {
-    cuts = ps_face_geom_cut_entries(
+    intrusions = ps_face_foreign_intrusion_records(
         $ps_face_pts2d,
         $ps_face_idx,
         $ps_poly_faces_idx,
@@ -182,16 +182,17 @@ module draw_cut_strips() {
         filter_parent = FILTER_PARENT_CUTS
     );
 
-    for (ci = [0:1:len(cuts)-1]) {
-        cut = cuts[ci];
-        mid = ps_segment_midpoint2d(cut[0]);
+    for (ii = [0:1:len(intrusions)-1]) {
+        intrusion = intrusions[ii];
+        seg2d = ps_intrusion_segment2d_local(intrusion);
+        mid = ps_segment_midpoint2d(seg2d);
 
         color("darkorange", 0.70)
-            draw_segment_stroke(cut[0], r = CUT_KERF, z = FACE_THK * 0.55);
+            draw_segment_stroke(seg2d, r = CUT_KERF, z = FACE_THK * 0.55);
 
         color("black")
             translate([mid[0], mid[1], FACE_THK * 0.95])
-                draw_text2d(str("c", ci, "/f", cut[1]), size = 1.05);
+                draw_text2d(str("i", ii, "/f", ps_intrusion_foreign_idx(intrusion)), size = 1.05);
     }
 }
 
@@ -309,7 +310,7 @@ module echo_row_summary(label_s, face_idx) {
     place_on_faces(P, IR) {
         if ($ps_face_idx == face_idx) {
             bm = ps_face_boundary_model($ps_face_pts3d_local, MODE);
-            cuts = ps_face_geom_cut_entries(
+            intrusions = ps_face_foreign_intrusion_records(
                 $ps_face_pts2d,
                 $ps_face_idx,
                 $ps_poly_faces_idx,
@@ -330,7 +331,7 @@ module echo_row_summary(label_s, face_idx) {
                 "minimal printable pre-punch-through ", label_s, " f", face_idx,
                 ": boundary_loops=", len(bm[2]),
                 " boundary_spans=", len(bm[3]),
-                " geom_cuts=", len(cuts),
+                " intrusions=", len(intrusions),
                 " visible_segments=", len(visible)
             ));
         }

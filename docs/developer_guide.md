@@ -307,6 +307,7 @@ See [segments.md](segments.md) for the face-local analysis layer:
 - `ps_face_segments(...)`
 - `ps_face_geom_cut_entries(...)`
 - `ps_face_geom_cut_segments(...)`
+- `ps_face_foreign_intrusion_records(...)`
 - `ps_face_visible_segments(...)`
 
 Use this layer when you want analyzable face-local cells, cuts, and visibility,
