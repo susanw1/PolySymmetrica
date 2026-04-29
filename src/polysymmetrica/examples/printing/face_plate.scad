@@ -1,4 +1,5 @@
 use <../../core/funcs.scad>
+use <../../core/placement.scad>
 use <../../core/render.scad>
 use <../../core/segments.scad>
 use <../../core/validate.scad>
@@ -392,35 +393,13 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
     }
 }
 
-function _body_loops_from_visible_cells(cells, diheds, insets, cut_entries, edge_inset) =
-    [
-        for (c = cells)
-            let(
-                s_pts = c[0],
-                s_edge_ids = c[2],
-                s_kinds = c[3],
-                m = len(s_pts),
-                s_insets = [
-                    for (k = [0:1:m-1])
-                        (_safe_at(s_kinds, k, "cut") == "parent")
-                            ? _safe_at(insets, _safe_at(s_edge_ids, k, 0), 0)
-                            : 0
-                ],
-                s_diheds = [
-                    for (k = [0:1:m-1])
-                        (_safe_at(s_kinds, k, "cut") == "parent")
-                            ? _safe_at(diheds, _safe_at(s_edge_ids, k, 0), 180)
-                            : _safe_at(_safe_at(cut_entries, _safe_at(s_edge_ids, k, 0), [undef, undef, 180]), 2, 180)
-                ],
-                s_top2d = _offset_pts2d_inset_edges(s_pts, s_insets)
-            )
-            [s_top2d, s_diheds]
-    ];
-
-// Visible-face variant for printing segmented parts directly.
-// If there are no geometry cut segments, it falls back to the normal face_plate
-// path so regular/star faces keep their known-good bevel behaviour.
-module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_space,
+/**
+ * Module: Emit `face_plate(...)` with caller-supplied foreign proxy bodies subtracted.
+ * Params: same printable face params as `face_plate(...)`; proxy_* controls foreign-site replay
+ * Returns: none
+ * Limitations/Gotchas: requires `place_on_faces(...)`; children must emit closed proxy bodies suitable for boolean subtraction
+ */
+module face_plate_minus_foreign_proxies(idx, pts, face_thk, diheds, insets_override, clear_space,
     edge_inset = FACE_PLATE_EDGE_INSET,
     pillow_min_rad = FACE_PLATE_PILLOW_MIN_RAD,
     pillow_inset = FACE_PLATE_PILLOW_INSET,
@@ -429,20 +408,20 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
     top_thk = FACE_PLATE_TOP_THK,
     base_z = undef,
     clear_height = FACE_PLATE_CLEAR_HEIGHT,
-    eps = 1e-4
+    eps = 1e-4,
+    proxy_mode = "nonzero",
+    proxy_eps = undef,
+    proxy_filter_parent = true,
+    proxy_coords = "element",
+    proxy_face_child = 0,
+    proxy_edge_child = 1,
+    proxy_vertex_child = 2
 ) {
-    assert(!is_undef($ps_face_idx), "face_plate_visible: requires place_on_faces context");
-    assert(!is_undef($ps_poly_faces_idx), "face_plate_visible: requires place_on_faces context");
-    assert(!is_undef($ps_poly_verts_local), "face_plate_visible: requires place_on_faces context");
+    assert(!is_undef($ps_face_idx), "face_plate_minus_foreign_proxies: requires place_on_faces context");
+    assert(!is_undef($ps_poly_faces_idx), "face_plate_minus_foreign_proxies: requires place_on_faces context");
+    assert(!is_undef($ps_poly_verts_local), "face_plate_minus_foreign_proxies: requires place_on_faces context");
 
-    n = len(pts);
-    insets = (is_undef(insets_override) || len(insets_override) != n)
-        ? [for (k = [0:1:len(pts)-1]) _gap_inset(diheds[k], edge_inset)]
-        : insets_override;
-    cut_entries = ps_face_geom_cut_entries(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
-    cut_segs = [for (e = cut_entries) e[0]];
-
-    if (len(cut_segs) == 0) {
+    difference() {
         face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
             edge_inset = edge_inset,
             pillow_min_rad = pillow_min_rad,
@@ -454,54 +433,17 @@ module face_plate_visible(idx, pts, face_thk, diheds, insets_override, clear_spa
             clear_height = clear_height,
             eps = eps
         );
-    } else {
-        vis_cells = ps_face_visible_segments(pts, idx, $ps_poly_faces_idx, $ps_poly_verts_local, eps, "nonzero", true);
-        body_loops = (edge_inset > 0)
-            ? _body_loops_from_visible_cells(vis_cells, diheds, insets, cut_entries, edge_inset)
-            : [
-                for (c = vis_cells)
-                    [c[0], [
-                        for (k = [0:1:len(c[0])-1])
-                            (_safe_at(c[3], k, "cut") == "parent")
-                                ? _safe_at(diheds, _safe_at(c[2], k, 0), 180)
-                                : 180
-                    ]]
-            ];
 
-        roof_loops = [for (bd = body_loops) bd[0]];
-        pts_gap = roof_loops[0];
-        centroid = _pts_centroid2d(pts_gap);
-        rad = _pts_radius2d(pts_gap, centroid);
-
-        base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z;
-        ramped_thk = face_thk - top_thk;
-        color(len(pts) == 4 ? "white" : "red") {
-            _render_body_loops(body_loops, base_z_eff, ramped_thk);
-            _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
-
-            if (rad > pillow_min_rad) {
-                for (ci = [0:1:len(vis_cells)-1]) {
-                    cell = vis_cells[ci];
-                    loop = roof_loops[ci];
-                    m = len(loop);
-                    kinds = cell[3];
-                    p0 = _offset_pts2d_inset_edges(loop, [
-                        for (k = [0:1:m-1])
-                            (_safe_at(kinds, k, "cut") == "parent") ? pillow_inset : 0
-                    ]);
-                    p1 = _offset_pts2d_inset_edges(loop, [
-                        for (k = [0:1:m-1])
-                            (_safe_at(kinds, k, "cut") == "parent") ? (pillow_inset + pillow_ramp) : pillow_ramp
-                    ]);
-                    if (len(p0) >= 3 && len(p1) == len(p0))
-                        translate([0, 0, base_z_eff + face_thk])
-                            _poly_loft_loops(p0, p1, 0, pillow_thk, eps);
-                }
-            }
-
-            if (clear_space)
-                _render_clearance_loops(roof_loops, base_z_eff + face_thk - eps, clear_height);
-        }
+        place_on_face_foreign_proxy_sites(
+            mode = proxy_mode,
+            eps = is_undef(proxy_eps) ? eps : proxy_eps,
+            filter_parent = proxy_filter_parent,
+            coords = proxy_coords,
+            face_child = proxy_face_child,
+            edge_child = proxy_edge_child,
+            vertex_child = proxy_vertex_child
+        )
+            children();
     }
 }
 

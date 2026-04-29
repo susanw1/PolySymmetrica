@@ -6,6 +6,7 @@ use <../../core/render.scad>
 use <../../core/classify.scad>
 use <../../core/prisms.scad>
 use <../../core/construction.scad>
+use <../../core/face_regions.scad>
 
 use <../../models/platonics_all.scad>
 use <../../models/archimedians_all.scad>
@@ -38,7 +39,7 @@ IR = 20 * SC;
 //p = poly_prism(5);
 //p = poly_antiprism(5);
 //p = poly_prism(n=5, p=2);
-p = poly_antiprism(n=5, p=2, angle = 0);
+p = poly_antiprism(n=5, p=2, angle = 15);
 
 //p = j1_square_pyramid();
 //p = poly_dual(j2_pentagonal_pyramid());
@@ -93,12 +94,28 @@ module model(show_faces = undef, clear_airspace = true) {
         place_on_faces(p, IR) {
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
-                face_plate_visible($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
+                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
                     edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6);
             }
         }
     }
 }
 
-model();
+//model();
 //poly_render(p, 20);
+
+show_faces = [2];
+place_on_faces(p, IR) {
+    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) 
+
+    let (idx = $ps_face_idx, pts2d = $ps_face_pts2d, dihedrals = $ps_face_dihedrals) {
+        intersection() {
+            face_plate_minus_foreign_proxies(idx, pts2d, FACE_T, dihedrals, undef,
+                    clear_space = false, edge_inset = 0.1, base_z = BASE_Z, clear_height = 0.1) {
+                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_space = false,
+                    edge_inset = 0.01, base_z = BASE_Z, clear_height = 0.1);
+            }
+            ps_face_anti_interference_volume(BASE_Z, BASE_Z + FACE_T*3, max_project = 10);
+        }
+    }
+}

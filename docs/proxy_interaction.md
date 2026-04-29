@@ -70,3 +70,38 @@ The library only identifies and positions replay contexts. It cannot discover
 already-rendered arbitrary geometry, and it does not infer a closed punch-through
 body from filtered face-plane cut segments.
 
+## Printable Face Plates
+
+`examples/printing/face_plate.scad` provides an opt-in printable wrapper:
+
+```scad
+place_on_faces(poly) {
+    if ($ps_face_idx == target_face_idx) {
+        face_plate_minus_foreign_proxies(
+            $ps_face_idx,
+            $ps_face_pts2d,
+            face_thk,
+            $ps_face_dihedrals,
+            undef,
+            false
+        ) {
+            my_foreign_face_proxy();   // child slot 0
+            my_foreign_edge_proxy();   // child slot 1, reserved
+            my_foreign_vertex_proxy(); // child slot 2, reserved
+        }
+    }
+}
+```
+
+This is just:
+
+```scad
+difference() {
+    face_plate(...);
+    place_on_face_foreign_proxy_sites(...) children();
+}
+```
+
+The wrapper keeps the proxy layer separate from the positive face-body builder:
+it subtracts supplied foreign proxy bodies from `face_plate(...)`; it does not
+imply automatic clearance of arbitrary geometry.

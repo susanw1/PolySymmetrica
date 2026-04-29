@@ -340,7 +340,8 @@ See [proxy_interaction.md](proxy_interaction.md) for the higher-level proxy
 child contract. In short, `place_on_face_foreign_proxy_sites(...)` dispatches
 candidate foreign sites to child slots (`face`, reserved `edge`, reserved
 `vertex`) and exposes `$ps_proxy_*` metadata so caller-supplied closed proxy
-bodies can be replayed deliberately.
+bodies can be replayed deliberately. Printable face plates can opt into this
+via `face_plate_minus_foreign_proxies(...)`.
 
 See [face_regions.md](face_regions.md) for positive face-local volumes built
 from those boundary spans:
