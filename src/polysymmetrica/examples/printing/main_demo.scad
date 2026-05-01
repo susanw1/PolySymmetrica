@@ -46,11 +46,10 @@ p = poly_antiprism(n=5, p=2, angle = 15);
 
 EDGE_T = 3.5 * SC; // 3.5
 FACE_T = 1.6 * SC; // 1.6 * SC;
-FIN_T = 1 * SC;
 INSET = 1.1 * SC;
 FACET_BASE_T = 1;
 FACET_BASE_W = 2.2;
-BASE_Z = -FACE_T / 4;
+BASE_Z = -FACE_T / 2;
 
 //// Or, experimental:
 //IR = 12 * SC;
@@ -104,18 +103,18 @@ module model(show_faces = undef, clear_airspace = true) {
 //model();
 //poly_render(p, 20);
 
-show_faces = [2];
+show_faces = undef;
 place_on_faces(p, IR) {
     if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) 
-
     let (idx = $ps_face_idx, pts2d = $ps_face_pts2d, dihedrals = $ps_face_dihedrals) {
         intersection() {
             face_plate_minus_foreign_proxies(idx, pts2d, FACE_T, dihedrals, undef,
-                    clear_space = false, edge_inset = 0.1, base_z = BASE_Z, clear_height = 0.1) {
-                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_space = false,
-                    edge_inset = 0.01, base_z = BASE_Z, clear_height = 0.1);
+                    clear_space = false, edge_inset = 0.001, base_z = BASE_Z, clear_height = 0.1) {
+                face_plate($ps_proxy_idx, $ps_proxy_face_pts2d, FACE_T, dihedrals, undef, clear_space = false,
+                    edge_inset = 0.001, base_z = BASE_Z, clear_height = 0.1);
             }
-            ps_face_anti_interference_volume(BASE_Z, BASE_Z + FACE_T*3, max_project = 10);
+            ps_face_anti_interference_volume(BASE_Z, BASE_Z + FACE_T*1.5, max_project = 10);
         }
     }
 }
+

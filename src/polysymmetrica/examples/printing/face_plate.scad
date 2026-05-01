@@ -1,5 +1,7 @@
 use <../../core/funcs.scad>
+use <../../core/face_regions.scad>
 use <../../core/placement.scad>
+use <../../core/prisms.scad>
 use <../../core/render.scad>
 use <../../core/segments.scad>
 use <../../core/validate.scad>
@@ -333,6 +335,36 @@ module _render_clearance_loops(roof_loops, z0, clear_height) {
         }
 }
 
+/**
+ * Module: Add raised pillow geometry above one or more roof loops.
+ * Params: roof_loops (2D loops), z0 (base Z for pillow), pillow_* (pillow sizing), eps (tolerance)
+ * Returns: none
+ */
+module _render_pillow_loops(roof_loops, z0,
+    pillow_min_rad = FACE_PLATE_PILLOW_MIN_RAD,
+    pillow_inset = FACE_PLATE_PILLOW_INSET,
+    pillow_ramp = FACE_PLATE_PILLOW_RAMP,
+    pillow_thk = FACE_PLATE_PILLOW_THK,
+    eps = 1e-4
+) {
+    for (loop = roof_loops) {
+        loop_centroid = _pts_centroid2d(loop);
+        loop_rad = _pts_radius2d(loop, loop_centroid);
+        if (loop_rad > pillow_min_rad && loop_rad > pillow_inset + pillow_ramp + eps) {
+            s0 = max(0, 1 - pillow_inset / loop_rad);
+            s1 = max(0, 1 - (pillow_inset + pillow_ramp) / loop_rad);
+            p0 = [for (p = loop) [
+                loop_centroid[0] + (p[0] - loop_centroid[0]) * s0,
+                loop_centroid[1] + (p[1] - loop_centroid[1]) * s0
+            ]];
+            scale_xy = s0 <= eps ? 0 : (s1 / s0);
+            translate([0, 0, z0])
+                linear_extrude(height = pillow_thk, scale = scale_xy)
+                    ps_polygon(points = p0, mode = "nonzero");
+        }
+    }
+}
+
 
 // Bevel by constructing an inset bottom polygon and lofting.
 // Expects LHR/CW polygon order for pts and aligned dihedrals.
@@ -355,42 +387,102 @@ module face_plate(idx, pts, face_thk, diheds, insets_override, clear_space,
         ? _segmented_body_loops(pts, diheds, insets, eps)
         : [[pts, diheds]];
     roof_loops = [for (bd = body_loops) bd[0]];
-    pts_gap = roof_loops[0];
-    centroid = _pts_centroid2d(pts_gap);
-    rad = _pts_radius2d(pts_gap, centroid);
 
     base_z_eff = is_undef(base_z)? -face_thk / 2 : base_z; // base Z coord
     ramped_thk = face_thk - top_thk; // actual thickness of ramped part
     color(len(pts) == 3 ? "white" : "red") {
         _render_body_loops(body_loops, base_z_eff, ramped_thk);
         _render_roof_loops(roof_loops, base_z_eff + ramped_thk, top_thk);
-
-        // top pillow part
-        if (rad > pillow_min_rad) {
-            // Build the pillow from the same simple loops as the face body/roof.
-            for (loop = roof_loops) {
-                loop_centroid = _pts_centroid2d(loop);
-                loop_rad = _pts_radius2d(loop, loop_centroid);
-                if (loop_rad > pillow_inset + pillow_ramp + eps) {
-                    s0 = max(0, 1 - pillow_inset / loop_rad);
-                    s1 = max(0, 1 - (pillow_inset + pillow_ramp) / loop_rad);
-                    p0 = [for (p = loop) [
-                        loop_centroid[0] + (p[0] - loop_centroid[0]) * s0,
-                        loop_centroid[1] + (p[1] - loop_centroid[1]) * s0
-                    ]];
-                    scale_xy = s0 <= eps ? 0 : (s1 / s0);
-                    translate([0, 0, base_z_eff + face_thk])
-                        linear_extrude(height = pillow_thk, scale = scale_xy)
-                            ps_polygon(points = p0, mode = "nonzero");
-                }
-            }
-        }
+        _render_pillow_loops(
+            roof_loops,
+            base_z_eff + face_thk,
+            pillow_min_rad = pillow_min_rad,
+            pillow_inset = pillow_inset,
+            pillow_ramp = pillow_ramp,
+            pillow_thk = pillow_thk,
+            eps = eps
+        );
     }
 
     // Conditionally clears the airspace above the face, to remove material from the face-mount above the face
     if (clear_space) {
         _render_clearance_loops(roof_loops, base_z_eff + face_thk - eps, clear_height);
     }
+}
+
+/**
+ * Module: Emit a face plate clipped by the current face's anti-interference volume.
+ * Params: face_thk (plate thickness), idx/face_pts3d_local/poly_faces_idx/poly_verts_local/face_neighbors_idx/face_dihedrals (optional overrides; default from `place_on_faces` context), clear_space (emit clearance cutter), pillow_* (raised pillow sizing), base_z (bottom Z; defaults to `-face_thk` so the top sits on the source face plane), clear_height (clearance height), mode/max_project/eps/convexity (anti-interference controls)
+ * Returns: none
+ * Limitations/Gotchas: requires `place_on_faces` context or explicit context overrides; true edge insets should be applied by subtractive edge operations around this body
+ */
+module face_plate2(face_thk,
+    idx = $ps_face_idx,
+    face_pts3d_local = $ps_face_pts3d_local,
+    poly_faces_idx = $ps_poly_faces_idx,
+    poly_verts_local = $ps_poly_verts_local,
+    face_neighbors_idx = $ps_face_neighbors_idx,
+    face_dihedrals = $ps_face_dihedrals,
+    clear_space=false,
+    pillow_min_rad = FACE_PLATE_PILLOW_MIN_RAD,
+    pillow_inset = FACE_PLATE_PILLOW_INSET,
+    pillow_ramp = FACE_PLATE_PILLOW_RAMP,
+    pillow_thk = FACE_PLATE_PILLOW_THK,
+    base_z = undef,
+    clear_height = FACE_PLATE_CLEAR_HEIGHT,
+    mode = "nonzero",
+    max_project = undef,
+    eps = 1e-4,
+    convexity = 6
+) {
+    assert(!is_undef(idx), "face_plate2: idx requires place_on_faces context or an explicit override");
+    assert(!is_undef(face_pts3d_local), "face_plate2: face_pts3d_local requires place_on_faces context or an explicit override");
+    assert(!is_undef(poly_faces_idx), "face_plate2: poly_faces_idx requires place_on_faces context or an explicit override");
+    assert(!is_undef(poly_verts_local), "face_plate2: poly_verts_local requires place_on_faces context or an explicit override");
+    assert(!is_undef(face_neighbors_idx), "face_plate2: face_neighbors_idx requires place_on_faces context or an explicit override");
+    assert(!is_undef(face_dihedrals), "face_plate2: face_dihedrals requires place_on_faces context or an explicit override");
+
+    base_z_eff = is_undef(base_z) ? -face_thk : base_z;
+    top_z = base_z_eff + face_thk;
+    pts = ps_xy(face_pts3d_local);
+    roof_loops = [pts];
+    shells = ps_face_anti_interference_shells(
+        face_pts3d_local,
+        idx,
+        poly_faces_idx,
+        poly_verts_local,
+        face_neighbors_idx,
+        face_dihedrals,
+        base_z_eff,
+        top_z,
+        mode,
+        max_project,
+        eps
+    );
+
+    color(len(pts) == 3 ? "white" : "red") {
+        union() {
+            for (shell = shells) {
+                if (shell[3] > 0)
+                    echo(str("face_plate2: capped ", shell[3], " projection(s) on face ", idx, " loop ", shell[2]));
+
+                polyhedron(points = shell[0], faces = shell[1], convexity = convexity);
+            }
+        }
+
+        _render_pillow_loops(
+            roof_loops,
+            top_z,
+            pillow_min_rad = pillow_min_rad,
+            pillow_inset = pillow_inset,
+            pillow_ramp = pillow_ramp,
+            pillow_thk = pillow_thk,
+            eps = eps
+        );
+    }
+
+    if (clear_space)
+        _render_clearance_loops(roof_loops, top_z - eps, clear_height);
 }
 
 /**
@@ -449,10 +541,12 @@ module face_plate_minus_foreign_proxies(idx, pts, face_thk, diheds, insets_overr
 
 
 
-// Example verifying face correctly subtracts from cube:
+// Direct smoke demo: subtract one placed star face cutter from a cube.
+_demo_poly = poly_antiprism(n=5, p=2, angle=15);
 difference() {
-    translate([0,0,-5]) cube(20);
+    translate([0, -15, -15]) cube(30);
 
-    *face_plate(0, [[10,0],[0,-10],[-10,0],[0,10]], face_thk=1.2, diheds=[140,80,140,80], insets_override=undef, clear_space=false);
-    #face_plate(0, [for (i=[0:4]) [10*cos(-144*i), 10*sin(-144*i)]], face_thk=1.2, diheds=[60,80,100,120,140], insets_override=undef, clear_space=false);
+    place_on_faces(_demo_poly, 17)
+        if ($ps_face_idx == 1)
+            #face_plate2(face_thk=1.2, clear_space=false, max_project=10);
 }
