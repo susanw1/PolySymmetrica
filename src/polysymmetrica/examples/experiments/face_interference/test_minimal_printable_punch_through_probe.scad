@@ -222,21 +222,18 @@ module foreign_face_proxy_body() {
  * Returns: none
  */
 module face_plate_with_proxy_cutouts() {
-    face_plate_minus_foreign_proxies(
-        $ps_face_idx,
-        $ps_face_pts2d,
-        FACE_THK,
-        $ps_face_dihedrals,
-        undef,
-        false,
-        edge_inset = PROXY_EDGE_INSET,
-        pillow_min_rad = 1000000,
-        top_thk = FACE_THK * 0.35,
-        base_z = -FACE_THK / 2,
-        proxy_mode = MODE,
-        proxy_filter_parent = FILTER_PARENT_CUTS
-    ) {
-        foreign_face_proxy_body();
+    difference() {
+        face_plate(
+            face_thk = FACE_THK,
+            clear_space = false,
+            pillow_min_rad = 1000000,
+            base_z = -FACE_THK / 2,
+            max_project = 10
+        );
+
+        place_on_face_foreign_proxy_sites(mode = MODE, filter_parent = FILTER_PARENT_CUTS) {
+            foreign_face_proxy_body();
+        }
     }
 }
 

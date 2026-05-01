@@ -93,28 +93,18 @@ module model(show_faces = undef, clear_airspace = true) {
         place_on_faces(p, IR) {
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
-                face_plate($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
-                    edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6);
+                face_plate(face_thk = FACE_T, base_z = BASE_Z, max_project = 10, 
+                        clear_space = clear_airspace, clear_height = 0.6);
             }
         }
     }
 }
 
-//model();
+model();
 //poly_render(p, 20);
 
-show_faces = undef;
-place_on_faces(p, IR) {
-    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) 
-    let (idx = $ps_face_idx, pts2d = $ps_face_pts2d, dihedrals = $ps_face_dihedrals) {
-        intersection() {
-            face_plate_minus_foreign_proxies(idx, pts2d, FACE_T, dihedrals, undef,
-                    clear_space = false, edge_inset = 0.001, base_z = BASE_Z, clear_height = 0.1) {
-                face_plate($ps_proxy_idx, $ps_proxy_face_pts2d, FACE_T, dihedrals, undef, clear_space = false,
-                    edge_inset = 0.001, base_z = BASE_Z, clear_height = 0.1);
-            }
-            ps_face_anti_interference_volume(BASE_Z, BASE_Z + FACE_T*1.5, max_project = 10);
-        }
-    }
-}
-
+//show_faces = [0,2,11,7];
+//place_on_faces(p, IR) {
+//    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0)
+//        face_plate(base_z = BASE_Z, face_thk = FACE_T, clear_space = false, clear_height = 0.1, max_project = 10);
+//}
