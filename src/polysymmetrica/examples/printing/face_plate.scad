@@ -19,7 +19,7 @@ FACE_PLATE_CLEAR_HEIGHT = 10;
  * Module: Emit a face plate clipped by the current face's anti-interference volume.
  * Params: face_thk (plate thickness), idx/face_pts3d_local/poly_faces_idx/poly_verts_local/face_neighbors_idx/face_dihedrals (optional overrides; default from `place_on_faces` context), clear_space (emit clearance cutter), pillow_* (raised pillow sizing), base_z (bottom Z; defaults to `-face_thk` so the top sits on the source face plane), clear_height (clearance height), mode/max_project/eps/convexity (anti-interference controls)
  * Returns: none
- * Limitations/Gotchas: requires `place_on_faces` context or explicit context overrides; true edge insets should be applied by subtractive edge operations around this body
+ * Limitations/Gotchas: requires `place_on_faces` context or explicit context overrides; the pillow intentionally embosses the source face loop rather than per-shell cut-through loops; true edge insets should be applied by subtractive edge operations around this body
  */
 module face_plate(face_thk,
     idx = $ps_face_idx,
@@ -74,6 +74,9 @@ module face_plate(face_thk,
             }
         }
 
+        // The pillow is source-face decoration: punch-through cuts are incidental
+        // and should be handled by later proxy subtraction, not by fragmenting the
+        // embossing over anti-interference shell loops.
         loop_centroid = [
             sum([for (p = pts) p[0]]) / len(pts),
             sum([for (p = pts) p[1]]) / len(pts)
