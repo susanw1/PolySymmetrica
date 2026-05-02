@@ -102,18 +102,29 @@ module model(show_faces = undef, clear_airspace = true) {
 //model();
 //poly_render(p, 20);
 
-module pb() {
+module demo_face() {
     face_plate(base_z = BASE_Z, face_thk = FACE_T, clear_space = false, clear_height = 0.1, max_project = 10);
 }
+module demo_edge(endPoints, edge_t) {
+    hull() {
+        translate(endPoints[0]) sphere(d = edge_t, $fn = 40);
+        translate(endPoints[1]) sphere(d = edge_t, $fn = 40);
+    }
+}
 
-show_faces = [0:20];
+module demo_vert() {
+    cylinder(r=3, $fn = $ps_vertex_valence);
+}
 
-place_on_faces(p, IR) {
-    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0)
+
+place_on_faces(p, IR, indices = [2]) {
     difference() {
-        pb();
-        place_on_face_foreign_proxy_sites()
-            pb();
+        demo_face();
+        place_on_face_foreign_proxy_sites() {
+            demo_face();
+            edge_seg($ps_edge_pts_local, $ps_poly_center_local, edge_t = EDGE_T);
+            demo_vert();
+        }
     }
 }
 

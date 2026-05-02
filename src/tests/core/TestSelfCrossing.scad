@@ -29,6 +29,9 @@ function _test_punch_poly() =
 function _test_punch_poly_angle0() =
     poly_antiprism(7, 3, angle = 0);
 
+function _test_penta_punch_poly() =
+    poly_antiprism(5, 2, angle = 15);
+
 function _test_antitet_poly() =
     poly_truncate(tetrahedron(), t = -0.5);
 
@@ -40,6 +43,9 @@ function _test_source_counts(records, source_idx_pos, n) =
         for (ei = [0:1:n-1])
             len([for (r = records) if (r[source_idx_pos] == ei) 1])
     ];
+
+function _test_replay_kind_count(sites, kind) =
+    len([for (s = sites) if (ps_replay_site_foreign_kind(s) == kind) 1]);
 
 function _test_coincident_intrusion_verts_local() =
     [
@@ -53,6 +59,18 @@ function _test_coincident_intrusion_faces_idx() =
         [0, 1, 2, 3],
         [4, 5, 6],
         [7, 8, 9]
+    ];
+
+function _test_duplicate_face_cut_verts_local() =
+    [
+        [-2, -2, 0], [2, -2, 0], [2, 2, 0], [-2, 2, 0],
+        [-1, -1, -1], [1, -1, 1], [1, 1, 1], [-1, 1, -1]
+    ];
+
+function _test_duplicate_face_cut_faces_idx() =
+    [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7]
     ];
 
 module test_ps_face_arrangement__7_3_15_star_has_stable_structure() {
@@ -224,6 +242,58 @@ module test_ps_face_foreign_face_replay_sites__7_3_15_triangle_builds_target_loc
     }
 }
 
+module test_ps_face_foreign_proxy_replay_sites__7_3_15_triangle_includes_edge_and_vertex_candidates() {
+    site = _test_face_site(_test_punch_poly(), TRI_FACE_IDX);
+    replay = ps_face_foreign_proxy_replay_sites(site[10], site[0], site[13], site[12], site[9], mode = MODE, filter_parent = true);
+
+    assert_int_eq(_test_replay_kind_count(replay, "face"), 6, "triangle proxy replay exact face count");
+    assert(_test_replay_kind_count(replay, "edge") > 0, "triangle proxy replay should include edge candidates");
+    assert(_test_replay_kind_count(replay, "vertex") > 0, "triangle proxy replay should include vertex candidates");
+
+    for (s = replay) {
+        assert_near(norm(ps_replay_site_ex_local(s)), 1, EPS, "proxy replay ex is unit");
+        assert_near(norm(ps_replay_site_ey_local(s)), 1, EPS, "proxy replay ey is unit");
+        assert_near(norm(ps_replay_site_ez_local(s)), 1, EPS, "proxy replay ez is unit");
+        if (ps_replay_site_foreign_kind(s) == "face")
+            assert(ps_replay_site_intrusion_confidence(s) == "exact", "face replay confidence");
+        if (ps_replay_site_foreign_kind(s) != "face")
+            assert(ps_replay_site_intrusion_confidence(s) == "candidate", "edge/vertex replay confidence");
+    }
+}
+
+module test_ps_face_foreign_proxy_replay_sites__5_2_15_triangle_includes_all_intruding_face_boundary_edges() {
+    site = _test_face_site(_test_penta_punch_poly(), 2);
+    replay = ps_face_foreign_proxy_replay_sites(site[10], site[0], site[13], site[12], site[9], mode = MODE, filter_parent = true);
+
+    assert_int_eq(_test_replay_kind_count(replay, "face"), 3, "pentagram triangle proxy replay exact face count");
+    assert_int_eq(_test_replay_kind_count(replay, "edge"), 7, "pentagram triangle proxy replay boundary edge candidate count");
+    assert_int_eq(_test_replay_kind_count(replay, "vertex"), 5, "pentagram triangle proxy replay boundary vertex candidate count");
+}
+
+module test_ps_face_foreign_proxy_replay_sites__preserves_duplicate_exact_face_cut_records() {
+    records = [
+        ["face_plane_cut", 0, "face", 1, [[-1, -0.5], [1, -0.5]], 90, "exact"],
+        ["face_plane_cut", 0, "face", 1, [[-1, 0.5], [1, 0.5]], 90, "exact"]
+    ];
+    replay = _ps_face_foreign_proxy_replay_sites_from_records(
+        0,
+        records,
+        _test_duplicate_face_cut_faces_idx(),
+        _test_duplicate_face_cut_verts_local(),
+        [0, 0, 0]
+    );
+    face_sites = [for (s = replay) if (ps_replay_site_foreign_kind(s) == "face") s];
+
+    assert_int_eq(_test_replay_kind_count(replay, "face"), 2, "duplicate exact face records should both replay");
+    assert_int_eq(_test_replay_kind_count(replay, "edge"), 4, "duplicate face records should share deduped edge candidates");
+    assert_int_eq(_test_replay_kind_count(replay, "vertex"), 4, "duplicate face records should share deduped vertex candidates");
+    assert_list_eq(
+        [for (s = face_sites) ps_replay_site_intrusion_segment2d_local(s)],
+        [records[0][4], records[1][4]],
+        "duplicate exact face records should preserve distinct cut segments"
+    );
+}
+
 module test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells() {
     site = _test_face_site(_test_punch_poly(), TRI_FACE_IDX);
     visible = ps_face_visible_segments(site[10], site[0], site[13], site[12], mode = MODE, filter_parent = true);
@@ -385,7 +455,7 @@ module test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_con
 }
 
 module _test_assert_triangle_proxy_face_child(expected_child_idx) {
-    assert_int_eq($ps_proxy_count, 6, "triangle proxy iterator count");
+    assert($ps_proxy_count > 6, str("triangle proxy iterator should include face plus candidates, count=", $ps_proxy_count));
     assert($ps_proxy_idx >= 0 && $ps_proxy_idx < $ps_proxy_count, "triangle proxy iterator idx bounds");
     assert($ps_proxy_kind == "foreign_face", "triangle proxy kind");
     assert($ps_proxy_source_kind == "face", "triangle proxy source kind");
@@ -397,6 +467,36 @@ module _test_assert_triangle_proxy_face_child(expected_child_idx) {
     assert_near(norm($ps_proxy_ex_local), 1, EPS, "triangle proxy ex unit");
     assert_near(norm($ps_proxy_ey_local), 1, EPS, "triangle proxy ey unit");
     assert_near(norm($ps_proxy_ez_local), 1, EPS, "triangle proxy ez unit");
+}
+
+module _test_assert_triangle_proxy_edge_child(expected_child_idx) {
+    assert($ps_proxy_idx >= 0 && $ps_proxy_idx < $ps_proxy_count, "triangle edge proxy idx bounds");
+    assert($ps_proxy_kind == "foreign_edge", "triangle edge proxy kind");
+    assert($ps_proxy_source_kind == "edge", "triangle edge proxy source kind");
+    assert_int_eq($ps_proxy_child_idx, expected_child_idx, "triangle edge proxy child slot");
+    assert_int_eq($ps_proxy_target_face_idx, TRI_FACE_IDX, "triangle edge proxy target face id");
+    assert($ps_proxy_intrusion_confidence == "candidate", "triangle edge proxy confidence");
+    assert_int_eq($ps_edge_idx, $ps_proxy_source_idx, "triangle edge proxy child edge id");
+    assert_list_eq($ps_edge_pts_local, $ps_proxy_edge_pts_local, "triangle edge proxy child edge points");
+    assert_list_eq($ps_edge_verts_idx, $ps_proxy_edge_verts_idx, "triangle edge proxy child edge vertices");
+    assert_near(norm($ps_proxy_ex_local), 1, EPS, "triangle edge proxy ex unit");
+    assert_near(norm($ps_proxy_ey_local), 1, EPS, "triangle edge proxy ey unit");
+    assert_near(norm($ps_proxy_ez_local), 1, EPS, "triangle edge proxy ez unit");
+}
+
+module _test_assert_triangle_proxy_vertex_child(expected_child_idx) {
+    assert($ps_proxy_idx >= 0 && $ps_proxy_idx < $ps_proxy_count, "triangle vertex proxy idx bounds");
+    assert($ps_proxy_kind == "foreign_vertex", "triangle vertex proxy kind");
+    assert($ps_proxy_source_kind == "vertex", "triangle vertex proxy source kind");
+    assert_int_eq($ps_proxy_child_idx, expected_child_idx, "triangle vertex proxy child slot");
+    assert_int_eq($ps_proxy_target_face_idx, TRI_FACE_IDX, "triangle vertex proxy target face id");
+    assert($ps_proxy_intrusion_confidence == "candidate", "triangle vertex proxy confidence");
+    assert_int_eq($ps_vertex_idx, $ps_proxy_source_idx, "triangle vertex proxy child vertex id");
+    assert_int_eq($ps_vertex_valence, $ps_proxy_vertex_valence, "triangle vertex proxy child valence");
+    assert_list_eq($ps_vertex_neighbors_idx, $ps_proxy_vertex_neighbors_idx, "triangle vertex proxy child neighbors");
+    assert_near(norm($ps_proxy_ex_local), 1, EPS, "triangle vertex proxy ex unit");
+    assert_near(norm($ps_proxy_ey_local), 1, EPS, "triangle vertex proxy ey unit");
+    assert_near(norm($ps_proxy_ez_local), 1, EPS, "triangle vertex proxy ez unit");
 }
 
 module _test_assert_triangle_proxy_face_child_element_context(expected_child_idx) {
@@ -411,10 +511,6 @@ module _test_assert_triangle_proxy_face_child_element_context(expected_child_idx
     assert_int_eq(len($ps_face_dihedrals), len($ps_face_pts2d), "triangle proxy child dihedral arity");
 }
 
-module _test_assert_unreachable_proxy_child(kind) {
-    assert(false, str("triangle proxy should not dispatch ", kind, " child for face intrusions"));
-}
-
 module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_child() {
     place_on_faces(_test_punch_poly()) {
         if ($ps_face_idx == TRI_FACE_IDX) {
@@ -423,9 +519,9 @@ module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_c
             }
 
             place_on_face_foreign_proxy_sites(mode = MODE, coords = "parent", face_child = 1, edge_child = 0, vertex_child = 2) {
-                _test_assert_unreachable_proxy_child("edge");
+                assert($ps_proxy_source_kind == "edge", "remapped child 0 should receive edge proxies");
                 _test_assert_triangle_proxy_face_child(1);
-                _test_assert_unreachable_proxy_child("vertex");
+                assert($ps_proxy_source_kind == "vertex", "remapped child 2 should receive vertex proxies");
             }
         }
     }
@@ -436,6 +532,18 @@ module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_element_child_use
         if ($ps_face_idx == TRI_FACE_IDX) {
             place_on_face_foreign_proxy_sites(mode = MODE) {
                 _test_assert_triangle_proxy_face_child_element_context(0);
+            }
+        }
+    }
+}
+
+module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_edge_and_vertex_children() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == TRI_FACE_IDX) {
+            place_on_face_foreign_proxy_sites(mode = MODE) {
+                _test_assert_triangle_proxy_face_child_element_context(0);
+                _test_assert_triangle_proxy_edge_child(1);
+                _test_assert_triangle_proxy_vertex_child(2);
             }
         }
     }
@@ -470,6 +578,9 @@ module run_TestSelfCrossing() {
     test_ps_face_foreign_intrusion_records__7_3_15_triangle_wraps_exact_face_cuts();
     test_ps_face_foreign_intrusion_records__preserves_coincident_foreign_face_provenance();
     test_ps_face_foreign_face_replay_sites__7_3_15_triangle_builds_target_local_frames();
+    test_ps_face_foreign_proxy_replay_sites__7_3_15_triangle_includes_edge_and_vertex_candidates();
+    test_ps_face_foreign_proxy_replay_sites__5_2_15_triangle_includes_all_intruding_face_boundary_edges();
+    test_ps_face_foreign_proxy_replay_sites__preserves_duplicate_exact_face_cut_records();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
     test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();
@@ -479,6 +590,7 @@ module run_TestSelfCrossing() {
     test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_context();
     test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_child();
     test_place_on_face_foreign_proxy_sites__7_3_15_triangle_element_child_uses_source_face_context();
+    test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_edge_and_vertex_children();
     test_face_local_iterators__parent_coords_preserve_metadata();
 }
 
