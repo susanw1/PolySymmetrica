@@ -33,7 +33,9 @@ The module dispatches to child slots by source kind:
 Foreign face callbacks are exact face-plane intrusions. Foreign edge and vertex
 callbacks are conservative provenance-driven candidates derived from those face
 intrusions: they identify source edges and vertices implicated by a known
-punch-through, but they are not distance/proximity envelope tests.
+punch-through. For each exact intruding face, all of its boundary edges and
+vertices are emitted as candidates, then deduplicated by source kind/index.
+They are not distance/proximity envelope tests.
 
 ## Coordinate Modes
 

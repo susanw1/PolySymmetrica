@@ -29,6 +29,9 @@ function _test_punch_poly() =
 function _test_punch_poly_angle0() =
     poly_antiprism(7, 3, angle = 0);
 
+function _test_penta_punch_poly() =
+    poly_antiprism(5, 2, angle = 15);
+
 function _test_antitet_poly() =
     poly_truncate(tetrahedron(), t = -0.5);
 
@@ -244,6 +247,15 @@ module test_ps_face_foreign_proxy_replay_sites__7_3_15_triangle_includes_edge_an
         if (ps_replay_site_foreign_kind(s) != "face")
             assert(ps_replay_site_intrusion_confidence(s) == "candidate", "edge/vertex replay confidence");
     }
+}
+
+module test_ps_face_foreign_proxy_replay_sites__5_2_15_triangle_includes_all_intruding_face_boundary_edges() {
+    site = _test_face_site(_test_penta_punch_poly(), 2);
+    replay = ps_face_foreign_proxy_replay_sites(site[10], site[0], site[13], site[12], site[9], mode = MODE, filter_parent = true);
+
+    assert_int_eq(_test_replay_kind_count(replay, "face"), 3, "pentagram triangle proxy replay exact face count");
+    assert_int_eq(_test_replay_kind_count(replay, "edge"), 7, "pentagram triangle proxy replay boundary edge candidate count");
+    assert_int_eq(_test_replay_kind_count(replay, "vertex"), 5, "pentagram triangle proxy replay boundary vertex candidate count");
 }
 
 module test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells() {
@@ -531,6 +543,7 @@ module run_TestSelfCrossing() {
     test_ps_face_foreign_intrusion_records__preserves_coincident_foreign_face_provenance();
     test_ps_face_foreign_face_replay_sites__7_3_15_triangle_builds_target_local_frames();
     test_ps_face_foreign_proxy_replay_sites__7_3_15_triangle_includes_edge_and_vertex_candidates();
+    test_ps_face_foreign_proxy_replay_sites__5_2_15_triangle_includes_all_intruding_face_boundary_edges();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
     test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();

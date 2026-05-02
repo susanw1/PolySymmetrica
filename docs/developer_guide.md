@@ -323,9 +323,11 @@ iterator built from those records:
 - `place_on_face_foreign_proxy_sites(...)`
 
 These identify exact foreign face intruders, plus provenance-driven edge and
-vertex candidate sites for proxy replay, and rebuild each source frame inside
-the current target face-local coordinate system. They intentionally do not emit
-proxy geometry or apply clearance.
+vertex candidate sites for proxy replay. For each exact intruding face, all of
+its boundary edges and vertices are emitted as candidates, then deduplicated by
+source kind/index. Each source frame is rebuilt inside the current target
+face-local coordinate system. These APIs intentionally do not emit proxy
+geometry or apply clearance.
 
 `place_on_face_foreign_face_replay_sites(...)` is used inside
 `place_on_faces(...)`. With `coords="element"` it places children in the

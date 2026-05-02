@@ -516,7 +516,9 @@ geometry can be replayed deliberately.
 For caller-supplied proxy geometry, use
 `ps_face_foreign_proxy_replay_sites(...)` or
 `place_on_face_foreign_proxy_sites(...)`. These add provenance-driven edge and
-vertex proxy candidates derived from exact face intrusions; see
+vertex proxy candidates derived from exact face intrusions. Candidate edges and
+vertices are all boundary elements of the exact intruding faces, deduplicated by
+source kind/index; see
 [proxy_interaction.md](proxy_interaction.md).
 
 ### `place_on_face_geom_cut_segments(...)`

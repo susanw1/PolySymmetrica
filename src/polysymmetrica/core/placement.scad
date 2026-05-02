@@ -197,15 +197,18 @@ function _ps_face_site_from_local_poly(face_idx, faces, verts_local, poly_center
  * Returns: edge index, or `-1` when absent
  */
 function _ps_edge_idx_from_verts(edges, a, b) =
-    _ps_index_of(edges, (a < b) ? [a, b] : [b, a]);
+    let(e = (a < b) ? [a, b] : [b, a])
+    _ps_edge_idx_from_canonical(edges, e);
 
 /**
- * Function: Test whether a 3D segment intersects the local Z=0 plane.
- * Params: a/b (3D endpoints), eps (tolerance)
- * Returns: boolean
+ * Function: Find the index of a canonical edge pair without `search(...)`.
+ * Params: edges (canonical edge list), e (canonical edge pair), i (recursion state)
+ * Returns: edge index, or `-1` when absent
  */
-function _ps_seg3_hits_z0(a, b, eps=1e-8) =
-    min(a[2], b[2]) <= eps && max(a[2], b[2]) >= -eps;
+function _ps_edge_idx_from_canonical(edges, e, i=0) =
+    (i >= len(edges)) ? -1 :
+    (edges[i][0] == e[0] && edges[i][1] == e[1]) ? i :
+    _ps_edge_idx_from_canonical(edges, e, i + 1);
 
 /**
  * Function: Deduplicate scalar values while preserving first-seen order.
@@ -340,8 +343,8 @@ function _ps_vertex_site_from_local_poly(vertex_idx, faces, verts_local, poly_ce
 
 /**
  * Function: Build edge ids from one foreign face intrusion record.
- * Params: record (foreign face intrusion record), faces (face list), verts_local (target face-local poly vertices), eps (tolerance)
- * Returns: global edge ids for boundary edges of the foreign face that intersect local Z=0
+ * Params: record (foreign face intrusion record), faces (face list), verts_local/eps (accepted for API symmetry)
+ * Returns: global edge ids for every boundary edge of the exact foreign face intruder
  */
 function _ps_proxy_edge_ids_from_face_record(record, faces, verts_local, eps=1e-8) =
     let(
@@ -355,7 +358,7 @@ function _ps_proxy_edge_ids_from_face_record(record, faces, verts_local, eps=1e-
                     b = f[(k + 1) % len(f)],
                     edge_idx = _ps_edge_idx_from_verts(edges, a, b)
                 )
-                if (edge_idx >= 0 && _ps_seg3_hits_z0(verts_local[a], verts_local[b], eps))
+                if (edge_idx >= 0)
                     edge_idx
         ]
     )
@@ -363,22 +366,13 @@ function _ps_proxy_edge_ids_from_face_record(record, faces, verts_local, eps=1e-
 
 /**
  * Function: Build vertex ids from one foreign face intrusion record.
- * Params: record (foreign face intrusion record), faces (face list), verts_local (target face-local poly vertices), eps (tolerance)
- * Returns: vertex ids at the ends of boundary edges of the foreign face that intersect local Z=0
+ * Params: record (foreign face intrusion record), faces (face list), verts_local/eps (accepted for API symmetry)
+ * Returns: vertex ids for every vertex of the exact foreign face intruder
  */
 function _ps_proxy_vertex_ids_from_face_record(record, faces, verts_local, eps=1e-8) =
     let(
         face_idx = ps_intrusion_foreign_idx(record),
-        f = faces[face_idx],
-        raw = [
-            for (k = [0:1:len(f)-1])
-                let(
-                    a = f[k],
-                    b = f[(k + 1) % len(f)]
-                )
-                if (_ps_seg3_hits_z0(verts_local[a], verts_local[b], eps))
-                    each [a, b]
-        ]
+        raw = faces[face_idx]
     )
     _ps_unique_values(raw);
 
@@ -531,7 +525,7 @@ function ps_face_foreign_face_replay_sites(face_pts2d, face_idx, poly_faces_idx,
 /**
  * Function: Build provenance-driven proxy replay sites for foreign face/edge/vertex sources.
  * Params: face_pts2d (target face loop), face_idx (target face index), poly_faces_idx/poly_verts_local/poly_center_local (current `place_on_faces(...)` metadata), eps (tolerance), mode (foreign face fill rule), filter_parent (drop parent-edge cuts)
- * Returns: replay site records for exact foreign faces plus candidate foreign edges/vertices implicated by those face-plane cuts
+ * Returns: replay site records for exact foreign faces plus every boundary edge/vertex of those exact face intruders
  * Limitations/Gotchas: edge and vertex sites are candidate/provenance records, not distance-envelope proximity tests
  */
 function ps_face_foreign_proxy_replay_sites(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, poly_center_local=undef, eps=1e-8, mode="nonzero", filter_parent=true) =
@@ -895,7 +889,7 @@ module place_on_face_foreign_face_replay_sites(mode="nonzero", eps=1e-8, filter_
  * Module: Replay caller-supplied proxy geometry for foreign sites affecting the current placed face.
  * Params: mode (foreign face fill rule), eps (tolerance), filter_parent (drop parent-edge cuts), coords (`"element"` or `"parent"`), face_child/edge_child/vertex_child (child slots)
  * Returns: none; exposes `$ps_proxy_*` metadata and calls the child slot matching the foreign source kind
- * Limitations/Gotchas: face sites are exact face-plane intrusions; edge/vertex sites are provenance-driven candidates, not distance-envelope proximity tests
+ * Limitations/Gotchas: face sites are exact face-plane intrusions; edge/vertex sites are deduped boundary candidates from those intruding faces, not distance-envelope proximity tests
  */
 module place_on_face_foreign_proxy_sites(
     mode="nonzero",
