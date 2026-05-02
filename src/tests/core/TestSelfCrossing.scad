@@ -61,6 +61,18 @@ function _test_coincident_intrusion_faces_idx() =
         [7, 8, 9]
     ];
 
+function _test_duplicate_face_cut_verts_local() =
+    [
+        [-2, -2, 0], [2, -2, 0], [2, 2, 0], [-2, 2, 0],
+        [-1, -1, -1], [1, -1, 1], [1, 1, 1], [-1, 1, -1]
+    ];
+
+function _test_duplicate_face_cut_faces_idx() =
+    [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7]
+    ];
+
 module test_ps_face_arrangement__7_3_15_star_has_stable_structure() {
     site = _test_face_site(_test_punch_poly(), STAR_FACE_IDX);
     arr = ps_face_arrangement(site[11]);
@@ -256,6 +268,30 @@ module test_ps_face_foreign_proxy_replay_sites__5_2_15_triangle_includes_all_int
     assert_int_eq(_test_replay_kind_count(replay, "face"), 3, "pentagram triangle proxy replay exact face count");
     assert_int_eq(_test_replay_kind_count(replay, "edge"), 7, "pentagram triangle proxy replay boundary edge candidate count");
     assert_int_eq(_test_replay_kind_count(replay, "vertex"), 5, "pentagram triangle proxy replay boundary vertex candidate count");
+}
+
+module test_ps_face_foreign_proxy_replay_sites__preserves_duplicate_exact_face_cut_records() {
+    records = [
+        ["face_plane_cut", 0, "face", 1, [[-1, -0.5], [1, -0.5]], 90, "exact"],
+        ["face_plane_cut", 0, "face", 1, [[-1, 0.5], [1, 0.5]], 90, "exact"]
+    ];
+    replay = _ps_face_foreign_proxy_replay_sites_from_records(
+        0,
+        records,
+        _test_duplicate_face_cut_faces_idx(),
+        _test_duplicate_face_cut_verts_local(),
+        [0, 0, 0]
+    );
+    face_sites = [for (s = replay) if (ps_replay_site_foreign_kind(s) == "face") s];
+
+    assert_int_eq(_test_replay_kind_count(replay, "face"), 2, "duplicate exact face records should both replay");
+    assert_int_eq(_test_replay_kind_count(replay, "edge"), 4, "duplicate face records should share deduped edge candidates");
+    assert_int_eq(_test_replay_kind_count(replay, "vertex"), 4, "duplicate face records should share deduped vertex candidates");
+    assert_list_eq(
+        [for (s = face_sites) ps_replay_site_intrusion_segment2d_local(s)],
+        [records[0][4], records[1][4]],
+        "duplicate exact face records should preserve distinct cut segments"
+    );
 }
 
 module test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells() {
@@ -544,6 +580,7 @@ module run_TestSelfCrossing() {
     test_ps_face_foreign_face_replay_sites__7_3_15_triangle_builds_target_local_frames();
     test_ps_face_foreign_proxy_replay_sites__7_3_15_triangle_includes_edge_and_vertex_candidates();
     test_ps_face_foreign_proxy_replay_sites__5_2_15_triangle_includes_all_intruding_face_boundary_edges();
+    test_ps_face_foreign_proxy_replay_sites__preserves_duplicate_exact_face_cut_records();
     test_ps_face_visible_segments__7_3_15_triangle_splits_into_visible_cells();
     test_ps_face_visible_segments__7_3_0_triangle_catches_meeting_cut_edges();
     test_ps_face_filled_boundary_source_edges__7_3_0_triangle_is_simple_boundary();

@@ -118,11 +118,11 @@ module demo_vert() {
 
 
 place_on_faces(p, IR, indices = [2]) {
-    union() {
+    difference() {
         demo_face();
         place_on_face_foreign_proxy_sites() {
             demo_face();
-            demo_edge($ps_edge_pts_local, edge_t = EDGE_T);
+            edge_seg($ps_edge_pts_local, $ps_poly_center_local, edge_t = EDGE_T);
             demo_vert();
         }
     }

@@ -523,6 +523,36 @@ function ps_face_foreign_face_replay_sites(face_pts2d, face_idx, poly_faces_idx,
     ];
 
 /**
+ * Function: Build proxy replay sites from already-derived exact foreign face records.
+ * Params: face_idx (target face index), face_records (exact foreign face intrusion records), poly_faces_idx/poly_verts_local/poly_center_local (current `place_on_faces(...)` metadata), eps (tolerance)
+ * Returns: replay site records preserving every exact face record, plus deduped edge/vertex boundary candidates
+ */
+function _ps_face_foreign_proxy_replay_sites_from_records(face_idx, face_records, poly_faces_idx, poly_verts_local, poly_center_local=undef, eps=1e-8) =
+    let(
+        edge_records = [
+            for (r = face_records)
+                for (edge_idx = _ps_proxy_edge_ids_from_face_record(r, poly_faces_idx, poly_verts_local, eps))
+                    ["face_plane_cut_candidate", face_idx, "edge", edge_idx, ps_intrusion_segment2d_local(r), ps_intrusion_dihedral(r), "candidate"]
+        ],
+        vertex_records = [
+            for (r = face_records)
+                for (vertex_idx = _ps_proxy_vertex_ids_from_face_record(r, poly_faces_idx, poly_verts_local, eps))
+                    ["face_plane_cut_candidate", face_idx, "vertex", vertex_idx, ps_intrusion_segment2d_local(r), ps_intrusion_dihedral(r), "candidate"]
+        ],
+        candidate_records = _ps_proxy_candidate_records_dedupe(concat(edge_records, vertex_records)),
+        records = concat(face_records, candidate_records)
+    )
+    [
+        for (ri = [0:1:len(records)-1])
+            let(kind = ps_intrusion_foreign_kind(records[ri]))
+                kind == "face"
+                    ? _ps_face_foreign_face_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
+                    : kind == "edge"
+                    ? _ps_face_foreign_edge_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
+                    : _ps_face_foreign_vertex_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
+    ];
+
+/**
  * Function: Build provenance-driven proxy replay sites for foreign face/edge/vertex sources.
  * Params: face_pts2d (target face loop), face_idx (target face index), poly_faces_idx/poly_verts_local/poly_center_local (current `place_on_faces(...)` metadata), eps (tolerance), mode (foreign face fill rule), filter_parent (drop parent-edge cuts)
  * Returns: replay site records for exact foreign faces plus every boundary edge/vertex of those exact face intruders
@@ -534,28 +564,9 @@ function ps_face_foreign_proxy_replay_sites(face_pts2d, face_idx, poly_faces_idx
             for (r = ps_face_foreign_intrusion_records(face_pts2d, face_idx, poly_faces_idx, poly_verts_local, eps, mode, filter_parent))
                 if (ps_intrusion_foreign_kind(r) == "face")
                     r
-        ],
-        edge_records = [
-            for (r = face_records)
-                for (edge_idx = _ps_proxy_edge_ids_from_face_record(r, poly_faces_idx, poly_verts_local, eps))
-                    ["face_plane_cut_candidate", face_idx, "edge", edge_idx, ps_intrusion_segment2d_local(r), ps_intrusion_dihedral(r), "candidate"]
-        ],
-        vertex_records = [
-            for (r = face_records)
-                for (vertex_idx = _ps_proxy_vertex_ids_from_face_record(r, poly_faces_idx, poly_verts_local, eps))
-                    ["face_plane_cut_candidate", face_idx, "vertex", vertex_idx, ps_intrusion_segment2d_local(r), ps_intrusion_dihedral(r), "candidate"]
-        ],
-        records = _ps_proxy_candidate_records_dedupe(concat(face_records, edge_records, vertex_records))
+        ]
     )
-    [
-        for (ri = [0:1:len(records)-1])
-            let(kind = ps_intrusion_foreign_kind(records[ri]))
-                kind == "face"
-                    ? _ps_face_foreign_face_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
-                    : kind == "edge"
-                    ? _ps_face_foreign_edge_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
-                    : _ps_face_foreign_vertex_replay_site(ri, records[ri], poly_faces_idx, poly_verts_local, poly_center_local, eps)
-    ];
+    _ps_face_foreign_proxy_replay_sites_from_records(face_idx, face_records, poly_faces_idx, poly_verts_local, poly_center_local, eps);
 
 /**
  * Function: Get replay site index.
