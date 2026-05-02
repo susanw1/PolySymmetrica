@@ -4,21 +4,26 @@ use <../../../core/placement.scad>
 use <../../../core/prisms.scad>
 use <../../../core/segments.scad>
 use <../../../core/render.scad>
+use <../../printing/face_plate.scad>
 
 // Minimal printable punch-through integration probe for poly_antiprism(7,3,15).
 // This deliberately stays narrow: it combines the stable face-local data APIs
-// into one positive keep-body and applies exact-intrusion clearance volumes
-// only in the final comparison panel.
+// into one positive keep-body, keeps the earlier strip-clearance result visible
+// as a reference, and demonstrates the opt-in face-plate proxy replay path.
 //
 // The keep-body panel in each row computes:
 //   raw face slab ∩ visible-cell mask ∩ positive anti-interference volume
 //
-// The cleared-body panel then subtracts:
+// The strip-cleared reference panel then subtracts:
 //   exact-intrusion clearance strip-prisms
 //
+// The proxy face-plate panel then subtracts:
+//   caller-supplied closed foreign face proxy bodies replayed via
+//   place_on_face_foreign_proxy_sites(...)
+//
 // Orange intrusion strips and crimson clearance bodies are drawn as inspection
-// aids. The core printable integration path remains isolated to this probe;
-// broader face-plate integration belongs to the next step.
+// aids. The proxy panel is the production-shaped API demonstration; it still
+// requires the caller/library to supply the proxy body deliberately.
 
 IR = 32;
 MODE = "nonzero";
@@ -41,6 +46,8 @@ PANEL_LABEL_Y = -50;
 CUT_KERF = 1.0;
 CLEARANCE_WIDTH = 3.2;
 CLEARANCE_EXTEND = 1.4;
+PROXY_FACE_THK = 3.6;
+PROXY_EDGE_INSET = 0.55;
 
 P = poly_antiprism(7, 3, angle = 15);
 
@@ -197,6 +204,37 @@ module intrusion_clearance_volume() {
         mode = MODE,
         filter_parent = FILTER_PARENT_CUTS
     );
+}
+
+/**
+ * Module: Emit one closed foreign face proxy body in the replayed source-face frame.
+ * Params: none; uses `$ps_proxy_*` from `place_on_face_foreign_proxy_sites(...)`
+ * Returns: none
+ */
+module foreign_face_proxy_body() {
+    linear_extrude(height = PROXY_FACE_THK, center = true)
+        ps_polygon($ps_proxy_face_pts2d, MODE);
+}
+
+/**
+ * Module: Emit the face plate after subtracting replayed foreign proxy bodies.
+ * Params: none
+ * Returns: none
+ */
+module face_plate_with_proxy_cutouts() {
+    difference() {
+        face_plate(
+            face_thk = FACE_THK,
+            clear_space = false,
+            pillow_min_rad = 1000000,
+            base_z = -FACE_THK / 2,
+            max_project = 10
+        );
+
+        place_on_face_foreign_proxy_sites(mode = MODE, filter_parent = FILTER_PARENT_CUTS) {
+            foreign_face_proxy_body();
+        }
+    }
 }
 
 /**
@@ -378,6 +416,30 @@ module draw_cleared_result_panel(face_idx, source_edge_idx, label_s) {
 }
 
 /**
+ * Module: Draw the face plate after subtracting replayed foreign proxy bodies.
+ * Params: face_idx (selected face), source_edge_idx (optional highlighted source edge), label_s (panel label)
+ * Returns: none
+ */
+module draw_proxy_face_plate_panel(face_idx, source_edge_idx, label_s) {
+    place_on_faces(P, IR) {
+        if ($ps_face_idx == face_idx) {
+            color("white")
+                face_plate_with_proxy_cutouts();
+
+            color("crimson", 0.22)
+                place_on_face_foreign_proxy_sites(mode = MODE, filter_parent = FILTER_PARENT_CUTS) {
+                    foreign_face_proxy_body();
+                }
+
+            draw_cut_strips();
+            draw_source_edge_labels($ps_face_pts2d, source_edge_idx);
+        }
+    }
+
+    draw_panel_label(label_s);
+}
+
+/**
  * Module: Echo summary counts for one row.
  * Params: label_s (row label), face_idx (selected face)
  * Returns: none
@@ -448,6 +510,9 @@ module draw_probe_row(face_idx, source_edge_idx, label_s, y) {
 
     translate([2.5 * PANEL_X, y, 0])
         draw_cleared_result_panel(face_idx, source_edge_idx, str(label_s, " cleared-body"));
+
+    translate([3.5 * PANEL_X, y, 0])
+        draw_proxy_face_plate_panel(face_idx, source_edge_idx, str(label_s, " proxy face-plate"));
 
     echo_row_summary(label_s, face_idx);
 }

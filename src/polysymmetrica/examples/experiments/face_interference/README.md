@@ -16,6 +16,6 @@ anti-interference data visible without reintroducing the proxy/carve stack.
   Minimal printable-style punch-through integration probe for
   `poly_antiprism(7,3, angle=15)`. It intersects raw face material with the
   visible-cell mask and positive anti-interference volume, then compares that
-  keep-body with a version that subtracts exact-intrusion clearance volumes.
-  This still stays local to the probe; general face-plate integration is a
-  later step.
+  keep-body with exact-intrusion strip clearance and an opt-in
+  `face_plate_minus_foreign_proxies(...)` panel that subtracts replayed foreign
+  face proxy bodies.

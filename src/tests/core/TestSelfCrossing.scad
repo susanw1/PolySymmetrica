@@ -399,6 +399,18 @@ module _test_assert_triangle_proxy_face_child(expected_child_idx) {
     assert_near(norm($ps_proxy_ez_local), 1, EPS, "triangle proxy ez unit");
 }
 
+module _test_assert_triangle_proxy_face_child_element_context(expected_child_idx) {
+    _test_assert_triangle_proxy_face_child(expected_child_idx);
+
+    assert_int_eq($ps_face_idx, $ps_proxy_source_idx, "triangle proxy child face id should be foreign face id");
+    assert_int_eq(len($ps_face_pts2d), len($ps_proxy_face_pts2d), "triangle proxy child face point arity");
+    assert_list_eq($ps_face_pts2d, $ps_proxy_face_pts2d, "triangle proxy child face points should match proxy face points");
+    assert_list_eq($ps_face_pts3d_local, $ps_proxy_face_pts3d_local, "triangle proxy child local 3d face points should match proxy face points");
+    assert_list_eq($ps_poly_faces_idx[$ps_face_idx], $ps_proxy_face_verts_idx, "triangle proxy child face vertex ids should match proxy source face");
+    assert_int_eq(len($ps_face_neighbors_idx), len($ps_face_pts2d), "triangle proxy child neighbor arity");
+    assert_int_eq(len($ps_face_dihedrals), len($ps_face_pts2d), "triangle proxy child dihedral arity");
+}
+
 module _test_assert_unreachable_proxy_child(kind) {
     assert(false, str("triangle proxy should not dispatch ", kind, " child for face intrusions"));
 }
@@ -414,6 +426,16 @@ module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_c
                 _test_assert_unreachable_proxy_child("edge");
                 _test_assert_triangle_proxy_face_child(1);
                 _test_assert_unreachable_proxy_child("vertex");
+            }
+        }
+    }
+}
+
+module test_place_on_face_foreign_proxy_sites__7_3_15_triangle_element_child_uses_source_face_context() {
+    place_on_faces(_test_punch_poly()) {
+        if ($ps_face_idx == TRI_FACE_IDX) {
+            place_on_face_foreign_proxy_sites(mode = MODE) {
+                _test_assert_triangle_proxy_face_child_element_context(0);
             }
         }
     }
@@ -456,6 +478,7 @@ module run_TestSelfCrossing() {
     test_place_on_face_foreign_intrusions__7_3_15_triangle_exposes_context();
     test_place_on_face_foreign_face_replay_sites__7_3_15_triangle_exposes_context();
     test_place_on_face_foreign_proxy_sites__7_3_15_triangle_dispatches_face_child();
+    test_place_on_face_foreign_proxy_sites__7_3_15_triangle_element_child_uses_source_face_context();
     test_face_local_iterators__parent_coords_preserve_metadata();
 }
 

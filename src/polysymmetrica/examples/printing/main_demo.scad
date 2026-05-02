@@ -6,6 +6,7 @@ use <../../core/render.scad>
 use <../../core/classify.scad>
 use <../../core/prisms.scad>
 use <../../core/construction.scad>
+use <../../core/face_regions.scad>
 
 use <../../models/platonics_all.scad>
 use <../../models/archimedians_all.scad>
@@ -38,24 +39,22 @@ IR = 20 * SC;
 //p = poly_prism(5);
 //p = poly_antiprism(5);
 //p = poly_prism(n=5, p=2);
-p = poly_antiprism(n=5, p=2, angle = 0);
+p = poly_antiprism(n=5, p=2, angle = 15);
 
 //p = j1_square_pyramid();
 //p = poly_dual(j2_pentagonal_pyramid());
 
 EDGE_T = 3.5 * SC; // 3.5
 FACE_T = 1.6 * SC; // 1.6 * SC;
-FIN_T = 1 * SC;
 INSET = 1.1 * SC;
 FACET_BASE_T = 1;
 FACET_BASE_W = 2.2;
-BASE_Z = -FACE_T / 4;
+BASE_Z = -FACE_T / 2;
 
 //// Or, experimental:
 //IR = 12 * SC;
 //EDGE_T = 3.0 * SC; // 3.5
 //FACE_T = 1.2 * SC; // 1.6 * SC;
-
 
 /**
 * Generate skeletal frame:
@@ -93,12 +92,29 @@ module model(show_faces = undef, clear_airspace = true) {
         place_on_faces(p, IR) {
             // add '!' here to force faces-only:
             if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0) {
-                face_plate_visible($ps_face_idx, $ps_face_pts2d, FACE_T, $ps_face_dihedrals, undef, clear_airspace,
-                    edge_inset = INSET, base_z = BASE_Z, clear_height = 0.6);
+                face_plate(face_thk = FACE_T, base_z = BASE_Z, max_project = 10, 
+                        clear_space = clear_airspace, clear_height = 0.6);
             }
         }
     }
 }
 
-model();
+//model();
 //poly_render(p, 20);
+
+module pb() {
+    face_plate(base_z = BASE_Z, face_thk = FACE_T, clear_space = false, clear_height = 0.1, max_project = 10);
+}
+
+show_faces = [0:20];
+
+place_on_faces(p, IR) {
+    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0)
+    difference() {
+        pb();
+        place_on_face_foreign_proxy_sites()
+            pb();
+    }
+}
+
+

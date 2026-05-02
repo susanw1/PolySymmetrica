@@ -105,15 +105,78 @@ function _ps_local_face_ex(verts_local, f, center, ez, eps=1e-12) =
         : _ps_any_perp(ez);
 
 /**
- * Function: Transform all target-local poly vertices into a foreign face-local frame.
- * Params: verts_local (poly vertices in target-local coordinates), center/ex/ey/ez (foreign face frame in target-local coordinates), zmean (foreign face local-z mean)
- * Returns: all poly vertices in foreign face-local coordinates
+ * Function: Build a canonical face placement site from vertices already in a local coordinate system.
+ * Params: face_idx (face index), faces (face list), verts_local (poly vertices in parent-local coordinates), poly_center_local_parent (optional poly center in parent-local coords), eps (degeneracy tolerance)
+ * Returns: face site record matching `ps_face_sites(...)`
  */
-function _ps_replay_poly_verts_local(verts_local, center, ex, ey, ez, zmean) =
+function _ps_face_site_from_local_poly(face_idx, faces, verts_local, poly_center_local_parent=undef, eps=1e-12) =
+    let(
+        f = faces[face_idx],
+        center = ps_face_centroid(verts_local, f),
+        ez = ps_face_frame_normal(verts_local, f, eps),
+        ex = _ps_local_face_ex(verts_local, f, center, ez, eps),
+        ey = v_cross(ez, ex),
+        edge_lens = [
+            for (k = [0:1:len(f)-1])
+                norm(verts_local[f[(k + 1) % len(f)]] - verts_local[f[k]])
+        ],
+        edge_len = len(edge_lens) == 0 ? 0 : sum(edge_lens) / len(edge_lens),
+        face_midradius = norm(center),
+        rad_vec = [for (vid = f) norm(verts_local[vid] - center)],
+        face_radius = len(rad_vec) == 0 ? 0 : sum(rad_vec) / len(rad_vec),
+        poly_center_parent = is_undef(poly_center_local_parent) ? [0, 0, 0] : poly_center_local_parent,
+        poly_center_delta = poly_center_parent - center,
+        poly_center_local_raw = [
+            v_dot(poly_center_delta, ex),
+            v_dot(poly_center_delta, ey),
+            v_dot(poly_center_delta, ez)
+        ],
+        face_verts_local_raw = [
+            for (vid = f)
+                let(p = verts_local[vid] - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        poly_verts_local_raw = [
+            for (p0 = verts_local)
+                let(p = p0 - center)
+                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
+        ],
+        zvals = [for (p = face_verts_local_raw) p[2]],
+        zmean = len(zvals) == 0 ? 0 : sum(zvals) / len(zvals),
+        face_planarity_err = len(zvals) == 0 ? 0 : max([for (z = zvals) abs(z - zmean)]),
+        face_pts3d_local = [for (p = face_verts_local_raw) [p[0], p[1], p[2] - zmean]],
+        poly_center_local = [poly_center_local_raw[0], poly_center_local_raw[1], poly_center_local_raw[2] - zmean],
+        poly_verts_local = [for (p = poly_verts_local_raw) [p[0], p[1], p[2] - zmean]],
+        face_pts2d = ps_xy(face_pts3d_local),
+        edges = _ps_edges_from_faces(faces),
+        edge_faces = ps_edge_faces_table(faces, edges),
+        face_n = [for (face = faces) ps_face_normal(verts_local, face)],
+        face_neighbors_idx = _ps_face_site_neighbors_idx(f, face_idx, faces, edges, edge_faces),
+        face_dihedrals = _ps_face_site_dihedrals(f, face_idx, faces, edges, edge_faces, face_n)
+    )
     [
-        for (p0 = verts_local)
-            let(p = p0 - center)
-                [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez) - zmean]
+        face_idx,
+        center,
+        ex,
+        ey,
+        ez,
+        edge_len,
+        len(face_pts2d),
+        face_midradius,
+        face_radius,
+        poly_center_local,
+        face_pts2d,
+        face_pts3d_local,
+        poly_verts_local,
+        faces,
+        face_planarity_err,
+        face_planarity_err <= eps,
+        undef,
+        undef,
+        undef,
+        undef,
+        face_neighbors_idx,
+        face_dihedrals
     ];
 
 /**
@@ -124,44 +187,26 @@ function _ps_replay_poly_verts_local(verts_local, center, ex, ey, ez, zmean) =
 function _ps_face_foreign_face_replay_site(replay_idx, record, poly_faces_idx, poly_verts_local, poly_center_local, eps=1e-12) =
     let(
         foreign_face_idx = ps_intrusion_foreign_idx(record),
-        f = poly_faces_idx[foreign_face_idx],
-        center = ps_face_centroid(poly_verts_local, f),
-        ez = ps_face_frame_normal(poly_verts_local, f, eps),
-        ex = _ps_local_face_ex(poly_verts_local, f, center, ez, eps),
-        ey = v_cross(ez, ex),
-        face_pts3d_raw = [
-            for (vid = f)
-                let(p = poly_verts_local[vid] - center)
-                    [v_dot(p, ex), v_dot(p, ey), v_dot(p, ez)]
-        ],
-        zvals = [for (p = face_pts3d_raw) p[2]],
-        zmean = (len(zvals) == 0) ? 0 : sum(zvals) / len(zvals),
-        face_pts3d_local = [for (p = face_pts3d_raw) [p[0], p[1], p[2] - zmean]],
-        poly_verts_replay_local = _ps_replay_poly_verts_local(poly_verts_local, center, ex, ey, ez, zmean),
-        poly_center_delta = (is_undef(poly_center_local) ? [0, 0, 0] : poly_center_local) - center,
-        poly_center_replay_local = [
-            v_dot(poly_center_delta, ex),
-            v_dot(poly_center_delta, ey),
-            v_dot(poly_center_delta, ez) - zmean
-        ]
+        face_site = _ps_face_site_from_local_poly(foreign_face_idx, poly_faces_idx, poly_verts_local, poly_center_local, eps)
     )
     [
         replay_idx,
         record,
-        center,
-        ex,
-        ey,
-        ez,
+        face_site[1],
+        face_site[2],
+        face_site[3],
+        face_site[4],
         foreign_face_idx,
-        ps_xy(face_pts3d_local),
-        face_pts3d_local,
-        poly_verts_replay_local,
-        poly_center_replay_local,
-        f,
+        face_site[10],
+        face_site[11],
+        face_site[12],
+        face_site[9],
+        face_site[13][foreign_face_idx],
         ps_intrusion_foreign_kind(record),
         ps_intrusion_segment2d_local(record),
         ps_intrusion_dihedral(record),
-        ps_intrusion_confidence(record)
+        ps_intrusion_confidence(record),
+        face_site
     ];
 
 /**
@@ -294,6 +339,13 @@ function ps_replay_site_intrusion_dihedral(site) = site[14];
  * Returns: confidence string
  */
 function ps_replay_site_intrusion_confidence(site) = site[15];
+
+/**
+ * Function: Get canonical face placement site from a replay site.
+ * Params: site (from `ps_face_foreign_face_replay_sites(...)`)
+ * Returns: face site record matching `ps_face_sites(...)`
+ */
+function ps_replay_site_face_site(site) = site[16];
 
 /**
  * Function: Build face placement site records for `place_on_faces(...)`.
@@ -430,6 +482,7 @@ module place_on_face_foreign_face_replay_sites(mode="nonzero", eps=1e-8, filter_
 
     sites = ps_face_foreign_face_replay_sites($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, $ps_poly_center_local, eps, mode, filter_parent);
     for (site = sites) {
+        face_site = ps_replay_site_face_site(site);
         $ps_replay_idx = ps_replay_site_idx(site);
         $ps_replay_count = len(sites);
         $ps_replay_intrusion_record = ps_replay_site_intrusion_record(site);
@@ -449,16 +502,36 @@ module place_on_face_foreign_face_replay_sites(mode="nonzero", eps=1e-8, filter_
         $ps_replay_intrusion_dihedral = ps_replay_site_intrusion_dihedral(site);
         $ps_replay_intrusion_confidence = ps_replay_site_intrusion_confidence(site);
 
-        if (coords == "element")
+        if (coords == "element") {
+            $ps_face_idx           = face_site[0];
+            $ps_edge_len           = face_site[5];
+            $ps_vertex_count       = face_site[6];
+            $ps_face_midradius     = face_site[7];
+            $ps_face_radius        = face_site[8];
+            $ps_poly_center_local  = face_site[9];
+            $ps_face_pts2d         = face_site[10];
+            $ps_face_pts3d_local   = face_site[11];
+            $ps_poly_verts_local   = face_site[12];
+            $ps_poly_faces_idx     = face_site[13];
+            $ps_face_planarity_err = face_site[14];
+            $ps_face_is_planar     = face_site[15];
+            $ps_face_family_id     = face_site[16];
+            $ps_face_family_count  = face_site[17];
+            $ps_edge_family_count  = face_site[18];
+            $ps_vertex_family_count = face_site[19];
+            $ps_face_neighbors_idx = face_site[20];
+            $ps_face_dihedrals     = face_site[21];
+
             multmatrix(ps_frame_matrix(
-                ps_replay_site_center_local(site),
-                ps_replay_site_ex_local(site),
-                ps_replay_site_ey_local(site),
-                ps_replay_site_ez_local(site)
+                face_site[1],
+                face_site[2],
+                face_site[3],
+                face_site[4]
             ))
                 children();
-        else
+        } else {
             children();
+        }
     }
 }
 
@@ -487,6 +560,7 @@ module place_on_face_foreign_proxy_sites(
     sites = ps_face_foreign_face_replay_sites($ps_face_pts2d, $ps_face_idx, $ps_poly_faces_idx, $ps_poly_verts_local, $ps_poly_center_local, eps, mode, filter_parent);
     for (site = sites) {
         source_kind = ps_replay_site_foreign_kind(site);
+        face_site = ps_replay_site_face_site(site);
         child_idx =
             source_kind == "face" ? face_child :
             source_kind == "edge" ? edge_child :
@@ -533,16 +607,36 @@ module place_on_face_foreign_proxy_sites(
         $ps_replay_intrusion_confidence = ps_replay_site_intrusion_confidence(site);
 
         if (!is_undef(child_idx) && child_idx < $children) {
-            if (coords == "element")
+            if (coords == "element") {
+                $ps_face_idx           = face_site[0];
+                $ps_edge_len           = face_site[5];
+                $ps_vertex_count       = face_site[6];
+                $ps_face_midradius     = face_site[7];
+                $ps_face_radius        = face_site[8];
+                $ps_poly_center_local  = face_site[9];
+                $ps_face_pts2d         = face_site[10];
+                $ps_face_pts3d_local   = face_site[11];
+                $ps_poly_verts_local   = face_site[12];
+                $ps_poly_faces_idx     = face_site[13];
+                $ps_face_planarity_err = face_site[14];
+                $ps_face_is_planar     = face_site[15];
+                $ps_face_family_id     = face_site[16];
+                $ps_face_family_count  = face_site[17];
+                $ps_edge_family_count  = face_site[18];
+                $ps_vertex_family_count = face_site[19];
+                $ps_face_neighbors_idx = face_site[20];
+                $ps_face_dihedrals     = face_site[21];
+
                 multmatrix(ps_frame_matrix(
-                    ps_replay_site_center_local(site),
-                    ps_replay_site_ex_local(site),
-                    ps_replay_site_ey_local(site),
-                    ps_replay_site_ez_local(site)
+                    face_site[1],
+                    face_site[2],
+                    face_site[3],
+                    face_site[4]
                 ))
                     children(child_idx);
-            else
+            } else {
                 children(child_idx);
+            }
         }
     }
 }
