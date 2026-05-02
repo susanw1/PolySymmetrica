@@ -229,6 +229,48 @@ module test_place_on_edges__no_auto_classify_by_default() {
     }
 }
 
+module test_place_on_all__indices_filter_selected_ids() {
+    p = hexahedron();
+    face_ids = [1, 3];
+    edge_ids = [0, 5, 11];
+    vertex_ids = [2, 7];
+
+    place_on_faces(p, indices = face_ids)
+        assert(_ps_list_contains(face_ids, $ps_face_idx), str("face index should be selected: ", $ps_face_idx));
+
+    place_on_edges(p, indices = edge_ids)
+        assert(_ps_list_contains(edge_ids, $ps_edge_idx), str("edge index should be selected: ", $ps_edge_idx));
+
+    place_on_vertices(p, indices = vertex_ids)
+        assert(_ps_list_contains(vertex_ids, $ps_vertex_idx), str("vertex index should be selected: ", $ps_vertex_idx));
+}
+
+module test_place_on_all__indices_accept_scalar() {
+    p = hexahedron();
+
+    place_on_faces(p, indices = 2)
+        assert_int_eq($ps_face_idx, 2, "scalar face index");
+
+    place_on_edges(p, indices = 4)
+        assert_int_eq($ps_edge_idx, 4, "scalar edge index");
+
+    place_on_vertices(p, indices = 6)
+        assert_int_eq($ps_vertex_idx, 6, "scalar vertex index");
+}
+
+module test_place_on_all__empty_indices_skip_children() {
+    p = hexahedron();
+
+    place_on_faces(p, indices = [])
+        assert(false, "empty face indices should skip children");
+
+    place_on_edges(p, indices = [])
+        assert(false, "empty edge indices should skip children");
+
+    place_on_vertices(p, indices = [])
+        assert(false, "empty vertex indices should skip children");
+}
+
 module test_place_on_face_segments__star_face_split() {
     p = poly_antiprism(5, 2);
     place_on_faces(p) {
@@ -568,6 +610,9 @@ module run_TestPlacement() {
     test_ps_vertex_sites__cube_records_match_vertex_structure();
     test_place_on_all__cube_single_family();
     test_place_on_edges__no_auto_classify_by_default();
+    test_place_on_all__indices_filter_selected_ids();
+    test_place_on_all__indices_accept_scalar();
+    test_place_on_all__empty_indices_skip_children();
     test_place_on_face_segments__star_face_split();
     test_place_on_faces__local_z_origin_consistent_for_face_and_poly_verts();
     test_seg_cycle_probe_point__concave_inside();

@@ -13,6 +13,18 @@ function _ps_cls_opt(classify_opts, i, def) =
         ? def
         : classify_opts[i];
 
+/**
+ * Function: Test whether a placement element index is selected.
+ * Params: idx (element index), indices (`undef`, scalar index, or list of indices)
+ * Returns: true when the element should be visited
+ */
+function _ps_place_idx_selected(idx, indices) =
+    is_undef(indices)
+        ? true
+        : is_list(indices)
+            ? _ps_list_contains(indices, idx)
+            : idx == indices;
+
 function _ps_resolve_classify(poly, classify=undef, classify_opts=undef) =
     is_undef(classify) && is_undef(classify_opts)
         ? undef
@@ -431,39 +443,46 @@ function ps_face_sites(poly, inter_radius = 1, edge_len = undef, classify = unde
             ]
     ];
 
-// ---- Generic face-placement driver ----
-module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
+/**
+ * Module: Place children on selected faces of a polyhedron.
+ * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context), indices (`undef`, scalar face index, or list of face indices)
+ * Returns: none; exposes `$ps_face_*` metadata for each selected face
+ * Limitations: `indices` filters the placement loop only; `ps_face_sites(...)` still builds the complete site list so element ids and classification metadata remain global
+ */
+module place_on_faces(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef, indices = undef) {
     sites = ps_face_sites(poly, inter_radius, edge_len, classify, classify_opts);
 
     for (site = sites) {
         fi = site[0];
-        center = site[1];
-        ex = site[2];
-        ey = site[3];
-        ez = site[4];
+        if (_ps_place_idx_selected(fi, indices)) {
+            center = site[1];
+            ex = site[2];
+            ey = site[3];
+            ez = site[4];
 
-        // Per-face metadata (local-space friendly) - mean average values where faces are irregular
-        $ps_face_idx           = fi;
-        $ps_edge_len           = site[5];
-        $ps_vertex_count       = site[6];
-        $ps_face_midradius     = site[7];
-        $ps_face_radius        = site[8];
-        $ps_poly_center_local  = site[9];
-        $ps_face_pts2d         = site[10];
-        $ps_face_pts3d_local   = site[11];
-        $ps_poly_verts_local   = site[12];
-        $ps_poly_faces_idx     = site[13];
-        $ps_face_planarity_err = site[14];
-        $ps_face_is_planar     = site[15];
-        $ps_face_family_id     = site[16];
-        $ps_face_family_count  = site[17];
-        $ps_edge_family_count  = site[18];
-        $ps_vertex_family_count = site[19];
-        $ps_face_neighbors_idx = site[20];
-        $ps_face_dihedrals     = site[21];
+            // Per-face metadata (local-space friendly) - mean average values where faces are irregular
+            $ps_face_idx           = fi;
+            $ps_edge_len           = site[5];
+            $ps_vertex_count       = site[6];
+            $ps_face_midradius     = site[7];
+            $ps_face_radius        = site[8];
+            $ps_poly_center_local  = site[9];
+            $ps_face_pts2d         = site[10];
+            $ps_face_pts3d_local   = site[11];
+            $ps_poly_verts_local   = site[12];
+            $ps_poly_faces_idx     = site[13];
+            $ps_face_planarity_err = site[14];
+            $ps_face_is_planar     = site[15];
+            $ps_face_family_id     = site[16];
+            $ps_face_family_count  = site[17];
+            $ps_edge_family_count  = site[18];
+            $ps_vertex_family_count = site[19];
+            $ps_face_neighbors_idx = site[20];
+            $ps_face_dihedrals     = site[21];
 
-        multmatrix(ps_frame_matrix(center, ex, ey, ez))
-            children();
+            multmatrix(ps_frame_matrix(center, ex, ey, ez))
+                children();
+        }
     }
 }
 
@@ -779,52 +798,66 @@ function ps_vertex_sites(poly, inter_radius = 1, edge_len = undef, classify = un
             ]
     ];
 
-// ---- Place children on all vertices of a polyhedron ----
-module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
+/**
+ * Module: Place children on selected vertices of a polyhedron.
+ * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context), indices (`undef`, scalar vertex index, or list of vertex indices)
+ * Returns: none; exposes `$ps_vertex_*` metadata for each selected vertex
+ * Limitations: `indices` filters the placement loop only; `ps_vertex_sites(...)` still builds the complete site list so element ids and classification metadata remain global
+ */
+module place_on_vertices(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef, indices = undef) {
     sites = ps_vertex_sites(poly, inter_radius, edge_len, classify, classify_opts);
 
     for (site = sites) {
-        // Metadata for children (local-space friendly)
-        $ps_vertex_idx                = site[0];
-        $ps_vertex_valence            = site[8];
-        $ps_vertex_neighbors_idx      = site[9];
-        $ps_vertex_neighbor_pts_local = site[10];
+        if (_ps_place_idx_selected(site[0], indices)) {
+            // Metadata for children (local-space friendly)
+            $ps_vertex_idx                = site[0];
+            $ps_vertex_valence            = site[8];
+            $ps_vertex_neighbors_idx      = site[9];
+            $ps_vertex_neighbor_pts_local = site[10];
 
-        $ps_edge_len                  = site[5];      // (target edge length parameter)
-        $ps_vert_radius               = site[6];
-        $ps_poly_center_local         = site[7];
-        $ps_vertex_family_id          = site[11];
-        $ps_face_family_count         = site[12];
-        $ps_edge_family_count         = site[13];
-        $ps_vertex_family_count       = site[14];
+            $ps_edge_len                  = site[5];      // (target edge length parameter)
+            $ps_vert_radius               = site[6];
+            $ps_poly_center_local         = site[7];
+            $ps_vertex_family_id          = site[11];
+            $ps_face_family_count         = site[12];
+            $ps_edge_family_count         = site[13];
+            $ps_vertex_family_count       = site[14];
 
-        multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
-            children();
+            multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
+                children();
+        }
     }
 }
 
 
-// ---- Place children on all edges of a polyhedron ----
-module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef) {
+/**
+ * Module: Place children on selected edges of a polyhedron.
+ * Params: poly (poly descriptor), inter_radius (scale input), edge_len (explicit scale override), classify/classify_opts (optional classification context), indices (`undef`, scalar edge index, or list of edge indices)
+ * Returns: none; exposes `$ps_edge_*` metadata for each selected edge
+ * Limitations: `indices` filters the placement loop only; `ps_edge_sites(...)` still builds the complete site list so element ids and classification metadata remain global
+ */
+module place_on_edges(poly, inter_radius = 1, edge_len = undef, classify = undef, classify_opts = undef, indices = undef) {
     sites = ps_edge_sites(poly, inter_radius, edge_len, classify, classify_opts);
 
     for (site = sites) {
-        // Metadata for children (edge-local)
-        $ps_edge_idx            = site[0];
-        $ps_edge_len            = site[5];      // actual length of this edge (vs supplied edge_len = scaling factor arg)
-        $ps_edge_midradius      = site[6];
-        $ps_poly_center_local   = site[7];
+        if (_ps_place_idx_selected(site[0], indices)) {
+            // Metadata for children (edge-local)
+            $ps_edge_idx            = site[0];
+            $ps_edge_len            = site[5];      // actual length of this edge (vs supplied edge_len = scaling factor arg)
+            $ps_edge_midradius      = site[6];
+            $ps_poly_center_local   = site[7];
 
-        $ps_edge_pts_local      = site[8];
-        $ps_edge_verts_idx      = site[9];
-        $ps_edge_adj_faces_idx  = site[10];
-        $ps_edge_family_id      = site[11];
-        $ps_face_family_count   = site[12];
-        $ps_edge_family_count   = site[13];
-        $ps_vertex_family_count = site[14];
+            $ps_edge_pts_local      = site[8];
+            $ps_edge_verts_idx      = site[9];
+            $ps_edge_adj_faces_idx  = site[10];
+            $ps_edge_family_id      = site[11];
+            $ps_face_family_count   = site[12];
+            $ps_edge_family_count   = site[13];
+            $ps_vertex_family_count = site[14];
 
-        multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
-            children();
+            multmatrix(ps_frame_matrix(site[1], site[2], site[3], site[4]))
+                children();
+        }
     }
 }
 

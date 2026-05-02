@@ -174,9 +174,9 @@ This has multiple advantages:
 
 These operators attach arbitrary geometry to each face/edge/vertex of a polyhedron:
 
-* `place_on_faces(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
-* `place_on_edges(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
-* `place_on_vertices(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef)`
+* `place_on_faces(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+* `place_on_edges(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
+* `place_on_vertices(poly, inter_radius, edge_len=undef, classify=undef, classify_opts=undef, indices=undef)`
 
 Or calculate it based on edge length:
 
@@ -184,11 +184,12 @@ Or calculate it based on edge length:
 * `place_on_edges(poly, edge_len = 2.5, classify=cls)`
 * `place_on_vertices(poly, edge_len = 2.5, classify=cls)`
 
-Classification controls:
+Selection and classification controls:
 
 * `classify`: optional precomputed value from `poly_classify(...)`; preferred for consistency and speed.
 * `classify_opts`: optional `[detail, eps, radius, include_geom]`; used only when `classify` is not passed.
 * if both are omitted, placement remains geometry-only (no classification is performed and family vars are `undef`).
+* `indices`: optional scalar index or list of element indices to visit; `undef` visits every element. Selected elements keep their original `$ps_*_idx` values.
 
 
 Each operator:
