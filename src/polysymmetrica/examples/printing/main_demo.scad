@@ -112,14 +112,18 @@ module demo_edge(endPoints, edge_t) {
     }
 }
 
+module demo_vert() {
+    cylinder(r=3, $fn = $ps_vertex_valence);
+}
+
 
 place_on_faces(p, IR, indices = [2]) {
     union() {
         demo_face();
         place_on_face_foreign_proxy_sites() {
             demo_face();
-            edge_seg($ps_edge_pts_local, $ps_poly_center_local, edge_t = EDGE_T);
-            union() {}
+            demo_edge($ps_edge_pts_local, edge_t = EDGE_T);
+            demo_vert();
         }
     }
 }
