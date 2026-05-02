@@ -27,12 +27,13 @@ place_on_faces(poly) {
 The module dispatches to child slots by source kind:
 
 - `face_child=0` receives foreign face proxy callbacks.
-- `edge_child=1` is reserved for foreign edge proxy callbacks.
-- `vertex_child=2` is reserved for foreign vertex proxy callbacks.
+- `edge_child=1` receives foreign edge proxy callbacks.
+- `vertex_child=2` receives foreign vertex proxy callbacks.
 
-Currently only exact foreign face intrusions are discovered. Edge and vertex
-slots are part of the public contract so proxy modules can be written against a
-stable shape while later candidate APIs are added.
+Foreign face callbacks are exact face-plane intrusions. Foreign edge and vertex
+callbacks are conservative provenance-driven candidates derived from those face
+intrusions: they identify source edges and vertices implicated by a known
+punch-through, but they are not distance/proximity envelope tests.
 
 ## Coordinate Modes
 
@@ -55,10 +56,19 @@ Each callback exposes:
 - `$ps_proxy_center_local`, `$ps_proxy_ex_local`, `$ps_proxy_ey_local`, `$ps_proxy_ez_local`
 - `$ps_proxy_intrusion_record`, `$ps_proxy_intrusion_segment2d_local`, `$ps_proxy_intrusion_dihedral`, `$ps_proxy_intrusion_confidence`
 - `$ps_proxy_face_pts2d`, `$ps_proxy_face_pts3d_local`, `$ps_proxy_face_verts_idx`
+- `$ps_proxy_edge_pts_local`, `$ps_proxy_edge_verts_idx`, `$ps_proxy_edge_adj_faces_idx`
+- `$ps_proxy_vertex_valence`, `$ps_proxy_vertex_neighbors_idx`, `$ps_proxy_vertex_neighbor_pts_local`
 - `$ps_proxy_poly_verts_local`, `$ps_proxy_poly_center_local`
 
 The corresponding `$ps_replay_*` variables are also exposed for compatibility
 with the lower-level replay iterator.
+
+With `coords="element"`, the child also receives the normal placement context
+for its source kind:
+
+- face callbacks expose the usual `$ps_face_*` variables;
+- edge callbacks expose the usual `$ps_edge_*` variables;
+- vertex callbacks expose the usual `$ps_vertex_*` variables.
 
 ## Responsibilities
 
@@ -86,8 +96,8 @@ place_on_faces(poly) {
             false
         ) {
             my_foreign_face_proxy();   // child slot 0
-            my_foreign_edge_proxy();   // child slot 1, reserved
-            my_foreign_vertex_proxy(); // child slot 2, reserved
+            my_foreign_edge_proxy();   // child slot 1
+            my_foreign_vertex_proxy(); // child slot 2
         }
     }
 }

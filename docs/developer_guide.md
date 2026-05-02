@@ -318,12 +318,14 @@ For punch-through/proxy work, `placement.scad` also provides the first replay
 iterator built from those records:
 
 - `ps_face_foreign_face_replay_sites(...)`
+- `ps_face_foreign_proxy_replay_sites(...)`
 - `place_on_face_foreign_face_replay_sites(...)`
 - `place_on_face_foreign_proxy_sites(...)`
 
-These identify exact foreign face intruders and rebuild each foreign face frame
-inside the current target face-local coordinate system. They intentionally do
-not emit proxy geometry or apply clearance; proxy body replay is a later layer.
+These identify exact foreign face intruders, plus provenance-driven edge and
+vertex candidate sites for proxy replay, and rebuild each source frame inside
+the current target face-local coordinate system. They intentionally do not emit
+proxy geometry or apply clearance.
 
 `place_on_face_foreign_face_replay_sites(...)` is used inside
 `place_on_faces(...)`. With `coords="element"` it places children in the
@@ -339,10 +341,9 @@ target face-local frame and only exposes metadata. The main metadata vars are:
 
 See [proxy_interaction.md](proxy_interaction.md) for the higher-level proxy
 child contract. In short, `place_on_face_foreign_proxy_sites(...)` dispatches
-candidate foreign sites to child slots (`face`, reserved `edge`, reserved
-`vertex`) and exposes `$ps_proxy_*` metadata so caller-supplied closed proxy
-bodies can be replayed deliberately. Printable face plates can opt into this
-via `face_plate_minus_foreign_proxies(...)`.
+candidate foreign sites to child slots (`face`, `edge`, `vertex`) and exposes
+`$ps_proxy_*` metadata so caller-supplied closed proxy bodies can be replayed
+deliberately.
 
 See [face_regions.md](face_regions.md) for positive face-local volumes built
 from those boundary spans:
