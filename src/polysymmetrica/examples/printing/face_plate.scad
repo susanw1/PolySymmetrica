@@ -19,7 +19,7 @@ FACE_PLATE_CLEAR_HEIGHT = 10;
  * Module: Emit a face plate clipped by the current face's anti-interference volume.
  * Params: face_thk (plate thickness), idx/face_pts3d_local/poly_faces_idx/poly_verts_local/face_neighbors_idx/face_dihedrals (optional overrides; default from `place_on_faces` context), clear_space (emit clearance cutter), pillow_* (raised pillow sizing), base_z (bottom Z; defaults to `-face_thk` so the top sits on the source face plane), clear_height (clearance height), mode/max_project/eps/convexity (anti-interference controls)
  * Returns: none
- * Limitations/Gotchas: requires `place_on_faces` context or explicit context overrides; the pillow intentionally embosses the source face loop rather than per-shell cut-through loops; true edge insets should be applied by subtractive edge operations around this body
+ * Limitations/Gotchas: requires `place_on_faces` context or explicit context overrides; pillow and clear-space cutter intentionally follow the source face loop rather than per-shell cut-through loops; true edge insets should be applied by subtractive edge operations around this body
  */
 module face_plate(face_thk,
     idx = $ps_face_idx,
@@ -96,6 +96,8 @@ module face_plate(face_thk,
         }
     }
 
+    // Like the pillow, clear-space is manufacturing clearance around the
+    // nominal source face rather than an exact copy of the kept shell footprint.
     if (clear_space)
         color("magenta")
             translate([0, 0, top_z - eps])
