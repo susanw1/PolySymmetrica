@@ -56,7 +56,6 @@ BASE_Z = -FACE_T / 2;
 //EDGE_T = 3.0 * SC; // 3.5
 //FACE_T = 1.2 * SC; // 1.6 * SC;
 
-
 /**
 * Generate skeletal frame:
     show_faces = undef;
@@ -100,11 +99,22 @@ module model(show_faces = undef, clear_airspace = true) {
     }
 }
 
-model();
+//model();
 //poly_render(p, 20);
 
-//show_faces = [0,2,11,7];
-//place_on_faces(p, IR) {
-//    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0)
-//        face_plate(base_z = BASE_Z, face_thk = FACE_T, clear_space = false, clear_height = 0.1, max_project = 10);
-//}
+module pb() {
+    face_plate(base_z = BASE_Z, face_thk = FACE_T, clear_space = false, clear_height = 0.1, max_project = 10);
+}
+
+show_faces = [0:20];
+
+place_on_faces(p, IR) {
+    if (is_undef(show_faces) || len(search($ps_face_idx, [for (i=show_faces) i])) > 0)
+    difference() {
+        pb();
+        place_on_face_foreign_proxy_sites()
+            pb();
+    }
+}
+
+
